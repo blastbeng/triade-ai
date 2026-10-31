@@ -248,6 +248,8 @@ export class DebateEngine extends EventEmitter {
             temperature: settings.temperature,
             maxTokens: budget,
             tools: settings.toolsEnabled ? TOOL_SPECS : undefined,
+            // dal secondo tentativo niente reasoning: serve solo la risposta finale
+            noThinking: attempt > 0,
             signal: controller.signal,
             onDelta: (chunk) => this.emitEvent({ type: 'delta', agentId: persona.id, text: chunk }),
             onReasoningDelta: (chunk) => {
