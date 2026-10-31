@@ -152,6 +152,14 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
             <label className="check">
               <input
                 type="checkbox"
+                checked={draft.autoTune}
+                onChange={(e) => setDraft({ ...draft, autoTune: e.target.checked })}
+              />
+              Auto-tuning dei parametri llama-server (contesto, KV, offload) in base alla VRAM
+            </label>
+            <label className="check">
+              <input
+                type="checkbox"
                 checked={draft.toolsEnabled}
                 onChange={(e) => setDraft({ ...draft, toolsEnabled: e.target.checked })}
               />

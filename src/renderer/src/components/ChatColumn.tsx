@@ -67,7 +67,7 @@ export default function ChatColumn({ persona, turns, streaming, streamReasoning,
             )}
           </article>
         ))}
-        {streaming !== null && (
+        {(streaming !== null || streamReasoning !== null) && (
           <article className="bubble streaming">
             {streamReasoning && (
               <details className="reasoning live">

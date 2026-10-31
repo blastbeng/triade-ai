@@ -63,8 +63,9 @@ export async function distillSession(baseUrl: string, session: Session): Promise
       }
     ],
     temperature: 0,
-    maxTokens: 700,
-    jsonMode: true
+    maxTokens: 800,
+    jsonMode: true,
+    noThinking: true
   })
 
   let facts: string[] = []

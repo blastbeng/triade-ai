@@ -101,6 +101,15 @@ export function settingsFile(): string {
   return path.join(dataDir(), 'impostazioni.json')
 }
 
+/**
+ * URL per il multimodale di llama-server: con --media-path i file vanno indicati
+ * in modo relativo alla cartella media (un path assoluto verrebbe concatenato).
+ */
+export function mediaUrl(file: string): string {
+  const rel = path.relative(cacheDir(), file).split(path.sep).join('/')
+  return `file://${rel}`
+}
+
 export function findBinary(base: string): string | null {
   const names = process.platform === 'win32' ? [`${base}.exe`, base] : [base]
   for (const name of names) {

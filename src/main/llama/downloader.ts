@@ -17,11 +17,18 @@ const state: {
   abort?: AbortController
 } = { id: null, downloading: false, progress: 0, phase: 'inattivo' }
 
+const sizeCache = new Map<string, { at: number; size: number }>()
+const SIZE_TTL = 10 * 60 * 1000
+
 async function remoteSize(url: string): Promise<number> {
+  const cached = sizeCache.get(url)
+  if (cached && Date.now() - cached.at < SIZE_TTL) return cached.size
   try {
     const res = await fetch(url, { method: 'HEAD', redirect: 'follow' })
     const len = res.headers.get('content-length') ?? res.headers.get('x-linked-size')
-    return len ? Number(len) : 0
+    const size = len ? Number(len) : 0
+    if (size > 0) sizeCache.set(url, { at: Date.now(), size })
+    return size
   } catch {
     return 0
   }

@@ -27,7 +27,8 @@ export function registerIpc(): void {
       before.gpuLayers !== next.gpuLayers ||
       before.flashAttention !== next.flashAttention ||
       before.kvCacheType !== next.kvCacheType ||
-      JSON.stringify(before.models) !== JSON.stringify(next.models)
+      JSON.stringify(before.models) !== JSON.stringify(next.models) ||
+      JSON.stringify(before.gpus) !== JSON.stringify(next.gpus)
     if (serverAffecting && llamaPool.status().some((s) => s.running)) await llamaPool.restartAll()
     return next
   })

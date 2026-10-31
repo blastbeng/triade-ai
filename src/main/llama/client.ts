@@ -26,6 +26,8 @@ export interface ChatRequest {
   onDelta?: (chunk: string) => void
   onReasoningDelta?: (chunk: string) => void
   jsonMode?: boolean
+  /** per le chiamate strutturate: niente reasoning, risposta diretta */
+  noThinking?: boolean
 }
 
 export interface ChatResult {
@@ -68,6 +70,7 @@ export async function chat(baseUrl: string, req: ChatRequest): Promise<ChatResul
   }
   if (req.tools && req.tools.length) body.tools = req.tools
   if (req.jsonMode) body.response_format = { type: 'json_object' }
+  if (req.noThinking) body.chat_template_kwargs = { enable_thinking: false }
 
   const res = await fetch(`${baseUrl}/v1/chat/completions`, {
     method: 'POST',

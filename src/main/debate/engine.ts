@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { chat, type LlmMessage } from '../llama/client'
 import { llamaPool } from '../llama/server'
 import { getSettings } from '../settings'
+import { mediaUrl } from '../paths'
 import { defaultModelId } from '../models/registry'
 import type { Attachment, DebateEvent, Persona, Session, Turn } from '../../shared/types'
 import { buildMessages, summarize, tokenCountOf } from './context'
@@ -25,7 +26,7 @@ function parseArgs(raw: string): Record<string, unknown> {
 export class DebateEngine extends EventEmitter {
   private session: Session | null = null
   private abort: AbortController | null = null
-  private looping = false
+  private loopPromise: Promise<void> | null = null
 
   get current(): Session | null {
     return this.session
@@ -86,6 +87,16 @@ export class DebateEngine extends EventEmitter {
       session.turns.push(turn)
       session.turnIndex = session.turns.length
       session.consensus = undefined
+      if (attachments.length) {
+        session.attachments = [...(session.attachments ?? []), ...attachments]
+        session.pendingImages = [
+          ...(session.pendingImages ?? []),
+          ...attachments.flatMap((a) => [
+            ...(a.kind === 'image' ? [a.path] : []),
+            ...(a.frames ?? [])
+          ])
+        ]
+      }
       saveSession(session)
       rememberUserNote(session, text)
       this.emitEvent({ type: 'session', session })
@@ -151,20 +162,31 @@ export class DebateEngine extends EventEmitter {
     if (this.session && this.session.state === 'running') this.setState('paused')
   }
 
+  /** Ferma la generazione e attende che il ciclo in corso esca davvero. */
   async halt(): Promise<void> {
     this.abort?.abort()
-    await new Promise((r) => setTimeout(r, 150))
+    const running = this.loopPromise
+    if (running) {
+      await Promise.race([running, new Promise((r) => setTimeout(r, 8000))])
+    }
     this.abort = null
   }
 
-  private async loop(): Promise<void> {
-    if (this.looping) return
-    this.looping = true
+  private loop(): void {
+    if (this.loopPromise) return
+    this.loopPromise = this.runLoop().finally(() => {
+      this.loopPromise = null
+      this.abort = null
+    })
+  }
+
+  private async runLoop(): Promise<void> {
     try {
       while (this.session && this.session.state === 'running') {
         const settings = getSettings()
         const personas = settings.personas
-        const turnIndex = this.session.turnIndex
+        const agentTurns = this.session.turns.filter((t) => t.agentId !== 'utente').length
+        const turnIndex = agentTurns
         if (turnIndex >= settings.maxTurns) {
           this.emitEvent({ type: 'log', message: `limite di ${settings.maxTurns} turni raggiunto` })
           const finished = this.session
@@ -192,11 +214,9 @@ export class DebateEngine extends EventEmitter {
           })
           const memory = await summarize(baseUrl, this.session, this.session.memory)
           this.session.memory = memory
-          const keep = Math.max(4, Math.min(10, this.session.turns.length - 6))
-          if (this.session.turns.length > keep) {
-            this.session.turns = this.session.turns.slice(-keep)
-            this.session.turnIndex = this.session.turns.length
-          }
+          // la trascrizione resta intera (disco + UI): al modello va solo la finestra
+          this.session.contextFrom = Math.max(0, this.session.turns.length - 4)
+          this.session.turnIndex = this.session.turns.length
           saveSession(this.session)
           messages = buildMessages(persona, this.session, settings, personas)
           tokens = await tokenCountOf(baseUrl, messages)
@@ -293,7 +313,7 @@ export class DebateEngine extends EventEmitter {
                     },
                     ...images.map((p) => ({
                       type: 'image_url' as const,
-                      image_url: { url: `file://${p}` }
+                      image_url: { url: mediaUrl(p) }
                     }))
                   ]
                 : `Ora rispondi tu come ${persona.name}.`
@@ -375,7 +395,6 @@ export class DebateEngine extends EventEmitter {
       }
       this.emitEvent({ type: 'error', message })
     } finally {
-      this.looping = false
       this.abort = null
     }
   }
@@ -408,8 +427,9 @@ export class DebateEngine extends EventEmitter {
         }
       ],
       temperature: 0,
-      maxTokens: 420,
+      maxTokens: 500,
       jsonMode: true,
+      noThinking: true,
       signal
     })
     try {

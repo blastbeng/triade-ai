@@ -29,7 +29,10 @@ export function loadSession(id: string): Session | null {
   const file = path.join(sessionsDir(), `${id}.json`)
   if (!fs.existsSync(file)) return null
   try {
-    return JSON.parse(fs.readFileSync(file, 'utf8')) as Session
+    const session = JSON.parse(fs.readFileSync(file, 'utf8')) as Session
+    // un processo chiuso a metà non può essere ancora "running"
+    if (session.state === 'running') session.state = 'paused'
+    return session
   } catch {
     return null
   }

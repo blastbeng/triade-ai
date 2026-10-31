@@ -106,7 +106,8 @@ export async function detectGpus(force = false): Promise<DetectedGpus> {
     backends.push(backend)
     const text = await runAsync(exe, ['--list-devices'])
     for (const d of parseDevices(text, backend)) {
-      if (found.some((f) => f.name === d.name)) continue
+      // stessa scheda su backend diversi = due voci scegliibili (Vulkan e CUDA)
+      if (found.some((f) => f.name === d.name && f.backend === d.backend)) continue
       found.push(d)
     }
   }

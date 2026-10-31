@@ -1,5 +1,6 @@
 import { chat, countTokens, type ContentPart, type LlmMessage } from '../llama/client'
 import { recallBlock } from '../memory/integrate'
+import { mediaUrl } from '../paths'
 import type { Persona, Session, Settings, Turn } from '../../shared/types'
 
 const PROTOCOL = (name: string, others: string[], maxTokens: number): string => `
@@ -48,7 +49,7 @@ function turnAsMessages(personaId: string, personaName: string, turn: Turn): Llm
 }
 
 function imageParts(paths: string[]): ContentPart[] {
-  return paths.map((p) => ({ type: 'image_url', image_url: { url: `file://${p}` } }))
+  return paths.map((p) => ({ type: 'image_url', image_url: { url: mediaUrl(p) } }))
 }
 
 /** Costruisce i messaggi del turno: system + storia (propria = assistant, altrui = user). */
@@ -62,7 +63,8 @@ export function buildMessages(
   const messages: LlmMessage[] = [
     { role: 'system', content: systemPrompt(persona, session, settings, personas) }
   ]
-  const recent = session.turns.slice(-windowTurns)
+  // solo la finestra attiva va al modello; i turni compressi restano su disco e in UI
+  const recent = session.turns.slice(session.contextFrom ?? 0).slice(-windowTurns)
   for (const turn of recent) {
     messages.push(turnAsMessages(persona.id, turn.name, turn))
   }
@@ -113,6 +115,7 @@ export async function summarize(
   signal?: AbortSignal
 ): Promise<string> {
   const transcript = session.turns
+    .slice(session.contextFrom ?? 0)
     .slice(-24)
     .map((t) => `[${t.name}] ${t.text}`)
     .join('\n\n')
@@ -133,7 +136,13 @@ export async function summarize(
         .join('\n\n')
     }
   ]
-  const res = await chat(baseUrl, { messages, temperature: 0.2, maxTokens: 600, signal })
+  const res = await chat(baseUrl, {
+    messages,
+    temperature: 0.2,
+    maxTokens: 700,
+    noThinking: true,
+    signal
+  })
   return res.content.trim()
 }
 

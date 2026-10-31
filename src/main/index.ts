@@ -144,7 +144,18 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', () => {
-  void engine.pause()
-  void llamaPool.stopAll()
+let shuttingDown = false
+
+app.on('before-quit', (event) => {
+  if (shuttingDown) return
+  event.preventDefault()
+  shuttingDown = true
+  void (async () => {
+    try {
+      await engine.pause()
+      await llamaPool.stopAll()
+    } finally {
+      app.quit()
+    }
+  })()
 })

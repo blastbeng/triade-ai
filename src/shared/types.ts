@@ -96,6 +96,8 @@ export interface Session {
   turns: Turn[]
   /** Memoria condivisa: sommario compresso della conversazione. */
   memory: string
+  /** Indice del primo turno incluso nel prompt: la trascrizione completa non si perde mai. */
+  contextFrom?: number
   consensus?: Consensus
   lastError?: string
   /** Immagini da mostrare al prossimo turno (ricerca immagini / frame video). */
