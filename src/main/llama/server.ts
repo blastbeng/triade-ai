@@ -166,7 +166,8 @@ class LlamaInstance extends EventEmitter {
           '-m', modelPath,
           ...(this.device ? ['--device', this.device.label] : []),
           ...(mmprojPath ? ['--mmproj', mmprojPath] : []),
-          '-c', String(plan.ctx),
+          // +1024 di slack: il conteggio lato app è una stima, il server non deve mai rifiutare
+          '-c', String(plan.ctx + 1024),
           '-ngl', String(plan.ngl),
           '-b', String(plan.batch),
           '-ub', String(plan.ubatch),

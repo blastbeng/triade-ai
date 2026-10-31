@@ -202,7 +202,7 @@ export class DebateEngine extends EventEmitter {
         })
 
         // --- prompt compression quando si supera la soglia (75% di default) ---
-        const toolOverhead = settings.toolsEnabled ? 700 : 0
+        const toolOverhead = settings.toolsEnabled ? 900 : 0
         let messages = buildMessages(persona, this.session, settings, personas)
         let tokens = await tokenCountOf(baseUrl, messages, toolOverhead)
         const limit = Math.floor(settings.contextSize * settings.compressionThreshold)
@@ -254,20 +254,41 @@ export class DebateEngine extends EventEmitter {
         if (turnCap < settings.maxTokensPerTurn) cut = 'budget'
         for (let attempt = 0; attempt < 3; attempt++) {
           const budget = turnCap
-          const result = await chat(baseUrl, {
-            messages,
-            temperature: settings.temperature,
-            maxTokens: budget,
-            tools: settings.toolsEnabled ? TOOL_SPECS : undefined,
-            // dal secondo tentativo niente reasoning: serve solo la risposta finale
-            noThinking: attempt > 0,
-            signal: controller.signal,
-            onDelta: (chunk) => this.emitEvent({ type: 'delta', agentId: persona.id, text: chunk }),
-            onReasoningDelta: (chunk) => {
-              reasoning += chunk
-              this.emitEvent({ type: 'reasoning', agentId: persona.id, text: chunk })
+          let result
+          try {
+            result = await chat(baseUrl, {
+              messages,
+              temperature: settings.temperature,
+              maxTokens: budget,
+              tools: settings.toolsEnabled ? TOOL_SPECS : undefined,
+              // dal secondo tentativo niente reasoning: serve solo la risposta finale
+              noThinking: attempt > 0,
+              signal: controller.signal,
+              onDelta: (chunk) => this.emitEvent({ type: 'delta', agentId: persona.id, text: chunk }),
+              onReasoningDelta: (chunk) => {
+                reasoning += chunk
+                this.emitEvent({ type: 'reasoning', agentId: persona.id, text: chunk })
+              }
+            })
+          } catch (err) {
+            const msg = (err as Error).message
+            if (/exceeds the available context size/i.test(msg) && attempt < 2) {
+              // il prompt reale è più grande della stima: restringo la finestra e riprovo
+              this.session.contextFrom = Math.max(
+                0,
+                Math.min(this.session.turns.length - 1, (this.session.contextFrom ?? 0) + 2)
+              )
+              saveSession(this.session)
+              messages = buildMessages(persona, this.session, settings, personas)
+              tokens = await tokenCountOf(baseUrl, messages, toolOverhead)
+              this.emitEvent({
+                type: 'log',
+                message: `contesto pieno: restringo la finestra (contextFrom ${this.session.contextFrom})`
+              })
+              continue
             }
-          })
+            throw err
+          }
           if (result.interrupted) {
             interrupted = true
             text += result.content
