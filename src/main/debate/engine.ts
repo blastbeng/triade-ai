@@ -238,7 +238,15 @@ export class DebateEngine extends EventEmitter {
           }
           messages = [
             ...messages,
-            { role: 'assistant', content: result.content, tool_calls: result.toolCalls } as LlmMessage
+            {
+              role: 'assistant',
+              content: result.content,
+              tool_calls: result.toolCalls.map((c) => ({
+                id: c.id,
+                type: 'function' as const,
+                function: c.function
+              }))
+            } as LlmMessage
           ]
           for (const call of result.toolCalls) {
             const args = parseArgs(call.function.arguments)

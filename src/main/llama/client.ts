@@ -13,7 +13,7 @@ export interface LlmMessage {
 
 export interface RawToolCall {
   id: string
-  type?: string
+  type?: 'function'
   function: { name: string; arguments: string }
 }
 
@@ -91,7 +91,9 @@ export async function chat(baseUrl: string, req: ChatRequest): Promise<ChatResul
     if (Array.isArray(delta.tool_calls)) {
       for (const tc of delta.tool_calls) {
         const idx: number = typeof tc.index === 'number' ? tc.index : toolCalls.length
-        if (!toolCalls[idx]) toolCalls[idx] = { id: tc.id ?? `call_${idx}`, function: { name: '', arguments: '' } }
+        if (!toolCalls[idx]) {
+          toolCalls[idx] = { id: tc.id ?? `call_${idx}`, type: 'function', function: { name: '', arguments: '' } }
+        }
         if (tc.id) toolCalls[idx].id = tc.id
         if (tc.function?.name) toolCalls[idx].function.name += tc.function.name
         if (tc.function?.arguments) toolCalls[idx].function.arguments += tc.function.arguments
