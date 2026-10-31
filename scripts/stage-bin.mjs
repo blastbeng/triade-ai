@@ -19,7 +19,9 @@ if (!fs.existsSync(from)) {
 
 fs.rmSync(stage, { recursive: true, force: true })
 fs.mkdirSync(stage, { recursive: true })
-fs.cpSync(from, stage, { recursive: true })
+// dereference: le .so di llama.cpp sono symlink relativi (libX.so.0 -> libX.so.0.8.0)
+// che nel pacchetto diventerebbero link rotti
+fs.cpSync(from, stage, { recursive: true, dereference: true })
 
 const files = fs.readdirSync(stage)
 console.log(`[stage] ${files.length} file copiati in bin/stage`)
