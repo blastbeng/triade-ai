@@ -159,8 +159,8 @@ class LlamaInstance extends EventEmitter {
           '--port', String(port),
           '--jinja',
           '--no-webui',
-          // senza questo il modello spende tutti i token nel reasoning e lascia vuoto il contenuto
-          '--reasoning-budget', '0',
+          // reasoning sempre attivo quando il template lo supporta: viene mostrato
+          // nell'interfaccia in un blocco richiudibile, non disattivato.
           // raccomandato da llama.cpp per i modelli Qwen-VL (grounding)
           '--image-min-tokens', '1024',
           '-fa', s.flashAttention ? 'on' : 'off',

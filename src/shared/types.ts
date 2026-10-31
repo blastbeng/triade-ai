@@ -188,7 +188,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoTune: true,
   flashAttention: true,
   kvCacheType: 'q8_0',
-  maxTokensPerTurn: 320,
+  maxTokensPerTurn: 700,
   maxTurns: 40,
   temperature: 0.85,
   toolsEnabled: true,

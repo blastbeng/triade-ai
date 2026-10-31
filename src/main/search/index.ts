@@ -1,10 +1,7 @@
 import { getSettings } from '../settings'
+import { fallbackSearch, parseSearxHtml, type SearchHit } from './engines'
 
-export interface SearchHit {
-  title: string
-  url: string
-  snippet: string
-}
+export type { SearchHit }
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36'
@@ -56,16 +53,9 @@ async function searxng(query: string, max: number, images = false): Promise<Sear
       headers: { 'User-Agent': UA },
       signal: AbortSignal.timeout(20000)
     })
-    if (!res.ok) throw new Error(`SearXNG non raggiungibile (HTTP ${res.status})`)
+    if (!res.ok) return []
     const html = await res.text()
-    const hits: SearchHit[] = []
-    const re = /<a[^>]+href="(https?:\/\/[^"]+)"[^>]*class="[^"]*url_header[^"]*"[^>]*>|<h3[^>]*>\s*<a[^>]+href="(https?:\/\/[^"]+)"/g
-    let m: RegExpExecArray | null
-    while ((m = re.exec(html)) && hits.length < max) {
-      const url = m[1] ?? m[2]
-      if (url) hits.push({ title: url, url, snippet: '' })
-    }
-    return hits
+    return parseSearxHtml(html, max)
   }
 }
 
@@ -117,17 +107,35 @@ async function googleCse(query: string, max: number): Promise<SearchHit[]> {
 export async function webSearch(query: string, max?: number, images = false): Promise<SearchHit[]> {
   const s = getSettings()
   const n = max ?? s.search.maxResults
-  switch (s.search.provider) {
-    case 'brave':
-      return brave(query, n)
-    case 'tavily':
-      return tavily(query, n)
-    case 'googlecse':
-      return googleCse(query, n)
-    case 'searxng':
-    default:
-      return searxng(query, n, images)
+  const primary = async (): Promise<SearchHit[]> => {
+    switch (s.search.provider) {
+      case 'brave':
+        return brave(query, n)
+      case 'tavily':
+        return tavily(query, n)
+      case 'googlecse':
+        return googleCse(query, n)
+      case 'searxng':
+      default:
+        return searxng(query, n, images)
+    }
   }
+
+  let hits: SearchHit[] = []
+  let primaryError: string | null = null
+  try {
+    hits = await primary()
+  } catch (err) {
+    primaryError = (err as Error).message
+  }
+
+  // SearXNG pubblici spesso rispondono con captcha: catena di riserva senza chiavi.
+  if (!hits.length) {
+    const fallback = await fallbackSearch(query, n)
+    if (fallback.hits.length) return fallback.hits
+    if (primaryError) throw new Error(primaryError)
+  }
+  return hits
 }
 
 /** Estrae il testo leggibile di una pagina, senza dipendenze pesanti. */

@@ -233,6 +233,14 @@ export class DebateEngine extends EventEmitter {
             break
           }
           if (!result.toolCalls.length) {
+            if (!result.content.trim() && reasoning.trim() && round === 0) {
+              // il modello ha speso tutto il budget nel ragionamento: chiedo solo la risposta
+              messages.push({
+                role: 'user',
+                content: 'Ora scrivi solo la risposta finale, senza altro ragionamento.'
+              })
+              continue
+            }
             text += result.content
             break
           }
