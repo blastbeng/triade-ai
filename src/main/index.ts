@@ -94,6 +94,9 @@ function createWindow(): void {
           console.error('[smoke] FALLITO:', (err as Error).message)
           process.exitCode = 1
         }
+        // i llama-server figli vanno fermati prima di uscire, altrimenti restano in VRAM
+        await engine.pause()
+        await llamaPool.stopAll()
         app.exit(typeof process.exitCode === 'number' ? process.exitCode : 0)
       })()
     })
