@@ -3,7 +3,8 @@ import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
-import { cacheDir, findBinary, modelsDir } from '../paths'
+import fs from 'node:fs'
+import { cacheDir, dataDir, findBinary, modelsDir } from '../paths'
 import { getSettings } from '../settings'
 import { catalogModel, defaultModelId } from '../models/registry'
 import { detectGpus, llamaBinaryFor, type Backend, type GpuDevice } from '../gpu/devices'
@@ -64,9 +65,24 @@ class LlamaInstance extends EventEmitter {
     }
   }
 
+  private logFile(): string {
+    const dir = `${dataDir()}/log`
+    try {
+      fs.mkdirSync(dir, { recursive: true })
+    } catch {
+      /* ignore */
+    }
+    return `${dir}/llama-server.log`
+  }
+
   private push(line: string): void {
     const clean = line.replace(/\r/g, '')
     if (!clean.trim()) return
+    try {
+      fs.appendFileSync(this.logFile(), `${new Date().toISOString()} [${this.modelId}] ${clean}\n`)
+    } catch {
+      /* ignore */
+    }
     this.logLines.push(clean)
     if (this.logLines.length > 300) this.logLines.splice(0, this.logLines.length - 300)
     if (/(vulkan|cuda)/i.test(clean) && /device/i.test(clean)) this.deviceLabel = 'GPU'
@@ -184,8 +200,8 @@ class LlamaInstance extends EventEmitter {
         }
         child.stdout.on('data', onData)
         child.stderr.on('data', onData)
-        child.on('exit', (code) => {
-          this.push(`[server terminato, codice ${code}]`)
+        child.on('exit', (code, signal) => {
+          this.push(`[server terminato, codice ${code}, segnale ${signal ?? 'nessuno'}]`)
           if (this.child === child) {
             this.child = null
             this.port = null

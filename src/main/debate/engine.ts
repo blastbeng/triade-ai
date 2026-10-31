@@ -216,7 +216,8 @@ export class DebateEngine extends EventEmitter {
 
         let toolRounds = 0
         for (let attempt = 0; attempt < 3; attempt++) {
-          const budget = attempt === 0 ? settings.maxTokensPerTurn : Math.min(3000, settings.maxTokensPerTurn * 2)
+          const base = Math.max(900, settings.maxTokensPerTurn)
+          const budget = attempt === 0 ? base : Math.min(4000, base * 2)
           const result = await chat(baseUrl, {
             messages,
             temperature: settings.temperature,
@@ -300,7 +301,8 @@ export class DebateEngine extends EventEmitter {
               })
               continue
             }
-            text += result.reasoning.trim()
+            // nessuna risposta dopo i retry: meglio dichiararlo che mostrare il ragionamento
+            text += '[il modello ha esaurito i token nel ragionamento senza produrre una risposta]'
             break
           }
 
