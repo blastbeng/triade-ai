@@ -84,6 +84,21 @@ function flatten(dir) {
   }
 }
 
+/** Trova l'URL di un asset nelle release recenti (i nomi dei file cambiano spesso). */
+async function githubAsset(repo, pattern) {
+  const res = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=6`, {
+    headers: { 'User-Agent': 'triade-ai' }
+  })
+  if (!res.ok) throw new Error(`GitHub API ${res.status}`)
+  const releases = await res.json()
+  for (const rel of releases) {
+    for (const asset of rel.assets ?? []) {
+      if (pattern.test(asset.name)) return asset.browser_download_url
+    }
+  }
+  throw new Error(`nessun asset che corrisponde a ${pattern} in ${repo}`)
+}
+
 function hasNvidiaGpu() {
   try {
     execFileSync('nvidia-smi', ['-L'], { stdio: 'ignore', timeout: 15000 })
@@ -190,7 +205,7 @@ async function whisper(target) {
   const dirW = path.join(dir, 'whisper')
   fs.mkdirSync(dirW, { recursive: true })
   if (target === 'win') {
-    const url = 'https://github.com/ggml-org/whisper.cpp/releases/latest/download/whisper-bin-x64.zip'
+    const url = await githubAsset('ggml-org/whisper.cpp', /^whisper-bin-(win-)?x64.*\.zip$/i)
     const zip = path.join(BIN, 'whisper-win.zip')
     await download(url, zip)
     const tmp = path.join(BIN, 'whisper-tmp')
