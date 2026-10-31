@@ -5,6 +5,7 @@ import type { Persona, Session, Settings, Turn } from '../../shared/types'
 const PROTOCOL = (name: string, others: string[], maxTokens: number): string => `
 PROTOCOLLO DEL DIBATTITO
 - Sei ${name}. Partecipi a una discussione a tre con ${others.join(' e ')}.
+- Ragiona e rispondi in italiano.
 - Parla solo per te: niente intestazioni, niente elenchi di repliche altrui. Massimo ~${maxTokens} token.
 - Aggiungi valore: se sei d'accordo dillo in una riga e passa al punto successivo.
 - Se un fatto esterno è decisivo, usa i tool disponibili (web_search, fetch_page, image_search, find_media) prima di affermarlo: cita gli URL che hai letto.

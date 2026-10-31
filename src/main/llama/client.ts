@@ -122,8 +122,6 @@ export async function chat(baseUrl: string, req: ChatRequest): Promise<ChatResul
     }
   }
 
-  // alcuni modelli mettono tutto in reasoning_content: meglio mostrarlo che un turno vuoto
-  if (!content.trim() && reasoning.trim()) content = reasoning.trim()
   return {
     content,
     reasoning,

@@ -214,11 +214,13 @@ export class DebateEngine extends EventEmitter {
         this.session.pendingImages = []
         let interrupted = false
 
-        for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+        let toolRounds = 0
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const budget = attempt === 0 ? settings.maxTokensPerTurn : Math.min(3000, settings.maxTokensPerTurn * 2)
           const result = await chat(baseUrl, {
             messages,
             temperature: settings.temperature,
-            maxTokens: settings.maxTokensPerTurn,
+            maxTokens: budget,
             tools: settings.toolsEnabled ? TOOL_SPECS : undefined,
             signal: controller.signal,
             onDelta: (chunk) => this.emitEvent({ type: 'delta', agentId: persona.id, text: chunk }),
@@ -232,68 +234,77 @@ export class DebateEngine extends EventEmitter {
             text += result.content
             break
           }
-          if (!result.toolCalls.length) {
-            if (!result.content.trim() && reasoning.trim() && round === 0) {
-              // il modello ha speso tutto il budget nel ragionamento: chiedo solo la risposta
+
+          if (result.toolCalls.length && toolRounds < MAX_TOOL_ROUNDS) {
+            toolRounds++
+            messages = [
+              ...messages,
+              {
+                role: 'assistant',
+                content: result.content,
+                tool_calls: result.toolCalls.map((c) => ({
+                  id: c.id,
+                  type: 'function' as const,
+                  function: c.function
+                }))
+              } as LlmMessage
+            ]
+            for (const call of result.toolCalls) {
+              const args = parseArgs(call.function.arguments)
+              let outcome: { text: string; images?: string[] } = { text: 'errore' }
+              let ok = true
+              try {
+                outcome = await runTool(call.function.name, args, (m) =>
+                  this.emitEvent({ type: 'log', message: m })
+                )
+              } catch (err) {
+                ok = false
+                outcome = { text: `errore tool: ${(err as Error).message}` }
+              }
+              if (outcome.images?.length) images = [...images, ...outcome.images]
+              tools.push({ name: call.function.name, args, result: outcome.text, ok })
+              this.emitEvent({
+                type: 'tool',
+                agentId: persona.id,
+                name: call.function.name,
+                args,
+                result: outcome.text
+              })
+              messages.push({ role: 'tool', tool_call_id: call.id, content: outcome.text })
+            }
+            messages.push({
+              role: 'user',
+              content: images.length
+                ? [
+                    {
+                      type: 'text',
+                      text: `Risultati dei tool qui sopra. Guarda le immagini allegate e rispondi come ${persona.name}.`
+                    },
+                    ...images.map((p) => ({
+                      type: 'image_url' as const,
+                      image_url: { url: `file://${p}` }
+                    }))
+                  ]
+                : `Ora rispondi tu come ${persona.name}.`
+            })
+            continue
+          }
+
+          if (!result.content.trim()) {
+            // il modello ha consumato il budget nel ragionamento: chiedo solo la risposta
+            if (attempt < 2) {
               messages.push({
                 role: 'user',
-                content: 'Ora scrivi solo la risposta finale, senza altro ragionamento.'
+                content: 'Scrivi ora solo la risposta finale in italiano, concisa, senza altro ragionamento.'
               })
               continue
             }
-            text += result.content
+            text += result.reasoning.trim()
             break
           }
-          messages = [
-            ...messages,
-            {
-              role: 'assistant',
-              content: result.content,
-              tool_calls: result.toolCalls.map((c) => ({
-                id: c.id,
-                type: 'function' as const,
-                function: c.function
-              }))
-            } as LlmMessage
-          ]
-          for (const call of result.toolCalls) {
-            const args = parseArgs(call.function.arguments)
-            let outcome: { text: string; images?: string[] } = { text: 'errore' }
-            let ok = true
-            try {
-              outcome = await runTool(call.function.name, args, (m) =>
-                this.emitEvent({ type: 'log', message: m })
-              )
-            } catch (err) {
-              ok = false
-              outcome = { text: `errore tool: ${(err as Error).message}` }
-            }
-            if (outcome.images?.length) images = [...images, ...outcome.images]
-            tools.push({ name: call.function.name, args, result: outcome.text, ok })
-            this.emitEvent({
-              type: 'tool',
-              agentId: persona.id,
-              name: call.function.name,
-              args,
-              result: outcome.text
-            })
-            messages.push({ role: 'tool', tool_call_id: call.id, content: outcome.text })
-          }
-          messages.push({
-            role: 'user',
-            content: images.length
-              ? [
-                  {
-                    type: 'text',
-                    text: `Risultati dei tool qui sopra. Guarda le immagini allegate e rispondi come ${persona.name}.`
-                  },
-                  ...images.map((p) => ({
-                    type: 'image_url' as const,
-                    image_url: { url: `file://${p}` }
-                  }))
-                ]
-              : `Ora rispondi tu come ${persona.name}.`
-          })
+
+          text += result.content
+          break
         }
 
         const clean = text.replace(CONSENSUS, '').trim()
