@@ -214,7 +214,7 @@ async function whisper(target) {
       for (const e of fs.readdirSync(d, { withFileTypes: true })) {
         const p = path.join(d, e.name)
         if (e.isDirectory()) walk(p)
-        else if (/^(whisper-cli|whisper|main|ggml.*|whisper.*\.dll|.*\.dll)$/i.test(e.name)) {
+        else if (/^(whisper-cli|whisper|main)(\.exe)?$|^(ggml.*|whisper.*)\.(dll|so)$|^.*\.dll$/i.test(e.name)) {
           fs.copyFileSync(p, path.join(dirW, e.name))
         }
       }
