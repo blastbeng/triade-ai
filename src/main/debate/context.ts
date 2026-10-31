@@ -146,12 +146,17 @@ export async function summarize(
   return res.content.trim()
 }
 
-export async function tokenCountOf(baseUrl: string, messages: LlmMessage[]): Promise<number> {
+export async function tokenCountOf(
+  baseUrl: string,
+  messages: LlmMessage[],
+  extraTokens = 0
+): Promise<number> {
   const images = messages.reduce(
     (n, m) => n + (Array.isArray(m.content) ? m.content.filter((p) => p.type !== 'text').length : 0),
     0
   )
   const flat = estimateTokensText(messages)
-  if (images > 0) return approximateTokens(flat, images)
-  return countTokens(baseUrl, flat)
+  const base = images > 0 ? approximateTokens(flat, images) : await countTokens(baseUrl, flat)
+  // gli schemi dei tool e il template di chat occupano contesto: vanno contati
+  return base + extraTokens
 }

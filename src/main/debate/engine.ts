@@ -202,10 +202,13 @@ export class DebateEngine extends EventEmitter {
         })
 
         // --- prompt compression quando si supera la soglia (75% di default) ---
+        const toolOverhead = settings.toolsEnabled ? 700 : 0
         let messages = buildMessages(persona, this.session, settings, personas)
-        let tokens = await tokenCountOf(baseUrl, messages)
+        let tokens = await tokenCountOf(baseUrl, messages, toolOverhead)
         const limit = Math.floor(settings.contextSize * settings.compressionThreshold)
-        if (tokens > limit) {
+        // margine per la generazione dentro il contesto reale del server
+        const hardLimit = settings.contextSize - 512
+        if (tokens > limit || tokens > hardLimit) {
           this.emitEvent({
             type: 'compression',
             tokens,
@@ -219,7 +222,16 @@ export class DebateEngine extends EventEmitter {
           this.session.turnIndex = this.session.turns.length
           saveSession(this.session)
           messages = buildMessages(persona, this.session, settings, personas)
-          tokens = await tokenCountOf(baseUrl, messages)
+          tokens = await tokenCountOf(baseUrl, messages, toolOverhead)
+          // se anche dopo il sommario il prompt è troppo grande, restringo la finestra
+          let guard = 0
+          while (tokens > hardLimit && guard < 40 && (this.session.contextFrom ?? 0) < this.session.turns.length - 1) {
+            this.session.contextFrom = (this.session.contextFrom ?? 0) + 1
+            messages = buildMessages(persona, this.session, settings, personas)
+            tokens = await tokenCountOf(baseUrl, messages, toolOverhead)
+            guard++
+          }
+          saveSession(this.session)
           this.emitEvent({ type: 'session', session: this.session })
         }
 
@@ -237,10 +249,9 @@ export class DebateEngine extends EventEmitter {
         let toolRounds = 0
         let cut: 'loop' | 'budget' | undefined
         // budget per turno: il contesto disponibile fino al 75% (soglia di compressione)
-        const ctxCap = Math.floor(settings.contextSize * settings.compressionThreshold)
-        const room = Math.max(256, ctxCap - tokens - 256)
+        const room = Math.max(128, settings.contextSize - tokens - 384)
         const turnCap = Math.min(settings.maxTokensPerTurn, room)
-        if (room < settings.maxTokensPerTurn) cut = 'budget'
+        if (turnCap < settings.maxTokensPerTurn) cut = 'budget'
         for (let attempt = 0; attempt < 3; attempt++) {
           const budget = turnCap
           const result = await chat(baseUrl, {
