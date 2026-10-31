@@ -1,6 +1,7 @@
-import { execFile } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
+import os from 'node:os'
 import { findBinary } from '../paths'
-import { parseDevices, type Backend, type GpuDevice } from './parse'
+import { parseDevices, parseVulkaninfoSummary, type Backend, type GpuDevice } from './parse'
 
 export type { Backend, GpuDevice } from './parse'
 
@@ -16,48 +17,106 @@ export function llamaBinaryFor(backend: Backend): string | null {
   return findBinary('llama-server')
 }
 
+function run(exe: string, args: string[], timeout = 20000): string {
+  try {
+    return execFileSync(exe, args, { timeout, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+  } catch (err) {
+    const e = err as { stdout?: string; stderr?: string }
+    return `${e.stdout ?? ''}${e.stderr ?? ''}`
+  }
+}
 
-
-function runList(exe: string): Promise<string> {
+function runAsync(exe: string, args: string[]): Promise<string> {
   return new Promise((resolve) => {
-    execFile(exe, ['--list-devices'], { timeout: 20000, windowsHide: true }, (err, stdout, stderr) => {
-      resolve(`${stdout ?? ''}${stderr ?? ''}` || (err ? '' : ''))
-    })
+    execFile(exe, args, { timeout: 20000, windowsHide: true }, (err, stdout, stderr) =>
+      resolve(`${stdout ?? ''}${stderr ?? ''}`)
+    )
+  })
+}
+
+/** Dedicated VRAM per adattatore, secondo il sistema operativo (Windows: WMI). */
+function windowsDedicatedVram(): Map<string, number> {
+  const map = new Map<string, number>()
+  if (process.platform !== 'win32') return map
+  const script =
+    'Get-CimInstance Win32_VideoController | Select-Object Name,AdapterRAM | ConvertTo-Json -Compress'
+  const text = run('powershell', ['-NoProfile', '-Command', script], 20000)
+  try {
+    const parsed = JSON.parse(text)
+    const rows = Array.isArray(parsed) ? parsed : [parsed]
+    for (const row of rows) {
+      if (!row?.Name) continue
+      map.set(String(row.Name), Number(row.AdapterRAM ?? 0) / (1024 * 1024))
+    }
+  } catch {
+    /* WMI non disponibile: si prosegue con le altre evidenze */
+  }
+  return map
+}
+
+/**
+ * Classificazione dinamica: nessun nome di GPU nel codice.
+ * 1. tipo dichiarato dal driver Vulkan (vulkaninfo), se disponibile;
+ * 2. memoria dedicata riportata dal sistema (Windows/WMI);
+ * 3. euristica sulla memoria condivisa: con più GPU presenti, un adattatore che
+ *    espone come "device local" gran parte della RAM di sistema è una iGPU.
+ */
+function classify(devices: GpuDevice[]): GpuDevice[] {
+  const totalRamMiB = os.totalmem() / (1024 * 1024)
+  const summary = process.platform === 'linux' ? parseVulkaninfoSummary(run('vulkaninfo', ['--summary'])) : new Map()
+  const dedicated = windowsDedicatedVram()
+
+  return devices.map((dev) => {
+    const vk = [...summary.entries()].find(([name]) => dev.name.includes(name) || name.includes(dev.name))
+    if (vk && vk[1] === 'integrated') {
+      return { ...dev, integrated: true, reason: 'tipo di dispositivo dichiarato dal driver (integrata)' }
+    }
+    if (vk && vk[1] === 'discrete') {
+      return { ...dev, integrated: false, reason: 'tipo di dispositivo dichiarato dal driver (dedicata)' }
+    }
+    const wmi = [...dedicated.entries()].find(([name]) => dev.name.includes(name) || name.includes(dev.name))
+    if (wmi) {
+      if (wmi[1] > 0 && wmi[1] < 1024) {
+        return { ...dev, integrated: true, reason: `memoria dedicata ${Math.round(wmi[1])} MiB (condivisa)` }
+      }
+      return { ...dev, integrated: false, reason: `memoria dedicata ${Math.round(wmi[1])} MiB` }
+    }
+    if (devices.length > 1 && dev.vramMiB > totalRamMiB * 0.4) {
+      return {
+        ...dev,
+        integrated: true,
+        reason: `espone ${Math.round(dev.vramMiB)} MiB su ${Math.round(totalRamMiB)} MiB di RAM (memoria condivisa)`
+      }
+    }
+    return dev
   })
 }
 
 let cache: { at: number; value: DetectedGpus } | null = null
 
-/**
- * Elenca le GPU realmente utilizzabili. Le integrate vengono riconosciute dal nome
- * (Raphael/Mendocino, Intel iGPU, llvmpipe) ed escluse dalla selezione.
- */
 export async function detectGpus(force = false): Promise<DetectedGpus> {
   if (!force && cache && Date.now() - cache.at < 60_000) return cache.value
+
   const found: GpuDevice[] = []
   const backends: Backend[] = []
-  let error: string | undefined
 
   for (const backend of ['vulkan', 'cuda'] as Backend[]) {
     const exe = llamaBinaryFor(backend)
     if (!exe) continue
     backends.push(backend)
-    const text = await runList(exe)
-    const devices = parseDevices(text, backend)
-    if (!devices.length) continue
-    for (const d of devices) {
+    const text = await runAsync(exe, ['--list-devices'])
+    for (const d of parseDevices(text, backend)) {
       if (found.some((f) => f.name === d.name)) continue
       found.push(d)
     }
   }
 
-  if (!found.length) error = 'nessuna GPU rilevata (manca la build llama.cpp o il driver Vulkan)'
-
+  const classified = classify(found)
   const value: DetectedGpus = {
-    usable: found.filter((d) => !d.integrated),
-    excluded: found.filter((d) => d.integrated),
+    usable: classified.filter((d) => !d.integrated),
+    excluded: classified.filter((d) => d.integrated),
     backends,
-    error
+    error: classified.length ? undefined : 'nessuna GPU rilevata: mancano i binari o il driver Vulkan/CUDA'
   }
   cache = { at: Date.now(), value }
   return value

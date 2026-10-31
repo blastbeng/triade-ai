@@ -925,3 +925,101 @@ button.ghost {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* ---------- reasoning e tool ---------- */
+.reasoning {
+  margin-top: 8px;
+  border-left: 2px solid #2b3a4f;
+  padding-left: 8px;
+}
+
+.reasoning summary {
+  cursor: pointer;
+  font-size: 10.5px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  list-style: none;
+}
+
+.reasoning summary::-webkit-details-marker {
+  display: none;
+}
+
+.reasoning summary::before {
+  content: '▸ ';
+}
+
+.reasoning[open] summary::before {
+  content: '▾ ';
+}
+
+.reasoning pre {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #96a7bd;
+  white-space: pre-wrap;
+  max-height: 260px;
+  overflow: auto;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}
+
+.reasoning.live pre {
+  color: #7e8fa6;
+}
+
+.toolcards {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.toolcard {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0d141d;
+  padding: 6px 8px;
+}
+
+.toolcard.ok {
+  border-left: 2px solid #1d5b60;
+}
+
+.toolcard.ko {
+  border-left: 2px solid #6b3a3a;
+}
+
+.toolcard summary {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  cursor: pointer;
+  font-size: 11px;
+  list-style: none;
+}
+
+.toolcard summary::-webkit-details-marker {
+  display: none;
+}
+
+.toolcard code {
+  color: var(--accent);
+}
+
+.toolcard .args {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolcard pre {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: #9fb0c6;
+  white-space: pre-wrap;
+  max-height: 220px;
+  overflow: auto;
+}

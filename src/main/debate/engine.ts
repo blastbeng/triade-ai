@@ -208,6 +208,7 @@ export class DebateEngine extends EventEmitter {
         this.emitEvent({ type: 'log', message: `${persona.name} sta scrivendo (turno ${turnIndex + 1})` })
 
         let text = ''
+        let reasoning = ''
         const tools: Turn['tools'] = []
         let images: string[] = this.session.pendingImages ?? []
         this.session.pendingImages = []
@@ -220,7 +221,11 @@ export class DebateEngine extends EventEmitter {
             maxTokens: settings.maxTokensPerTurn,
             tools: settings.toolsEnabled ? TOOL_SPECS : undefined,
             signal: controller.signal,
-            onDelta: (chunk) => this.emitEvent({ type: 'delta', agentId: persona.id, text: chunk })
+            onDelta: (chunk) => this.emitEvent({ type: 'delta', agentId: persona.id, text: chunk }),
+            onReasoningDelta: (chunk) => {
+              reasoning += chunk
+              this.emitEvent({ type: 'reasoning', agentId: persona.id, text: chunk })
+            }
           })
           if (result.interrupted) {
             interrupted = true
@@ -282,6 +287,7 @@ export class DebateEngine extends EventEmitter {
           agentId: persona.id,
           name: persona.name,
           text: clean || (interrupted ? '[interrotto]' : '[nessun contenuto]'),
+          reasoning: reasoning.trim() || undefined,
           ts: Date.now(),
           tokensIn: tokens,
           tokensOut: Math.ceil(clean.length / 3.6),

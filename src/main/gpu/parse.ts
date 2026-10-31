@@ -8,19 +8,9 @@ export interface GpuDevice {
   name: string
   vramMiB: number
   freeMiB: number
+  /** dedotto dinamicamente (tipo riportato dal driver, memoria dedicata, condivisione RAM) */
   integrated: boolean
-}
-
-const IGPU_PATTERNS = [
-  /\(RADV (RAPHAEL|RENOIR|CEZANNE|PICASSO|BARCELO|MENDOCINO|VANGOGH|REM\s?BRANDT)/i,
-  /Ryzen.*(Processor|Graphics)/i,
-  /Intel.*(Graphics|UHD|Iris)/i,
-  /llvmpipe|lavapipe|software rasterizer|Microsoft Basic Render/i,
-  /Apple M\d/i
-]
-
-export function isIntegrated(name: string): boolean {
-  return IGPU_PATTERNS.some((p) => p.test(name))
+  reason?: string
 }
 
 /** Interpreta l'output di `llama-server --list-devices`. */
@@ -41,8 +31,28 @@ export function parseDevices(text: string, backend: Backend): GpuDevice[] {
       name: name.trim(),
       vramMiB: Number(total),
       freeMiB: Number(free),
-      integrated: isIntegrated(name)
+      integrated: false
     })
   }
   return out
+}
+
+/** `vulkaninfo --summary`: tipo di GPU dichiarato dal driver (INTEGRATED_GPU / DISCRETE_GPU). */
+export function parseVulkaninfoSummary(text: string): Map<string, 'integrated' | 'discrete' | 'other'> {
+  const map = new Map<string, 'integrated' | 'discrete' | 'other'>()
+  // in vulkaninfo il deviceType precede il deviceName nello stesso blocco GPU
+  let pending: 'integrated' | 'discrete' | 'other' | null = null
+  for (const line of text.split('\n')) {
+    const t = /deviceType\s*=\s*(.+)$/.exec(line)
+    if (t) {
+      const type = t[1].trim()
+      pending = type.includes('INTEGRATED') ? 'integrated' : type.includes('DISCRETE') ? 'discrete' : 'other'
+    }
+    const n = /deviceName\s*=\s*(.+)$/.exec(line)
+    if (n && pending) {
+      map.set(n[1].trim(), pending)
+      pending = null
+    }
+  }
+  return map
 }

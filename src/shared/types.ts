@@ -26,6 +26,8 @@ export interface Settings {
   /** Frazione del contesto oltre la quale scatta il prompt compression (0.75 = 75%). */
   compressionThreshold: number
   gpuLayers: number
+  /** adatta -c, -ngl, KV, batch e offload del mmproj alla VRAM reale */
+  autoTune: boolean
   flashAttention: boolean
   kvCacheType: 'f16' | 'q8_0'
   maxTokensPerTurn: number
@@ -65,6 +67,8 @@ export interface Turn {
   agentId: string
   name: string
   text: string
+  /** ragionamento del modello, nascosto nella UI salvo espansione */
+  reasoning?: string
   ts: number
   tokensIn: number
   tokensOut: number
@@ -146,6 +150,7 @@ export interface DebateEvent {
     | 'log'
     | 'session'
     | 'model'
+    | 'reasoning'
   [key: string]: unknown
 }
 
@@ -180,6 +185,7 @@ export const DEFAULT_SETTINGS: Settings = {
   contextSize: 65536,
   compressionThreshold: 0.75,
   gpuLayers: 999,
+  autoTune: true,
   flashAttention: true,
   kvCacheType: 'q8_0',
   maxTokensPerTurn: 320,

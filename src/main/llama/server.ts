@@ -7,6 +7,7 @@ import { cacheDir, findBinary, modelsDir } from '../paths'
 import { getSettings } from '../settings'
 import { catalogModel, defaultModelId } from '../models/registry'
 import { detectGpus, llamaBinaryFor, type Backend, type GpuDevice } from '../gpu/devices'
+import { planLaunch } from './tuning'
 import type { ServerStatus } from '../../shared/types'
 
 export interface ServerInfo {
@@ -127,7 +128,20 @@ class LlamaInstance extends EventEmitter {
       const model = catalogModel(this.modelId)
       const modelPath = path.join(modelsDir(), model.files.model.name)
       const mmprojPath = model.files.mmproj ? path.join(modelsDir(), model.files.mmproj.name) : ''
-      const threads = Math.max(2, Math.floor(os.cpus().length / 2))
+      const plan = planLaunch({
+        device: this.device,
+        contextSize: s.contextSize,
+        kvPreference: s.kvCacheType,
+        gpuLayers: s.gpuLayers,
+        modelPath,
+        mmprojPath: mmprojPath || undefined,
+        autoTune: s.autoTune
+      })
+      for (const note of plan.notes) this.push(`[tuning] ${note}`)
+      this.push(
+        `[tuning] ctx=${plan.ctx} kv=${plan.kvType} ngl=${plan.ngl} ubatch=${plan.ubatch} ` +
+          `mmproj=${plan.mmprojOffload ? 'GPU' : 'CPU'} stima=${plan.estimate.totalMiB}MiB / ${plan.estimate.availableMiB}MiB`
+      )
 
       let lastError: Error | null = null
       for (let attempt = 1; attempt <= 5; attempt++) {
@@ -136,8 +150,10 @@ class LlamaInstance extends EventEmitter {
           '-m', modelPath,
           ...(this.device ? ['--device', this.device.label] : []),
           ...(mmprojPath ? ['--mmproj', mmprojPath] : []),
-          '-c', String(s.contextSize),
-          '-ngl', String(s.gpuLayers),
+          '-c', String(plan.ctx),
+          '-ngl', String(plan.ngl),
+          '-b', String(plan.batch),
+          '-ub', String(plan.ubatch),
           '-np', '1',
           '--host', '127.0.0.1',
           '--port', String(port),
@@ -148,11 +164,12 @@ class LlamaInstance extends EventEmitter {
           // raccomandato da llama.cpp per i modelli Qwen-VL (grounding)
           '--image-min-tokens', '1024',
           '-fa', s.flashAttention ? 'on' : 'off',
-          '-ctk', s.kvCacheType,
-          '-ctv', s.kvCacheType,
+          '-ctk', plan.kvType,
+          '-ctv', plan.kvType,
+          ...(plan.mmprojOffload ? [] : ['--no-mmproj-offload']),
           '--media-path', cacheDir(),
           '--video-ffmpeg-dir', path.dirname(exe),
-          '--threads', String(threads)
+          '--threads', String(plan.threads)
         ]
         this.logLines = []
         this.push(

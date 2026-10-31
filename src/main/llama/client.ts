@@ -24,6 +24,7 @@ export interface ChatRequest {
   tools?: unknown[]
   signal?: AbortSignal
   onDelta?: (chunk: string) => void
+  onReasoningDelta?: (chunk: string) => void
   jsonMode?: boolean
 }
 
@@ -85,6 +86,7 @@ export async function chat(baseUrl: string, req: ChatRequest): Promise<ChatResul
     }
     if (typeof delta.reasoning_content === 'string' && delta.reasoning_content) {
       reasoning += delta.reasoning_content
+      req.onReasoningDelta?.(delta.reasoning_content)
     }
     if (Array.isArray(delta.tool_calls)) {
       for (const tc of delta.tool_calls) {

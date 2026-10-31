@@ -27,6 +27,7 @@ export default function App(): JSX.Element {
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [catalog, setCatalog] = useState<CatalogEntry[]>([])
   const [stream, setStream] = useState<{ agentId: string; text: string } | null>(null)
+  const [streamReasoning, setStreamReasoning] = useState<{ agentId: string; text: string } | null>(null)
   const [servers, setServers] = useState<ServerStatus[]>([])
   const [logs, setLogs] = useState<string[]>([])
   const [notice, setNotice] = useState<string | null>(null)
@@ -69,8 +70,17 @@ export default function App(): JSX.Element {
           )
           break
         }
+        case 'reasoning': {
+          const agentId = String(event.agentId)
+          const chunk = String(event.text ?? '')
+          setStreamReasoning((prev) =>
+            prev && prev.agentId === agentId ? { agentId, text: prev.text + chunk } : { agentId, text: chunk }
+          )
+          break
+        }
         case 'turn':
           setStream(null)
+          setStreamReasoning(null)
           void window.triade.listSessions().then(setSessions)
           break
         case 'session':
@@ -165,6 +175,7 @@ export default function App(): JSX.Element {
     await window.triade.newChat()
     setSession(null)
     setStream(null)
+    setStreamReasoning(null)
     setAttachments([])
     setSessions(await window.triade.listSessions())
   }
@@ -274,6 +285,7 @@ export default function App(): JSX.Element {
               persona={persona}
               turns={(session?.turns ?? []).filter((t) => t.agentId === persona.id)}
               streaming={stream?.agentId === persona.id ? stream.text : null}
+              streamReasoning={streamReasoning?.agentId === persona.id ? streamReasoning.text : null}
               active={session?.state === 'running' && stream?.agentId === persona.id}
             />
           ))}

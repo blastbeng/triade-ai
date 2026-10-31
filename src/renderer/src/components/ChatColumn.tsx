@@ -5,10 +5,11 @@ interface Props {
   persona: Persona
   turns: Turn[]
   streaming: string | null
+  streamReasoning: string | null
   active: boolean
 }
 
-export default function ChatColumn({ persona, turns, streaming, active }: Props): JSX.Element {
+export default function ChatColumn({ persona, turns, streaming, streamReasoning, active }: Props): JSX.Element {
   const boxRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -36,21 +37,42 @@ export default function ChatColumn({ persona, turns, streaming, active }: Props)
               {turn.tokensIn > 0 && <span className="tok"> · {turn.tokensIn} in</span>}
             </div>
             <div className="text">{turn.text}</div>
-            {turn.tools.length > 0 && (
-              <details className="tools">
-                <summary>{turn.tools.length} tool</summary>
-                {turn.tools.map((t, i) => (
-                  <div key={i} className="toolrow">
-                    <code>{t.name}</code>
-                    <pre>{t.result.slice(0, 600)}</pre>
-                  </div>
-                ))}
+
+            {turn.reasoning && (
+              <details className="reasoning">
+                <summary>ragionamento</summary>
+                <pre>{turn.reasoning}</pre>
               </details>
+            )}
+
+            {turn.tools.length > 0 && (
+              <div className="toolcards">
+                {turn.tools.map((t, i) => (
+                  <details key={i} className={`toolcard ${t.ok ? 'ok' : 'ko'}`}>
+                    <summary>
+                      <code>{t.name}</code>
+                      <span className="args">
+                        {Object.entries(t.args)
+                          .map(([k, v]) => `${k}=${String(v).slice(0, 60)}`)
+                          .join(' · ')
+                          .slice(0, 90)}
+                      </span>
+                    </summary>
+                    <pre>{t.result.slice(0, 2000)}</pre>
+                  </details>
+                ))}
+              </div>
             )}
           </article>
         ))}
         {streaming !== null && (
           <article className="bubble streaming">
+            {streamReasoning && (
+              <details className="reasoning live">
+                <summary>sta ragionando…</summary>
+                <pre>{streamReasoning}</pre>
+              </details>
+            )}
             <div className="text">
               {streaming}
               <span className="caret" />
