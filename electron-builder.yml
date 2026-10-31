@@ -1,0 +1,39 @@
+appId: dev.blast.triadeai
+productName: TriadeAI
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**/*
+  - package.json
+extraResources:
+  - from: bin/stage
+    to: bin
+    filter:
+      - '**/*'
+asar: true
+compression: normal
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+  artifactName: TriadeAI-${version}-portable.exe
+  # Firma del codice: serve un certificato reale per non far comparire SmartScreen.
+  # CSC_LINK (percorso .pfx o base64) e CSC_KEY_PASSWORD arrivano dall'ambiente.
+  signingHashAlgorithms:
+    - sha256
+  rfc3161TimeStampServer: http://timestamp.digicert.com
+  verifyUpdateCodeSignature: false
+portable:
+  unpackDirName: TriadeAI
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  category: Utility
+  artifactName: TriadeAI-${version}.AppImage
+  executableName: triadeai
+appImage:
+  artifactName: TriadeAI-${version}.AppImage

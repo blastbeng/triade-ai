@@ -1,0 +1,195 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import { createHash, randomUUID } from 'node:crypto'
+import { memoryDir } from '../paths'
+import { DIM, cosine, embed } from './embeddings'
+
+export type MemoryKind = 'turno' | 'sintesi' | 'fatto' | 'documento'
+
+export interface MemoryEntry {
+  id: string
+  text: string
+  kind: MemoryKind
+  sessionId: string
+  topic: string
+  ts: number
+}
+
+export interface MemoryHit extends MemoryEntry {
+  score: number
+}
+
+interface Meta {
+  version: number
+  dim: number
+  entries: MemoryEntry[]
+  hashes: string[]
+}
+
+/**
+ * Vector store persistente su disco (dati/memoria):
+ *  - meta.json  : testi + metadati
+ *  - vettori.f32: matrice dei vettori, un Float32Array dopo l'altro
+ */
+class VectorMemory {
+  private entries: MemoryEntry[] = []
+  private vectors: Float32Array[] = []
+  private hashes = new Set<string>()
+  private loaded = false
+  private dirty = false
+  private saveTimer: NodeJS.Timeout | null = null
+
+  private metaFile(): string {
+    return path.join(memoryDir(), 'meta.json')
+  }
+
+  private vecFile(): string {
+    return path.join(memoryDir(), 'vettori.f32')
+  }
+
+  load(): void {
+    if (this.loaded) return
+    this.loaded = true
+    try {
+      if (!fs.existsSync(this.metaFile()) || !fs.existsSync(this.vecFile())) return
+      const meta = JSON.parse(fs.readFileSync(this.metaFile(), 'utf8')) as Meta
+      const buf = fs.readFileSync(this.vecFile())
+      const n = meta.entries.length
+      if (buf.byteLength < n * DIM * 4) return
+      const flat = new Float32Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + n * DIM * 4))
+      this.entries = meta.entries
+      this.hashes = new Set(meta.hashes)
+      this.vectors = []
+      for (let i = 0; i < n; i++) this.vectors.push(flat.subarray(i * DIM, (i + 1) * DIM))
+    } catch {
+      this.entries = []
+      this.vectors = []
+      this.hashes = new Set()
+    }
+  }
+
+  private scheduleSave(): void {
+    this.dirty = true
+    if (this.saveTimer) return
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null
+      this.save()
+    }, 1200)
+  }
+
+  save(force = false): void {
+    if (!this.dirty && !force) return
+    this.load()
+    const dir = memoryDir()
+    fs.mkdirSync(dir, { recursive: true })
+    const n = this.entries.length
+    const flat = new Float32Array(n * DIM)
+    for (let i = 0; i < n; i++) flat.set(this.vectors[i], i * DIM)
+    const tmpVec = `${this.vecFile()}.tmp`
+    fs.writeFileSync(tmpVec, Buffer.from(flat.buffer))
+    fs.renameSync(tmpVec, this.vecFile())
+    const meta: Meta = {
+      version: 1,
+      dim: DIM,
+      entries: this.entries,
+      hashes: [...this.hashes]
+    }
+    const tmpMeta = `${this.metaFile()}.tmp`
+    fs.writeFileSync(tmpMeta, JSON.stringify(meta), 'utf8')
+    fs.renameSync(tmpMeta, this.metaFile())
+    this.dirty = false
+  }
+
+  add(items: Array<Omit<MemoryEntry, 'id' | 'ts'> & { id?: string; ts?: number }>): number {
+    this.load()
+    let added = 0
+    for (const item of items) {
+      const text = item.text.trim()
+      if (text.length < 24) continue
+      const hash = createHash('sha1').update(text).digest('hex')
+      if (this.hashes.has(hash)) continue
+      this.hashes.add(hash)
+      this.entries.push({
+        id: item.id ?? randomUUID(),
+        text,
+        kind: item.kind,
+        sessionId: item.sessionId,
+        topic: item.topic,
+        ts: item.ts ?? Date.now()
+      })
+      this.vectors.push(embed(text))
+      added++
+    }
+    if (added) this.scheduleSave()
+    return added
+  }
+
+  search(query: string, k = 6, excludeSessionId?: string): MemoryHit[] {
+    this.load()
+    if (!query.trim() || !this.entries.length) return []
+    const q = embed(query)
+    const scored: MemoryHit[] = []
+    for (let i = 0; i < this.entries.length; i++) {
+      if (excludeSessionId && this.entries[i].sessionId === excludeSessionId) continue
+      const score = cosine(q, this.vectors[i])
+      if (score > 0.12) scored.push({ ...this.entries[i], score })
+    }
+    scored.sort((a, b) => b.score - a.score)
+    return scored.slice(0, k)
+  }
+
+  recent(limit = 40): MemoryEntry[] {
+    this.load()
+    return [...this.entries].sort((a, b) => b.ts - a.ts).slice(0, limit)
+  }
+
+  stats(): { entries: number; byKind: Record<string, number>; bytes: number; lastTs: number } {
+    this.load()
+    const byKind: Record<string, number> = {}
+    for (const e of this.entries) byKind[e.kind] = (byKind[e.kind] ?? 0) + 1
+    let bytes = 0
+    try {
+      bytes =
+        (fs.existsSync(this.vecFile()) ? fs.statSync(this.vecFile()).size : 0) +
+        (fs.existsSync(this.metaFile()) ? fs.statSync(this.metaFile()).size : 0)
+    } catch {
+      bytes = 0
+    }
+    return {
+      entries: this.entries.length,
+      byKind,
+      bytes,
+      lastTs: this.entries.reduce((m, e) => Math.max(m, e.ts), 0)
+    }
+  }
+
+  clear(): void {
+    this.load()
+    this.entries = []
+    this.vectors = []
+    this.hashes = new Set()
+    this.dirty = true
+    this.save(true)
+  }
+
+  /** Rimuove le voci di una sessione eliminata. */
+  removeSession(sessionId: string): void {
+    this.load()
+    const keepEntries: MemoryEntry[] = []
+    const keepVectors: Float32Array[] = []
+    for (let i = 0; i < this.entries.length; i++) {
+      if (this.entries[i].sessionId === sessionId) continue
+      keepEntries.push(this.entries[i])
+      keepVectors.push(this.vectors[i])
+    }
+    this.entries = keepEntries
+    this.vectors = keepVectors
+    this.hashes = new Set(
+      keepEntries.map((e) => createHash('sha1').update(e.text).digest('hex'))
+    )
+    this.dirty = true
+    this.save(true)
+  }
+}
+
+export const memory = new VectorMemory()

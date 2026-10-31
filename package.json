@@ -1,0 +1,35 @@
+{
+  "name": "triade-ai",
+  "version": "0.1.0",
+  "description": "Tre personalita, un solo modello, un dibattito che arriva a una conclusione",
+  "main": "./out/main/index.js",
+  "author": "blast",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "fetch:bin": "node scripts/fetch-binaries.mjs",
+    "stage:win": "node scripts/stage-bin.mjs win",
+    "stage:linux": "node scripts/stage-bin.mjs linux",
+    "dist:linux": "npm run build && npm run stage:linux && electron-builder --linux",
+    "dist:win": "npm run build && npm run stage:win && electron-builder --win",
+    "dist:linux:remote": "bash scripts/build-remote.sh linux",
+    "dist:win:remote": "bash scripts/build-remote.sh win"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.3.1",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.7.2",
+    "vite": "^5.4.11"
+  }
+}
