@@ -215,9 +215,14 @@ export class DebateEngine extends EventEmitter {
         let interrupted = false
 
         let toolRounds = 0
+        let cut: 'loop' | 'budget' | undefined
+        // budget per turno: il contesto disponibile fino al 75% (soglia di compressione)
+        const ctxCap = Math.floor(settings.contextSize * settings.compressionThreshold)
+        const room = Math.max(256, ctxCap - tokens - 256)
+        const turnCap = Math.min(settings.maxTokensPerTurn, room)
+        if (room < settings.maxTokensPerTurn) cut = 'budget'
         for (let attempt = 0; attempt < 3; attempt++) {
-          const base = Math.max(900, settings.maxTokensPerTurn)
-          const budget = attempt === 0 ? base : Math.min(4000, base * 2)
+          const budget = turnCap
           const result = await chat(baseUrl, {
             messages,
             temperature: settings.temperature,
@@ -232,6 +237,11 @@ export class DebateEngine extends EventEmitter {
           })
           if (result.interrupted) {
             interrupted = true
+            text += result.content
+            break
+          }
+          if (result.stopReason === 'loop') {
+            cut = 'loop'
             text += result.content
             break
           }
@@ -322,7 +332,8 @@ export class DebateEngine extends EventEmitter {
           tokensIn: tokens,
           tokensOut: Math.ceil(clean.length / 3.6),
           tools,
-          interrupted
+          interrupted,
+          cut
         }
         this.session.turns.push(turn)
         this.session.turnIndex = this.session.turns.length

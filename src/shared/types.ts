@@ -74,6 +74,8 @@ export interface Turn {
   tokensOut: number
   tools: ToolRun[]
   interrupted?: boolean
+  /** perché la generazione si è fermata: ripetizione o limite di contesto */
+  cut?: 'loop' | 'budget'
 }
 
 export type SessionState = 'running' | 'paused' | 'concluded' | 'error'
@@ -188,7 +190,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoTune: true,
   flashAttention: true,
   kvCacheType: 'q8_0',
-  maxTokensPerTurn: 1800,
+  maxTokensPerTurn: 4096,
   maxTurns: 40,
   temperature: 0.85,
   toolsEnabled: true,

@@ -35,6 +35,8 @@ export default function ChatColumn({ persona, turns, streaming, streamReasoning,
             <div className="meta">
               turno · {new Date(turn.ts).toLocaleTimeString('it-IT')}
               {turn.tokensIn > 0 && <span className="tok"> · {turn.tokensIn} in</span>}
+              {turn.cut === 'loop' && <span className="tok"> · fermato: ripetizione</span>}
+              {turn.cut === 'budget' && <span className="tok"> · vicino al 75% di contesto</span>}
             </div>
             <div className="text">{turn.text}</div>
 

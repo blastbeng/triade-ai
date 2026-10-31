@@ -33,6 +33,27 @@ export interface ChatResult {
   reasoning: string
   toolCalls: RawToolCall[]
   interrupted: boolean
+  /** 'loop' = generazione fermata per ripetizione ossessiva */
+  stopReason?: 'loop'
+}
+
+/** Rileva la ripetizione ossessiva dello stesso blocco (allucinazione a loop). */
+function looksRepetitive(text: string): boolean {
+  const tail = text.slice(-1500)
+  for (const size of [80, 120, 200, 300]) {
+    const last = tail.slice(-size)
+    if (last.trim().length < 40) continue
+    let count = 0
+    let idx = 0
+    for (;;) {
+      const at = tail.indexOf(last, idx)
+      if (at === -1) break
+      count++
+      idx = at + size
+      if (count >= 3) return true
+    }
+  }
+  return false
 }
 
 /** Streaming di /v1/chat/completions (SSE) con accumulo dei tool call. */
@@ -63,6 +84,8 @@ export async function chat(baseUrl: string, req: ChatRequest): Promise<ChatResul
   let reasoning = ''
   const toolCalls: RawToolCall[] = []
   let interrupted = false
+  let stopReason: 'loop' | undefined
+  let sinceCheck = 0
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
@@ -109,6 +132,12 @@ export async function chat(baseUrl: string, req: ChatRequest): Promise<ChatResul
       const lines = buffer.split('\n')
       buffer = lines.pop() ?? ''
       for (const line of lines) handleLine(line)
+      sinceCheck += lines.length
+      if (sinceCheck > 25 && looksRepetitive(content)) {
+        stopReason = 'loop'
+        break
+      }
+      if (stopReason) break
     }
     if (buffer) handleLine(buffer)
   } catch (err) {
@@ -126,7 +155,8 @@ export async function chat(baseUrl: string, req: ChatRequest): Promise<ChatResul
     content,
     reasoning,
     toolCalls: toolCalls.filter((t) => t && t.function.name),
-    interrupted
+    interrupted,
+    stopReason
   }
 }
 
