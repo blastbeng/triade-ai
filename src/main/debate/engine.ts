@@ -295,7 +295,8 @@ export class DebateEngine extends EventEmitter {
             if (attempt < 2) {
               messages.push({
                 role: 'user',
-                content: 'Scrivi ora solo la risposta finale in italiano, concisa, senza altro ragionamento.'
+                content:
+                  'Scrivi ora la risposta finale in italiano: 3-6 frasi, contenuto concreto, nessun altro ragionamento.'
               })
               continue
             }
