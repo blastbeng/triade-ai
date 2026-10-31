@@ -14,12 +14,12 @@ import { TOOL_SPECS, runTool } from './tools'
 const CONSENSUS = /\[\[\s*CONSENSO\s*(?::([\s\S]*?))?\s*\]\]/i
 const MAX_TOOL_ROUNDS = 2
 
-function parseArgs(raw: string): Record<string, unknown> {
+function parseArgs(raw: string): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(raw || '{}')
-    return typeof parsed === 'object' && parsed ? (parsed as Record<string, unknown>) : {}
+    return typeof parsed === 'object' && parsed ? (parsed as Record<string, unknown>) : null
   } catch {
-    return {}
+    return null
   }
 }
 
@@ -279,22 +279,40 @@ export class DebateEngine extends EventEmitter {
             break
           }
 
-          if (result.toolCalls.length && toolRounds < MAX_TOOL_ROUNDS) {
+          // se la generazione si è chiusa a metà, gli argomenti possono essere JSON rotto:
+          // in quel caso non li rimandiamo al server (lo farebbe fallire), chiediamo la risposta
+          const callsWithArgs = result.toolCalls.map((c) => ({ call: c, args: parseArgs(c.function.arguments) }))
+          const validCalls = callsWithArgs.filter(
+            (c): c is { call: (typeof result.toolCalls)[number]; args: Record<string, unknown> } => c.args !== null
+          )
+          if (result.toolCalls.length && validCalls.length < result.toolCalls.length) {
+            this.emitEvent({
+              type: 'log',
+              message: 'tool call troncato dal limite di token: ignorato, chiedo la risposta'
+            })
+            messages.push({
+              role: 'user',
+              content:
+                'La tua chiamata al tool era incompleta (JSON rotto). Rispondi ora usando solo ciò che sai, senza tool.'
+            })
+            continue
+          }
+
+          if (validCalls.length && toolRounds < MAX_TOOL_ROUNDS) {
             toolRounds++
             messages = [
               ...messages,
               {
                 role: 'assistant',
                 content: result.content,
-                tool_calls: result.toolCalls.map((c) => ({
-                  id: c.id,
+                tool_calls: validCalls.map((c) => ({
+                  id: c.call.id,
                   type: 'function' as const,
-                  function: c.function
+                  function: c.call.function
                 }))
               } as LlmMessage
             ]
-            for (const call of result.toolCalls) {
-              const args = parseArgs(call.function.arguments)
+            for (const { call, args } of validCalls) {
               let outcome: { text: string; images?: string[] } = { text: 'errore' }
               let ok = true
               try {
