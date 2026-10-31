@@ -7,9 +7,24 @@ import fs from 'node:fs'
  * electron-builder scompatta il portable.
  */
 export function appRoot(): string {
+  // Windows portable: la cartella reale dell'exe, non quella di scompattazione
   const portable = process.env.PORTABLE_EXECUTABLE_DIR
   if (portable) return portable
-  if (app.isPackaged) return path.dirname(app.getPath('exe'))
+  // AppImage: l'exe gira da un mount temporaneo, i dati stanno accanto al file .AppImage
+  const appImage = process.env.APPIMAGE
+  if (appImage) return path.dirname(appImage)
+  if (app.isPackaged) {
+    const dir = path.dirname(app.getPath('exe'))
+    // installazione in /usr/bin o Program Files: meglio la cartella utente
+    try {
+      fs.accessSync(dir, fs.constants.W_OK)
+      return dir
+    } catch {
+      const fallback = path.join(app.getPath('userData'), 'dati-app')
+      fs.mkdirSync(fallback, { recursive: true })
+      return fallback
+    }
+  }
   return process.cwd()
 }
 
