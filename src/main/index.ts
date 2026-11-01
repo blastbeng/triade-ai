@@ -82,6 +82,22 @@ function createWindow(): void {
             console.log('[ob] di nuovo backend:', JSON.stringify(await state()))
             console.log('[ob] vai ai modelli:', await click('continua'))
             await new Promise((r) => setTimeout(r, 1500))
+            console.log('[ob] passo personalità:', JSON.stringify(await state()))
+            const picked = (await js(`(() => {
+              const btns = [...document.querySelectorAll('.personacount .langbutton')];
+              const before = btns.map((b) => b.className.includes('selected'));
+              const two = btns[1];
+              if (two) two.click();
+              return { count: btns.length, before, labels: btns.map((b) => b.textContent.trim()) };
+            })()`)) as { count: number; before: boolean[]; labels: string[] }
+            await new Promise((r) => setTimeout(r, 500))
+            const afterPick = (await js(`(() => {
+              const btns = [...document.querySelectorAll('.personacount .langbutton')];
+              return btns.map((b) => b.className.includes('selected'));
+            })()`)) as boolean[]
+            console.log('[ob] default preselezionato:', JSON.stringify(picked.before), '| dopo clic su 2:', JSON.stringify(afterPick))
+            console.log('[ob] vai ai modelli:', await click('continua'))
+            await new Promise((r) => setTimeout(r, 1500))
             console.log('[ob] passo modelli:', JSON.stringify(await state()))
             const done = await click('concludi')
             await new Promise((r) => setTimeout(r, 1500))

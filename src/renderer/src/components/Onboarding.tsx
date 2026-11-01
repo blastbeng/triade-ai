@@ -26,7 +26,7 @@ export default function Onboarding({
   onDone,
   onProgress
 }: Props): JSX.Element {
-  const [step, setStep] = useState<'language' | 'backend' | 'models'>('language')
+  const [step, setStep] = useState<'language' | 'backend' | 'personas' | 'models'>('language')
   const [localBackend, setLocalBackend] = useState<Backend>(backend)
   const [localRemote, setLocalRemote] = useState<RemoteSettings>(remote)
   // in onboarding l'italiano è preselezionato (l'app resta in inglese finché non si conferma)
@@ -68,7 +68,8 @@ export default function Onboarding({
   const remoteChosen = localBackend !== 'llama'
 
   const goBack = (): void => {
-    if (step === 'models') setStep('backend')
+    if (step === 'models') setStep('personas')
+    else if (step === 'personas') setStep('backend')
     else if (step === 'backend') setStep('language')
   }
 
@@ -143,20 +144,6 @@ export default function Onboarding({
             }}
           />
 
-        <h3 className="searchtitle">{t('onboarding.personasTitle')}</h3>
-        <p className="lead small">{t('onboarding.personasLead')}</p>
-        <div className="personacount">
-          {[1, 2, 3].map((n) => (
-            <button
-              key={n}
-              className={`langbutton ${personas === n ? 'selected' : ''}`}
-              onClick={() => setPersonas(n)}
-            >
-              {t(n === 1 ? 'onboarding.personasOne' : n === 2 ? 'onboarding.personasTwo' : 'onboarding.personasThree')}
-            </button>
-          ))}
-        </div>
-
           <footer className="modalfooter">
             <button className="ghost" onClick={() => setStep('language')}>
               ← {t('onboarding.back')}
@@ -165,8 +152,52 @@ export default function Onboarding({
               className="primary"
               onClick={async () => {
                 await onBackend(localBackend, localRemote)
-                if (remoteBackend) {
-                  // nessun download: si mantiene il catalogo locale già presente
+                setStep('personas')
+              }}
+            >
+              {t('onboarding.continue')}
+            </button>
+          </footer>
+        </div>
+      </div>
+    )
+  }
+
+  if (step === 'personas') {
+    const remoteChosenNow = localBackend !== 'llama'
+    return (
+      <div className="modal">
+        <div className="modalbox onboarding">
+          <h2>{t('onboarding.personasTitle')}</h2>
+          <p className="lead">{t('onboarding.personasLead')}</p>
+          <div className="personacount">
+            {[1, 2, 3].map((n) => (
+              <button
+                key={n}
+                type="button"
+                className={`langbutton ${personas === n ? 'selected' : ''}`}
+                onClick={() => setPersonas(n)}
+              >
+                {t(
+                  n === 1
+                    ? 'onboarding.personasOne'
+                    : n === 2
+                      ? 'onboarding.personasTwo'
+                      : 'onboarding.personasThree'
+                )}
+                {personas === n && <span className="check">✓</span>}
+              </button>
+            ))}
+          </div>
+          <footer className="modalfooter">
+            <button className="ghost" type="button" onClick={goBack}>
+              ← {t('onboarding.back')}
+            </button>
+            <button
+              className="primary"
+              type="button"
+              onClick={async () => {
+                if (remoteChosenNow) {
                   await onDone(installed, installed[0] ?? '', personas)
                   return
                 }
