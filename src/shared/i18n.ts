@@ -11,6 +11,8 @@ export const LOCALES: { id: Locale; label: string; flag: string }[] = [
 export type Dict = Record<string, string>
 
 const en: Dict = {
+  'settings.tab.generale': "general",
+  'settings.tab.ricerca': "search",
   'update.errorTitle': "Update failed",
   'update.errorDetail': "You can download the latest version from the project Releases page.",
   'update.rollbackTitle': "Update rolled back",
@@ -269,6 +271,8 @@ const en: Dict = {
 }
 
 const it: Dict = {
+  'settings.tab.generale': "generale",
+  'settings.tab.ricerca': "ricerca",
   'update.errorTitle': "Aggiornamento non riuscito",
   'update.errorDetail': "Puoi scaricare l’ultima versione dalla pagina Releases del progetto.",
   'update.rollbackTitle': "Aggiornamento annullato",
@@ -524,6 +528,8 @@ const it: Dict = {
 }
 
 const de: Dict = {
+  'settings.tab.generale': "allgemein",
+  'settings.tab.ricerca': "Suche",
   'update.errorTitle': "Update fehlgeschlagen",
   'update.errorDetail': "Die neueste Version finden Sie auf der Releases-Seite des Projekts.",
   'update.rollbackTitle': "Update zurückgerollt",
@@ -778,6 +784,8 @@ const de: Dict = {
 }
 
 const fr: Dict = {
+  'settings.tab.generale': "général",
+  'settings.tab.ricerca': "recherche",
   'update.errorTitle': "Échec de la mise à jour",
   'update.errorDetail': "Vous pouvez télécharger la dernière version depuis la page Releases du projet.",
   'update.rollbackTitle': "Mise à jour annulée",
@@ -1032,6 +1040,8 @@ const fr: Dict = {
 }
 
 const es: Dict = {
+  'settings.tab.generale': "general",
+  'settings.tab.ricerca': "búsqueda",
   'update.errorTitle': "Actualización fallida",
   'update.errorDetail': "Puedes descargar la última versión desde la página Releases del proyecto.",
   'update.rollbackTitle': "Actualización revertida",

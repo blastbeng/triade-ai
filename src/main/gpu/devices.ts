@@ -172,7 +172,8 @@ export async function detectGpus(force = false): Promise<DetectedGpus> {
         name,
         vramMiB: Math.round(mb),
         freeMiB: Math.round(mb),
-        integrated: false
+        integrated: false,
+        estimated: true
       }
       classified.push(dev)
       log.info(`[gpu] rilevamento da WMI: ${name} (${Math.round(mb)} MiB)`)

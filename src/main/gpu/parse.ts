@@ -12,6 +12,8 @@ export interface GpuDevice {
   freeMiB: number
   /** dedotto dinamicamente (tipo riportato dal driver, memoria dedicata, condivisione RAM) */
   integrated: boolean
+  /** VRAM dedotta dal driver (non misurata): può essere troncata a 4 GiB */
+  estimated?: boolean
   reason?: string
 }
 

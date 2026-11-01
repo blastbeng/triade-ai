@@ -55,7 +55,11 @@ export function planPool(
   const contextByKey = new Map<string, number>()
   if (!targets.length) return { contextByKey, notes }
 
-  const available = Math.max(0, Math.min(device.vramMiB - RESERVE_MIB, device.freeMiB || device.vramMiB))
+  const estimated = (device as { estimated?: boolean }).estimated === true
+  const available = Math.max(
+    0,
+    Math.min(device.vramMiB - RESERVE_MIB, device.freeMiB || device.vramMiB)
+  )
   const weights = targets.reduce((sum, t) => {
     const w = sizeMiB(t.modelPath) + sizeMiB(t.mmprojPath)
     // MoE: in GPU va solo la parte attiva/shared, gli esperti restano in RAM
@@ -66,8 +70,15 @@ export function planPool(
     0
   )
   const kvBudget = available - weights - overheads
+  if (kvBudget <= 0 && estimated) {
+    // VRAM misurata dal driver può essere troncata (Windows riporta 4 GiB):
+    // non si blocca l'avvio, decide il fit di llama.cpp sulla VRAM reale
+    notes.push(
+      `VRAM dichiarata dal driver poco affidabile (${Math.round(available)} MiB): l'offload lo decide llama.cpp`
+    )
+  }
 
-  if (kvBudget <= 0) {
+  if (kvBudget <= 0 && !estimated) {
     throw new Error(
       `VRAM insufficiente su ${device.name}: i pesi dei ${targets.length} modelli occupano ${Math.round(
         weights
@@ -76,7 +87,7 @@ export function planPool(
   }
 
   const minNeed = targets.reduce((sum, t) => sum + kvPerTokenMiB(t.modelPath, kv) * MIN_CTX, 0)
-  if (minNeed > kvBudget) {
+  if (minNeed > kvBudget && !estimated) {
     throw new Error(
       `VRAM insufficiente su ${device.name} per ${targets.length} modelli contemporanei: servono almeno ${Math.round(
         minNeed
