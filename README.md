@@ -49,7 +49,11 @@ Anthropic, Ollama).
   exhausted — both flagged in the UI (`stopped: repetition`, `near the context limit`).
 
 ### Model & context management
-- **Default model**: [Ornith-1.5-9B-uncensored Q4_K_M + mmproj-Q8_0](https://huggingface.co/mradermacher/Ornith-1.5-9B-uncensored-GGUF)
+- **Default model**: `Ornith-1.5-9B-uncensored.i1-Q4_K_M.gguf` (imatrix) from
+  [Ornith-1.5-9B-uncensored-i1-GGUF](https://huggingface.co/mradermacher/Ornith-1.5-9B-uncensored-i1-GGUF),
+  with `mmproj-Q8_0.gguf` taken from the **base** repo
+  [Ornith-1.5-9B-uncensored-GGUF](https://huggingface.co/mradermacher/Ornith-1.5-9B-uncensored-GGUF)
+  — imatrix repos do not contain the vision projector
   (`qwen35` hybrid architecture, 32 layers of which 8 with full attention, 262144 native context,
   vision tower).
 - **Context** default **131072** tokens, shared by all chats and editable in settings — but always
@@ -70,6 +74,8 @@ Anthropic, Ollama).
   model can be searched **on HuggingFace** from the onboarding or from *Settings → models*.
 - Every candidate is verified *before* being offered:
   - must have a **vision `mmproj`** (otherwise excluded: the app uses images/video);
+  - for imatrix repos (`-i1-GGUF`) the projector is searched in the parent repo
+    (`-GGUF`, base name, `<base>-GGUF`); files named `mmproj*` or `projector*` are accepted;
   - the **best quant that fits** is chosen (and shown per quant: *all in GPU (ctx N)* /
     *experts on CPU (ctx N)* / *does not fit*);
   - **MoE** models are supported with partial offload (experts in RAM) and a recommended context;
@@ -218,7 +224,10 @@ credentials are committed.
 
 ## 7. Model
 
-- Default: `Ornith-1.5-9B-uncensored` Q4_K_M + `mmproj-Q8_0` (mradermacher GGUF).
+- Default: `Ornith-1.5-9B-uncensored.i1-Q4_K_M` (imatrix) + `mmproj-Q8_0` from the base repo.
+- Downloads are taken in **64 MB verified blocks**, the size must match the byte and the
+  SHA-256 must match the official HuggingFace one; otherwise the file is deleted and retried.
+- Runtime quant choice: `Q8_0 → Q4_K_M → Q3_K_M → Q2_K` when VRAM is tight.
 - Architecture `qwen35`, 32 layers (8 full-attention), 262144 native context, vision through
   `qwen3vl_merger`.
 - Runtime quant choice: `Q8_0 → Q4_K_M → Q3_K_M → Q2_K` when VRAM is tight.
