@@ -156,6 +156,30 @@ export async function detectGpus(force = false): Promise<DetectedGpus> {
       : 'binario llama-server non trovato accanto all\'app: i file in bin/ non sono stati inclusi nel pacchetto'
     log.error(`[gpu] nessuna GPU: ${diag}`)
   }
+  // Windows: se llama-server non enumera (DLL Vulkan vicine all'exe, percorso,
+  // permessi) le schede si ricavano dal driver via WMI. L'unico backend che
+  // spediamo è Vulkan, quindi una GPU dedicata va comunque proposta.
+  if (!classified.some((d) => !d.integrated) && process.platform === 'win32') {
+    const wmi = windowsDedicatedVram()
+    let i = 0
+    for (const [name, mb] of wmi) {
+      if (!(mb >= 512)) continue
+      const dev: GpuDevice = {
+        key: `vulkan:${i}`,
+        label: name,
+        backend: 'vulkan',
+        index: i,
+        name,
+        vramMiB: Math.round(mb),
+        freeMiB: Math.round(mb),
+        integrated: false
+      }
+      classified.push(dev)
+      log.info(`[gpu] rilevamento da WMI: ${name} (${Math.round(mb)} MiB)`)
+      i++
+    }
+  }
+
   const value: DetectedGpus = {
     usable: classified.filter((d) => !d.integrated && d.backend !== 'cuda'),
     excluded: classified.filter((d) => d.integrated),
