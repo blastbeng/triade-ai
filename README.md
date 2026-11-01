@@ -80,6 +80,10 @@ Anthropic, Ollama).
 - **Downloads and GPU checks only apply to the local backend**: choosing an API skips them entirely.
 
 ### Backends
+Every personality picks **its own backend and model**, so one agent can run on the local
+llama-server while another talks to OpenAI (mixed setups are supported: one process is started only
+for the personalities that actually use `llama`).
+
 | Backend | How | Needs GPU | Downloads |
 |---|---|---|---|
 | `llama` (default) | bundled `llama-server` (Vulkan, CUDA if fetched) | yes, dedicated | model + mmproj + whisper |
@@ -90,7 +94,9 @@ Anthropic, Ollama).
 - Configured in onboarding and in *Settings → backend* with base URL, API key, model picker
   (*load models* reads `/v1/models`, Ollama's `models[].name` included) and a **test** button that
   performs a minimal generation and reports the exact error.
-- Each chat picks its own model **of the active provider** (local catalog or remote list).
+- Each chat picks its own **backend** (llama/openai/anthropic/ollama) *and* model: the local catalog
+  for llama, the provider's model list for the APIs. Choices are stored per personality and per
+  backend, so switching back restores the previous model.
 - With no dedicated GPU the app no longer exits blindly: it offers a remote API first, and only
   quits if you decline.
 
