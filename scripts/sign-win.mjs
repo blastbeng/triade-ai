@@ -103,6 +103,54 @@ function signLinux() {
   }
 }
 
+/** jsign (Java) firmato su qualunque OS: non dipende dal provider PowerShell 'Cert:' */
+async function ensureJsign() {
+  const jar = path.join(certDir, 'jsign.jar')
+  if (fs.existsSync(jar) && fs.statSync(jar).size > 100000) return jar
+  const url = 'https://repo1.maven.org/maven2/net/jsign/jsign/6.0/jsign-6.0.jar'
+  const res = await fetch(url, { redirect: 'follow' })
+  if (!res.ok) throw new Error(`download jsign fallito: HTTP ${res.status}`)
+  fs.writeFileSync(jar, Buffer.from(await res.arrayBuffer()))
+  return jar
+}
+
+/** PFX self-signed creato con openssl: nessun archivio certificati Windows richiesto. */
+function ensurePfxOpenssl() {
+  fs.mkdirSync(certDir, { recursive: true })
+  if (fs.existsSync(pfx)) return
+  const key = path.join(certDir, 'key.pem')
+  const crt = path.join(certDir, 'cert.pem')
+  execFileSync('openssl', [
+    'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '730',
+    '-keyout', key, '-out', crt,
+    '-subj', '/CN=TriadeAI/O=TriadeAI/C=IT',
+    '-addext', 'extendedKeyUsage=codeSigning',
+    '-addext', 'keyUsage=digitalSignature'
+  ], { stdio: 'ignore' })
+  execFileSync('openssl', [
+    'pkcs12', '-export', '-out', pfx, '-inkey', key, '-in', crt,
+    '-passout', `pass:${password}`, '-name', 'TriadeAI'
+  ], { stdio: 'ignore' })
+}
+
+async function signWindowsJsign() {
+  const jar = await ensureJsign()
+  ensurePfxOpenssl()
+  for (const file of files) {
+    execFileSync('java', [
+      '-jar', jar,
+      '--keystore', pfx,
+      '--storetype', 'PKCS12',
+      '--storepass', password,
+      '--alias', 'TriadeAI',
+      '--tsaurl', process.env.TSA_URL ?? 'http://timestamp.digicert.com',
+      '--name', 'TriadeAI',
+      file
+    ], { stdio: 'inherit' })
+    console.log(`[sign] firmato (jsign): ${path.basename(file)}`)
+  }
+}
+
 function signWindows() {
   fs.mkdirSync(certDir, { recursive: true })
   const script = `
@@ -137,15 +185,26 @@ foreach ($f in $files) {
   execFileSync('powershell', ['-NoProfile', '-Command', script], { stdio: 'inherit' })
 }
 
-try {
+async function main() {
+  if (process.platform === 'win32' && !process.env.CSC_LINK && !process.env.AZURE_SIGNING_ACCOUNT) {
+    // percorso affidabile sui runner: openssl + jsign, senza provider 'Cert:'
+    try {
+      await signWindowsJsign()
+      return
+    } catch (err) {
+      console.error(`[sign] jsign non disponibile (${err.message}): provo PowerShell`)
+    }
+  }
   if (process.platform === 'win32') signWindows()
   else signLinux()
   console.log('[sign] completato (self-signed: SmartScreen avviserà comunque su altre macchine)')
-} catch (err) {
+}
+
+main().catch((err) => {
   const realCert = Boolean(process.env.CSC_LINK || process.env.AZURE_SIGNING_ACCOUNT)
   console.error(`[sign] firma fallita: ${err.message}`)
-  if (realCert) {
-    // con un certificato reale la firma è un requisito, non un optional
+  if (realCert || process.env.CI) {
+    // in CI la firma è verificata da uno step successivo: qui non si finge nulla
     process.exitCode = 1
   } else {
     console.error(
@@ -153,4 +212,4 @@ try {
         '(la firma self-signed non rimuove gli avvisi SmartScreen su altre macchine).'
     )
   }
-}
+})
