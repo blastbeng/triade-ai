@@ -51,11 +51,13 @@ export function getSettings(): Settings {
     loaded = DEFAULT_SETTINGS
   }
   // sane defaults requested by the user
-  if (!loaded.personas || loaded.personas.length !== 3) {
-    loaded.personas = defaultPersonas(loaded.ui?.language ?? 'en')
+  const count = Math.min(3, Math.max(1, loaded.personaCount ?? 3))
+  loaded.personaCount = count
+  if (!loaded.personas || loaded.personas.length < 1) {
+    loaded.personas = defaultPersonas(loaded.ui?.language ?? 'en', count)
   } else if (areDefaultPersonas(loaded.personas)) {
-    // se sono ancora quelle predefinite, i tre system prompt seguono la lingua scelta
-    loaded.personas = defaultPersonas(loaded.ui?.language ?? 'en')
+    // se sono ancora quelle predefinite, system prompt e numero seguono la scelta
+    loaded.personas = defaultPersonas(loaded.ui?.language ?? 'en', count)
   }
   if (!loaded.contextSize || loaded.contextSize < 2048) loaded.contextSize = 65536
   if (!loaded.compressionThreshold) loaded.compressionThreshold = 0.75
