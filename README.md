@@ -263,24 +263,6 @@ The release branch is therefore always an exact copy of `main`: `release.yml` re
 4. First run: `Actions → promote → Run workflow` with `force` = true, or bump the version with
    `npm run release:minor` and push to `main`.
 
-## 10. CI details (old section placeholder) (GitHub Actions)
-
-The repository lives on GitHub, so the pipeline is **GitHub Actions** (`.github/workflows/pipeline.yml`);
-GitLab CI cannot run on GitHub-hosted repositories, it would only apply to a GitLab mirror.
-
-What happens on every push:
-
-1. **check** — `npm ci`, `npm run typecheck`, `npm run build`.
-2. **linux** — fetch the bundles (cached by `scripts/fetch-binaries.mjs` hash), build the AppImage,
-   generate checksums, upload the artifact.
-3. **windows** — same on a native `windows-latest` runner (no wine needed), portable `.exe`.
-4. **release** — on `main` (or a `v*` tag), if the version in `package.json` has no release yet, it
-   creates the tag `v<version>` and publishes a GitHub Release with the AppImage, the portable exe
-   and a merged `SHA256SUMS.txt`, with notes generated from the commits.
-
-So the release flow is: **change → `npm run release:minor` → commit → push**. The runner publishes the
-release automatically; pushing again with the same version does nothing (no duplicate releases).
-
 ## 10. License
 
 MIT for the code. The model has its own license — see the
