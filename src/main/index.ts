@@ -48,6 +48,13 @@ function createWindow(): void {
       void (async () => {
         const js = (code: string): Promise<unknown> => mainWindow!.webContents.executeJavaScript(code)
         try {
+          if (process.env.TRIADE_SHOT_TEST === 'install') {
+            const id = process.env.TRIADE_SHOT_ID ?? ''
+            console.log(`[shot] install ${id}`)
+            const res = await js(`window.triade.modelsInstall(${JSON.stringify(id)})`)
+            console.log(`[shot] install completato: ${JSON.stringify(res).slice(0, 200)}`)
+          }
+
           if (process.env.TRIADE_SHOT_TEST === 'onboarding') {
             const click = (label: string): Promise<unknown> =>
               js(`(() => {
