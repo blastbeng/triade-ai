@@ -703,6 +703,7 @@ button.ghost {
 .sidebar {
   width: 262px;
   flex: 0 0 262px;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1340,6 +1341,8 @@ button.ghost {
 }
 
 .sessionrow .title {
+  overflow-wrap: anywhere;
+  word-break: break-word;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
