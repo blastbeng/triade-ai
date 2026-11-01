@@ -669,8 +669,10 @@ export class DebateEngine extends EventEmitter {
           id: randomUUID(),
           agentId: persona.id,
           name: persona.name,
-          // pausa a vuoto (nessun token utile): il turno non viene nemmeno aggiunto
-          text: clean || (interrupted ? '' : '[nessun contenuto]'),
+          // un intervento fatto solo di [[PASSA A: …]] o [[CONSENSO: …]] resta in
+          // trascrizione (serve a rotazione e limite turni) ma non ha testo da
+          // mostrare: prima diventava una bolla “[nessun contenuto]” in chat
+          text: clean,
           reasoning: reasoning.trim() || undefined,
           ts: Date.now(),
           tokensIn: tokens,
@@ -696,7 +698,10 @@ export class DebateEngine extends EventEmitter {
         if (!emptyInterrupted && !this.session.titleGenerated) {
           void this.generateTitle(persona)
         }
-        if (!emptyInterrupted) {
+        // senza testo (solo marcatori) non c'è niente da appendere alla colonna:
+        // il turno resta su disco ma non produce una bolla vuota
+        const visible = Boolean(clean || turn.reasoning)
+        if (!emptyInterrupted && visible) {
           rememberTurn(this.session, turn)
           this.emitEvent({ type: 'turn', turn })
         }
@@ -761,6 +766,7 @@ export class DebateEngine extends EventEmitter {
     const personas = activePersonas(settings)
     const judge = personas.find((p) => p.id !== proposer.id) ?? proposer
     const transcript = (this.session?.turns ?? [])
+      .filter((t) => t.text.trim().length > 0)
       .slice(-12)
       .map((t) => `[${t.name}] ${t.text}`)
       .join('\n\n')

@@ -3,6 +3,7 @@ import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { sessionsDir } from '../paths'
 import type { Session } from '../../shared/types'
+import { visibleTurn } from '../../shared/turns'
 
 /** Titolo provvisorio: prime parole del messaggio, tagliate a fine parola. */
 export function provisionalTitle(topic: string): string {
@@ -77,7 +78,8 @@ export function listSessions(): SessionSummary[] {
           title: s.title ?? provisionalTitle(s.topic),
           updatedAt: s.updatedAt,
           state: s.state,
-          turns: s.turns.length
+          // i turni fatti solo di marcatori non sono interventi visibili
+          turns: s.turns.filter(visibleTurn).length
         }
       } catch {
         return null

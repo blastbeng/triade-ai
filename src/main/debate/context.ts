@@ -89,8 +89,13 @@ export function buildMessages(
   const messages: LlmMessage[] = [
     { role: 'system', content: systemPrompt(persona, session, settings, personas) }
   ]
-  // solo la finestra attiva va al modello; i turni compressi restano su disco e in UI
-  const recent = session.turns.slice(session.contextFrom ?? 0).slice(-windowTurns)
+  // solo la finestra attiva va al modello; i turni compressi restano su disco e in UI.
+  // I turni senza testo (solo [[PASSA A: …]] o [[CONSENSO: …]]) non dicono nulla:
+  // mandare messaggi vuoti al server è rumore, e alcuni backend li rifiutano
+  const recent = session.turns
+    .slice(session.contextFrom ?? 0)
+    .filter((t) => t.text.trim().length > 0)
+    .slice(-windowTurns)
   for (const turn of recent) {
     messages.push(turnAsMessages(persona.id, turn.name, turn))
   }
@@ -142,6 +147,7 @@ export async function summarize(
 ): Promise<string> {
   const transcript = session.turns
     .slice(session.contextFrom ?? 0)
+    .filter((t) => t.text.trim().length > 0)
     .slice(-24)
     .map((t) => `[${t.name}] ${t.text}`)
     .join('\n\n')

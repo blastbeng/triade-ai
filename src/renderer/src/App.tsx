@@ -9,6 +9,7 @@ import type {
   Settings,
   UiFont
 } from '../../shared/types'
+import { visibleTurn } from '../../shared/turns'
 import ChatColumn, { type Phase } from './components/ChatColumn'
 import { LocaleContext } from './i18n'
 import { translate, type Locale } from '../../shared/i18n'
@@ -218,6 +219,7 @@ export default function App(): JSX.Element {
       return personas[0]?.id ?? ''
     }
     all.forEach((t, i) => {
+      if (!visibleTurn(t)) return
       if (t.agentId === personaId) {
         out.push(t)
         return
