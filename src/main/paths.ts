@@ -91,7 +91,76 @@ function migrateLegacyModels(target: string): void {
   }
 }
 
+/** Cartella binari inclusa nel pacchetto (dentro l'app, non modificabile). */
+function packagedBinDir(): string {
+  const platformDir = process.platform === 'win32' ? 'win' : 'linux'
+  const exe = process.platform === 'win32' ? 'llama-server.exe' : 'llama-server'
+  const root = path.join(appRoot(), 'bin')
+  const platform = path.join(root, platformDir)
+  if (fs.existsSync(path.join(platform, exe))) return platform
+  const packaged = path.join(process.resourcesPath ?? '', 'bin')
+  if (fs.existsSync(path.join(packaged, exe))) return packaged
+  if (fs.existsSync(path.join(root, exe))) return root
+  if (fs.existsSync(platform)) return platform
+  if (fs.existsSync(root)) return root
+  return path.join(app.getAppPath(), 'bin')
+}
+
+function copyTree(from: string, to: string): void {
+  const walk = (dir: string, out: string): void => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const src = path.join(dir, e.name)
+      const dst = path.join(out, e.name)
+      if (e.isDirectory()) {
+        fs.mkdirSync(dst, { recursive: true })
+        walk(src, dst)
+      } else {
+        fs.mkdirSync(path.dirname(dst), { recursive: true })
+        fs.copyFileSync(src, dst)
+        if (process.platform !== 'win32') {
+          try {
+            fs.chmodSync(dst, 0o755)
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+  }
+  walk(from, to)
+}
+
+/**
+ * Tutto ciò che serve deve stare in `dati/bin`: i binari inclusi nel pacchetto
+ * vengono copiati lì al primo avvio (con le loro sottocartelle, es. `whisper/`),
+ * così il runtime non dipende mai dalla cartella temporanea di scompattazione.
+ */
+export function ensureBinaries(): string {
+  const target = path.join(dataDir(), 'bin')
+  const exe = process.platform === 'win32' ? 'llama-server.exe' : 'llama-server'
+  if (fs.existsSync(path.join(target, exe))) return target
+  const source = packagedBinDir()
+  if (!fs.existsSync(source)) return target
+  try {
+    fs.mkdirSync(target, { recursive: true })
+    copyTree(source, target)
+    log.info(`[paths] binari copiati in ${target}`)
+  } catch (err) {
+    log.error(`[paths] copia binari fallita: ${(err as Error).message}`)
+  }
+  return target
+}
+
 export function binDir(): string {
+  // 1) `dati/bin` (tutto dentro la cartella dati, come da requisito)
+  const own = path.join(dataDir(), 'bin')
+  const exeName = process.platform === 'win32' ? 'llama-server.exe' : 'llama-server'
+  if (fs.existsSync(path.join(own, exeName))) return own
+  // 2) binari inclusi nel pacchetto (prima della prima copia)
+  return packagedBinDir()
+}
+
+function legacyBinDir(): string {
   const platformDir = process.platform === 'win32' ? 'win' : 'linux'
   const exe = process.platform === 'win32' ? 'llama-server.exe' : 'llama-server'
   const root = path.join(appRoot(), 'bin')

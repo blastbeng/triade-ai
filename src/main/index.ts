@@ -516,6 +516,14 @@ app.whenReady().then(async () => {
     if (freed > 0) log.info(`[cache] liberati ${(freed / 1024 ** 2).toFixed(1)} MiB`)
   })
 
+  // tutti i binari vivono in dati/bin (copiati dal pacchetto al primo avvio)
+  try {
+    const { ensureBinaries } = await import('./paths')
+    ensureBinaries()
+  } catch {
+    /* la copia non deve impedire l'avvio */
+  }
+
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
