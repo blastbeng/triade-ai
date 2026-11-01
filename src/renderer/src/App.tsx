@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type {
+  Turn,
   Attachment,
   DebateEvent,
   ModelStatus,
@@ -159,6 +160,23 @@ export default function App(): JSX.Element {
   }, [])
 
   const personas = settings?.personas ?? []
+
+  /** Turni visibili in una colonna: quelli dell'agente più i messaggi dell'utente rivolti a lui. */
+  const turnsFor = (personaId: string): Turn[] => {
+    const all = session?.turns ?? []
+    const out: Turn[] = []
+    all.forEach((t, i) => {
+      if (t.agentId === personaId) {
+        out.push(t)
+        return
+      }
+      if (t.agentId === 'utente') {
+        const target = t.toPersonaId ?? all.slice(i + 1).find((x) => x.agentId !== 'utente')?.agentId
+        if (target === personaId) out.push(t)
+      }
+    })
+    return out
+  }
   const isRunning = session?.state === 'running'
   const activeModel = catalog.find((m) => m.active)
   const lastTokens = session?.turns[session.turns.length - 1]?.tokensIn ?? 0
@@ -391,7 +409,7 @@ export default function App(): JSX.Element {
               key={persona.id}
               persona={persona}
               personas={personas}
-              turns={(session?.turns ?? []).filter((t) => t.agentId === persona.id)}
+              turns={turnsFor(persona.id)}
               streaming={stream?.agentId === persona.id ? stream.text : null}
               ui={settings?.ui}
               streamReasoning={streamReasoning?.agentId === persona.id ? streamReasoning.text : null}

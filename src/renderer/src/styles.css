@@ -1686,3 +1686,19 @@ body[data-density='compact'] .reasoning pre {
   border-color: #5c4a1c;
   background: #221c0d;
 }
+
+/* ---------- messaggi dell'utente nella colonna ---------- */
+.bubble.user {
+  background: #16202c;
+  border: 1px solid #27384a;
+  margin-left: 18px;
+}
+
+.bubble.user .meta {
+  color: #93b4d4;
+}
+
+.bubble.user .md,
+.bubble.user pre.plain {
+  color: #dbeaf8;
+}

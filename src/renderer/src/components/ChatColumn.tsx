@@ -110,10 +110,14 @@ export default function ChatColumn({
         )}
 
         {turns.map((turn) => (
-          <article key={turn.id} className={`bubble ${turn.interrupted ? 'interrupted' : ''}`}>
+          <article
+            key={turn.id}
+            className={`bubble ${turn.agentId === 'utente' ? 'user' : ''} ${turn.interrupted ? 'interrupted' : ''}`}
+          >
             <div className="meta">
-              turno
+              {turn.agentId === 'utente' ? 'tu' : 'turno'}
               {(ui?.showTimestamps ?? true) && ` · ${new Date(turn.ts).toLocaleTimeString('it-IT')}`}
+              {turn.agentId === 'utente' && <span className="tok"> · messaggio inviato</span>}
               {(ui?.showTokens ?? true) && turn.tokensIn > 0 && (
                 <span className="tok"> · {turn.tokensIn} token di prompt</span>
               )}

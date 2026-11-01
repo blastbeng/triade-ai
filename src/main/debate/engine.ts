@@ -127,10 +127,21 @@ export class DebateEngine extends EventEmitter {
   async submit(text: string, attachments: Attachment[] = [], startWith?: string): Promise<Session> {
     if (this.session && this.session.turns.length > 0 && this.session.state !== 'running') {
       const session = this.session
+      const personas = getSettings().personas
+      const responder =
+        startWith ??
+        session.nextSpeakerId ??
+        chooseNextSpeaker({
+          personas,
+          turns: session.turns,
+          nextSpeakerId: session.nextSpeakerId,
+          rotationOffset: session.rotationOffset
+        }).id
       const turn: Turn = {
         id: randomUUID(),
         agentId: 'utente',
         name: 'Utente',
+        toPersonaId: responder,
         text,
         ts: Date.now(),
         tokensIn: 0,
@@ -190,11 +201,22 @@ export class DebateEngine extends EventEmitter {
       .join('\n\n')
     if (context) session.topic = `${topic}\n\nMateriale fornito dall'utente:\n${context}`
     this.session = session
+    const personasForStart = getSettings().personas
     if (startWith) {
-      const personas = getSettings().personas
-      const idx = personas.findIndex((p) => p.id === startWith)
+      const idx = personasForStart.findIndex((p) => p.id === startWith)
       if (idx >= 0) session.rotationOffset = idx
     }
+    const firstSpeaker =
+      startWith ??
+      chooseNextSpeaker({
+        personas: personasForStart,
+        turns: session.turns,
+        rotationOffset: session.rotationOffset
+      }).id
+    session.turns = session.turns.map((t) =>
+      t.agentId === 'utente' && !t.toPersonaId ? { ...t, toPersonaId: firstSpeaker } : t
+    )
+    saveSession(session)
     saveSession(session)
     this.emitEvent({ type: 'session', session })
     this.setState('running')

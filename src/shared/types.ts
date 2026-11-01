@@ -124,6 +124,8 @@ export interface Turn {
   cut?: 'loop' | 'budget' | 'handoff'
   /** personalità a cui questo turno ha ceduto la parola */
   handoffTo?: string
+  /** per i turni dell'utente: chat a cui il messaggio è rivolto */
+  toPersonaId?: string
 }
 
 export type SessionState = 'running' | 'paused' | 'stopped' | 'concluded' | 'error'
