@@ -139,6 +139,7 @@ export default function App(): JSX.Element {
   const personas = settings?.personas ?? []
   const isRunning = session?.state === 'running'
   const activeModel = catalog.find((m) => m.active)
+  const lastTokens = session?.turns[session.turns.length - 1]?.tokensIn ?? 0
   const ctxUsed = useMemo(() => {
     const last = session?.turns[session.turns.length - 1]
     const ctx = settings?.contextSize ?? 65536
@@ -234,7 +235,9 @@ export default function App(): JSX.Element {
           {sessions.map((s) => (
             <div key={s.id} className={`sessionrow ${session?.id === s.id ? 'selected' : ''}`}>
               <button className="rowbtn" onClick={() => void openSession(s.id)}>
-                <span className="title">{s.topic.split('\n')[0].slice(0, 60)}</span>
+                <span className="title" title={s.topic}>
+                  {s.topic.split('\n')[0].slice(0, 90)}
+                </span>
                 <span className="sub">
                   {s.turns} turni · {s.state} · {new Date(s.updatedAt).toLocaleDateString('it-IT')}
                 </span>
@@ -282,8 +285,17 @@ export default function App(): JSX.Element {
                 </span>
               ))}
             <span className="badge">ctx {settings?.contextSize ?? '—'}</span>
-            <span className="badge ctxbadge" title="token del prompt nell'ultimo turno">
+            <span
+              className="badge ctxbadge"
+              title={`token del prompt nell'ultimo turno su ${settings?.contextSize ?? 0}`}
+            >
               prompt {Math.round(ctxUsed * 100)}%
+              {lastTokens > 0 && (
+                <span className="tokcount">
+                  {lastTokens > 1000 ? `${(lastTokens / 1000).toFixed(1)}k` : lastTokens}/
+                  {((settings?.contextSize ?? 0) / 1000).toFixed(0)}k
+                </span>
+              )}
               <span className="ctxbar">
                 <span style={{ width: `${Math.round(ctxUsed * 100)}%` }} />
               </span>

@@ -652,8 +652,8 @@ button.ghost {
 }
 
 .sidebar {
-  width: 240px;
-  flex: 0 0 240px;
+  width: 262px;
+  flex: 0 0 262px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1281,9 +1281,21 @@ button.ghost {
 /* ---------- eliminazione sessioni e voci di memoria ---------- */
 .sessionrow {
   display: flex;
+  flex-direction: row;
   align-items: stretch;
   gap: 2px;
   padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+
+.sessionrow .title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.3;
 }
 
 .sessionrow .rowbtn {
@@ -1352,4 +1364,10 @@ button.ghost {
 .memdel:hover {
   background: #3a1d1d;
   color: #fca5a5;
+}
+
+.tokcount {
+  color: var(--muted);
+  font-size: 11.5px;
+  margin-left: 2px;
 }
