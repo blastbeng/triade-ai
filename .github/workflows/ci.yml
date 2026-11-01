@@ -53,6 +53,8 @@ jobs:
           key: bin-${{ matrix.target }}-${{ hashFiles('scripts/fetch-binaries.mjs') }}
       - run: npm ci
       - run: npm run fetch:bin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: npm run build
       - run: npm run stage:${{ matrix.target }}
       - name: package
