@@ -1,3 +1,4 @@
+import { log } from '../log'
 /** Motori di ricerca senza chiave API, usati come catena di riserva. */
 
 export interface SearchHit {
@@ -41,12 +42,12 @@ async function get(url: string, accept = 'text/html,application/xhtml+xml'): Pro
       signal: AbortSignal.timeout(15000)
     })
     if (!res.ok) {
-      if (process.env.TRIADE_DEBUG_SEARCH) console.log(`[search] GET ${url} → HTTP ${res.status}`)
+      if (process.env.TRIADE_DEBUG_SEARCH) log.info(`[search] GET ${url} → HTTP ${res.status}`)
       return null
     }
     const body = await res.text()
     if (process.env.TRIADE_DEBUG_SEARCH) {
-      console.log(`[search] GET ${url} → ${res.status}, ${body.length} byte, b_algo=${(body.match(/<li class="b_algo/g) ?? []).length}`)
+      log.info(`[search] GET ${url} → ${res.status}, ${body.length} byte, b_algo=${(body.match(/<li class="b_algo/g) ?? []).length}`)
     }
     return body
   } catch {
@@ -186,7 +187,7 @@ export async function fallbackSearch(
   for (const engine of chain) {
     const hits = await engine.run()
     if (process.env.TRIADE_DEBUG_SEARCH) {
-      console.log(`[search] ${engine.name} → ${hits.length} risultati`)
+      log.info(`[search] ${engine.name} → ${hits.length} risultati`)
     }
     if (hits.length) return { hits, engine: engine.name }
   }

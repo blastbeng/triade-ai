@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { findBinary } from '../paths'
 import { parseDevices, parseVulkaninfoSummary, type Backend, type GpuDevice } from './parse'
+import { log } from '../log'
 
 export type { Backend, GpuDevice } from './parse'
 
@@ -153,7 +154,7 @@ export async function detectGpus(force = false): Promise<DetectedGpus> {
     diag = exe
       ? `binario: ${exe} — risposta di --list-devices: ${(await runAsync(exe, ['--list-devices'])).slice(0, 300) || '(vuota)'}`
       : 'binario llama-server non trovato accanto all\'app: i file in bin/ non sono stati inclusi nel pacchetto'
-    console.error(`[gpu] nessuna GPU: ${diag}`)
+    log.error(`[gpu] nessuna GPU: ${diag}`)
   }
   const value: DetectedGpus = {
     usable: classified.filter((d) => !d.integrated && d.backend !== 'cuda'),

@@ -13,6 +13,7 @@ import { bestDevice, detectGpus, hasCudaBuild } from './gpu/devices'
 import { CATALOG, catalogModel, defaultModelId, listModels } from './models/registry'
 import { inspectRepo, searchGgufModels, systemRamMiB } from './hf/hf'
 import type { Attachment, DebateEvent, Settings } from '../shared/types'
+import { log } from './log'
 
 function broadcast(event: DebateEvent): void {
   for (const win of BrowserWindow.getAllWindows()) win.webContents.send('debate:event', event)
@@ -56,7 +57,7 @@ export function registerIpc(): void {
     try {
       const st = await installModel(id, (status) => {
         if (process.env.TRIADE_DEBUG_DOWNLOAD) {
-          console.log(
+          log.info(
             `[dl] ${status.id} ${status.phase} ${Math.round((status.progress ?? 0) * 100)}%`
           )
         }

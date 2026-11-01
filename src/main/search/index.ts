@@ -1,5 +1,6 @@
 import { getSettings } from '../settings'
 import { fallbackSearch, parseSearxHtml, type SearchHit } from './engines'
+import { log } from '../log'
 
 export type { SearchHit }
 
@@ -143,7 +144,7 @@ export async function webSearchDetailed(
     const lang = (s.ui?.language ?? 'it') === 'en' ? 'en' : 'it'
     const fallback = await fallbackSearch(query, n, lang)
     if (fallback.hits.length) {
-      console.log(`[search] "${query}" → ${fallback.engine} (${fallback.hits.length})`)
+      log.info(`[search] "${query}" → ${fallback.engine} (${fallback.hits.length})`)
       return { hits: fallback.hits, engine: fallback.engine }
     }
     if (primaryError) throw new Error(primaryError)

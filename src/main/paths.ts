@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
+import { log } from './log'
 
 /**
  * Cartella "portabile": dove vive l'exe, non la cartella temporanea in cui
@@ -56,7 +57,7 @@ export function dataDir(): string {
   fs.mkdirSync(dir, { recursive: true })
   if (!loggedDataDir) {
     loggedDataDir = true
-    console.log(`[paths] cartella dati: ${dir}`)
+    log.info(`[paths] cartella dati: ${dir}`)
   }
   return dir
 }

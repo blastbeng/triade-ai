@@ -6,6 +6,7 @@ import { detectGpus } from './gpu/devices'
 import { engine } from './debate/engine'
 import { translate } from '../shared/i18n'
 import { getSettings } from './settings'
+import { log } from './log'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -27,15 +28,15 @@ function createWindow(): void {
   })
 
   if (process.env.TRIADE_SMOKE) {
-    console.log(`[smoke] finestra creata (livello ${process.env.TRIADE_SMOKE})`)
+    log.info(`[smoke] finestra creata (livello ${process.env.TRIADE_SMOKE})`)
     mainWindow.webContents.on('did-fail-load', (_e, code, desc) =>
-      console.error(`[smoke] did-fail-load ${code} ${desc}`)
+      log.error(`[smoke] did-fail-load ${code} ${desc}`)
     )
     mainWindow.webContents.on('render-process-gone', (_e, details) =>
-      console.error(`[smoke] render-process-gone ${details.reason}`)
+      log.error(`[smoke] render-process-gone ${details.reason}`)
     )
     mainWindow.webContents.on('console-message', (_e, _lvl, message) =>
-      console.log(`[smoke][renderer] ${message}`)
+      log.info(`[smoke][renderer] ${message}`)
     )
   }
   // nessun onboarding sotto il dialogo: la finestra appare solo a fine aggiornamento
@@ -58,9 +59,9 @@ function createWindow(): void {
         try {
           if (process.env.TRIADE_SHOT_TEST === 'install') {
             const id = process.env.TRIADE_SHOT_ID ?? ''
-            console.log(`[shot] install ${id}`)
+            log.info(`[shot] install ${id}`)
             const res = await js(`window.triade.modelsInstall(${JSON.stringify(id)})`)
-            console.log(`[shot] install completato: ${JSON.stringify(res).slice(0, 200)}`)
+            log.info(`[shot] install completato: ${JSON.stringify(res).slice(0, 200)}`)
           }
 
           if (process.env.TRIADE_SHOT_TEST === 'onboarding') {
@@ -85,19 +86,19 @@ function createWindow(): void {
               if (st.modal) break
               await new Promise((r) => setTimeout(r, 250))
             }
-            console.log('[ob] lingua:', JSON.stringify(await state()))
-            console.log('[ob] continua:', await click('continua'))
+            log.info('[ob] lingua:', JSON.stringify(await state()))
+            log.info('[ob] continua:', await click('continua'))
             await new Promise((r) => setTimeout(r, 900))
-            console.log('[ob] passo backend:', JSON.stringify(await state()))
+            log.info('[ob] passo backend:', JSON.stringify(await state()))
             const back1 = await click('indietro')
             await new Promise((r) => setTimeout(r, 900))
-            console.log('[ob] indietro dal backend:', back1, JSON.stringify(await state()))
-            console.log('[ob] riavanti:', await click('continua'))
+            log.info('[ob] indietro dal backend:', back1, JSON.stringify(await state()))
+            log.info('[ob] riavanti:', await click('continua'))
             await new Promise((r) => setTimeout(r, 900))
-            console.log('[ob] di nuovo backend:', JSON.stringify(await state()))
-            console.log('[ob] vai ai modelli:', await click('continua'))
+            log.info('[ob] di nuovo backend:', JSON.stringify(await state()))
+            log.info('[ob] vai ai modelli:', await click('continua'))
             await new Promise((r) => setTimeout(r, 1500))
-            console.log('[ob] passo personalità:', JSON.stringify(await state()))
+            log.info('[ob] passo personalità:', JSON.stringify(await state()))
             const picked = (await js(`(() => {
               const btns = [...document.querySelectorAll('.personacount .langbutton')];
               const before = btns.map((b) => b.className.includes('selected'));
@@ -110,16 +111,16 @@ function createWindow(): void {
               const btns = [...document.querySelectorAll('.personacount .langbutton')];
               return btns.map((b) => b.className.includes('selected'));
             })()`)) as boolean[]
-            console.log('[ob] default preselezionato:', JSON.stringify(picked.before), '| dopo clic su 2:', JSON.stringify(afterPick))
-            console.log('[ob] vai ai modelli:', await click('continua'))
+            log.info('[ob] default preselezionato:', JSON.stringify(picked.before), '| dopo clic su 2:', JSON.stringify(afterPick))
+            log.info('[ob] vai ai modelli:', await click('continua'))
             await new Promise((r) => setTimeout(r, 1500))
-            console.log('[ob] passo modelli:', JSON.stringify(await state()))
+            log.info('[ob] passo modelli:', JSON.stringify(await state()))
             const done = await click('concludi')
             await new Promise((r) => setTimeout(r, 1500))
             const after = await state()
             const settings = await js('window.triade.getSettings()')
-            console.log('[ob] clic concludi:', done, '→', JSON.stringify(after))
-            console.log('[ob] onboardingDone:', (settings as { onboardingDone?: boolean }).onboardingDone)
+            log.info('[ob] clic concludi:', done, '→', JSON.stringify(after))
+            log.info('[ob] onboardingDone:', (settings as { onboardingDone?: boolean }).onboardingDone)
           }
 
           if (process.env.TRIADE_SHOT_TEST === 'search') {
@@ -127,8 +128,8 @@ function createWindow(): void {
               `window.triade.searchWeb(${JSON.stringify(process.env.TRIADE_SHOT_QUERY ?? 'vulkan amd rx 7600 xt')}, 4)`
             )
             const r = out as { engine: string; hits: { title: string; url: string }[] }
-            console.log(`[shot] search engine=${r.engine} hits=${r.hits.length}`)
-            for (const h of r.hits.slice(0, 3)) console.log(`[shot]   - ${h.title} (${h.url})`)
+            log.info(`[shot] search engine=${r.engine} hits=${r.hits.length}`)
+            for (const h of r.hits.slice(0, 3)) log.info(`[shot]   - ${h.title} (${h.url})`)
           }
           if (process.env.TRIADE_SHOT_TAB) {
             await js(
@@ -143,7 +144,7 @@ function createWindow(): void {
                  return tabs.map((t) => t.textContent.trim()).join(',') + ' -> ' + (target ? 'cliccata' : 'non trovata');
                })()`
             )
-            console.log(`[shot] tab: ${String(clicked)}`)
+            log.info(`[shot] tab: ${String(clicked)}`)
           } else {
             await js(
               `window.triade.startDebate('Screenshot: come progettiamo un agente locale che usa la GPU AMD per la ricerca?', [], ${JSON.stringify(process.env.TRIADE_SHOT_PERSONA ?? '')})`
@@ -161,7 +162,7 @@ function createWindow(): void {
                  return (cur?.turns ?? []).filter((x) => x.agentId === 'utente').map((x) => x.toPersonaId + ':' + x.text.slice(0, 16)).join(' | ');
                })()`
             )
-            console.log(`[shot] turni utente -> ${String(owners)}`)
+            log.info(`[shot] turni utente -> ${String(owners)}`)
           }
           await new Promise((r) => setTimeout(r, Number(process.env.TRIADE_SHOT_DELAY ?? 30000)))
           if (process.env.TRIADE_SHOT_SCROLL === 'top') {
@@ -176,9 +177,9 @@ function createWindow(): void {
           const { dataDir } = await import('./paths')
           const file = path.join(dataDir(), 'screenshot.png')
           fs.writeFileSync(file, image.toPNG())
-          console.log(`[shot] salvato ${file} (${fs.statSync(file).size} byte)`)
+          log.info(`[shot] salvato ${file} (${fs.statSync(file).size} byte)`)
         } catch (err) {
-          console.error('[shot] fallito:', (err as Error).message)
+          log.error('[shot] fallito:', (err as Error).message)
         }
         await engine.pause()
         await llamaPool.stopAll()
@@ -204,16 +205,16 @@ function createWindow(): void {
             excluded: { name: string }[]
             selectable: boolean
           }
-          console.log(`[smoke] gpu utilizzabili: ${gpus.usable.map((g) => g.name).join(' | ') || 'nessuna'}`)
-          console.log(`[smoke] gpu escluse: ${gpus.excluded.map((g) => g.name).join(' | ') || 'nessuna'}`)
-          console.log(`[smoke] selezione per chat attiva: ${gpus.selectable}`)
+          log.info(`[smoke] gpu utilizzabili: ${gpus.usable.map((g) => g.name).join(' | ') || 'nessuna'}`)
+          log.info(`[smoke] gpu escluse: ${gpus.excluded.map((g) => g.name).join(' | ') || 'nessuna'}`)
+          log.info(`[smoke] selezione per chat attiva: ${gpus.selectable}`)
           const model = (await js('window.triade.modelStatus()')) as { id: string; modelReady: boolean }
-          console.log(`[smoke] modello ${model.id} pronto: ${model.modelReady}`)
+          log.info(`[smoke] modello ${model.id} pronto: ${model.modelReady}`)
           const catalog = (await js('window.triade.modelsCatalog()')) as unknown[]
-          console.log(`[smoke] catalogo: ${catalog.length} modelli`)
+          log.info(`[smoke] catalogo: ${catalog.length} modelli`)
 
           const found = (await js(`window.triade.hfSearch('qwen2.5-vl')`)) as { repo: string }[]
-          console.log(`[smoke] ricerca HuggingFace: ${found.length} risultati`)
+          log.info(`[smoke] ricerca HuggingFace: ${found.length} risultati`)
           if (found[0]) {
             const v = (await js(`window.triade.hfInspect(${JSON.stringify(found[0].repo)})`)) as {
               ok: boolean
@@ -223,25 +224,25 @@ function createWindow(): void {
               availableMiB: number
               reason: string
             }
-            console.log(
+            log.info(
               `[smoke] verdetto ${found[0].repo}: ok=${v.ok} vision=${v.vision} quant=${v.quant} ` +
                 `${v.totalMiB}/${v.availableMiB} MiB — ${v.reason}`
             )
             const moe = (await js(
               `window.triade.hfInspect('Qwen/Qwen3-VL-30B-A3B-Instruct-GGUF')`
             )) as { ok: boolean; moe: boolean; mode: string; quant: string; contextSuggestion: number }
-            console.log(
+            log.info(
               `[smoke] MoE: ok=${moe.ok} moe=${moe.moe} modo=${moe.mode} quant=${moe.quant} ctx=${moe.contextSuggestion}`
             )
           }
           const memory = (await js('window.triade.memoryStats()')) as { entries: number }
-          console.log(`[smoke] memoria: ${memory.entries} elementi`)
+          log.info(`[smoke] memoria: ${memory.entries} elementi`)
           const list = (await js('window.triade.listSessions()')) as { id: string }[]
           if (list.length) {
             const res = (await js(
               `window.triade.deleteSession(${JSON.stringify(list[0].id)})`
             )) as { sessions: unknown[]; memory: { entries: number } }
-            console.log(
+            log.info(
               `[smoke] eliminazione sessione: ${list.length} -> ${res.sessions.length} chat, memoria ${memory.entries} -> ${res.memory.entries}`
             )
           }
@@ -251,7 +252,7 @@ function createWindow(): void {
             const removed = (await js(
               `window.triade.memoryDelete(${JSON.stringify([recent[0].id])})`
             )) as { stats: { entries: number } }
-            console.log(
+            log.info(
               `[smoke] eliminazione voce di memoria: ${before.entries} -> ${removed.stats.entries}`
             )
           }
@@ -262,10 +263,10 @@ function createWindow(): void {
             await new Promise((r) => setTimeout(r, 6000))
             const stopped = (await js('window.triade.stopDebate()')) as { state: string; turns: unknown[] }
             const listAfter = (await js('window.triade.listSessions()')) as { id: string }[]
-            console.log(`[smoke] dopo stop: stato=${stopped.state} turni=${stopped.turns.length} sessioni elencate=${listAfter.length}`)
+            log.info(`[smoke] dopo stop: stato=${stopped.state} turni=${stopped.turns.length} sessioni elencate=${listAfter.length}`)
             await new Promise((r) => setTimeout(r, 1500))
             const still = (await js('window.triade.currentSession()')) as { state: string; turns: unknown[] }
-            console.log(`[smoke] dopo 1.5s: stato=${still.state} turni=${still.turns.length} (nessun nuovo turno atteso)`)
+            log.info(`[smoke] dopo 1.5s: stato=${still.state} turni=${still.turns.length} (nessun nuovo turno atteso)`)
           }
 
           if (process.env.TRIADE_SMOKE === '5') {
@@ -276,24 +277,24 @@ function createWindow(): void {
                 process.env.TRIADE_SMOKE_QUANT ?? 'F16'
               )})`
             )) as { entry: { id: string } }
-            console.log(`[smoke] aggiunto modello personalizzato: ${added.entry.id}`)
+            log.info(`[smoke] aggiunto modello personalizzato: ${added.entry.id}`)
             const st = (await js(
               `window.triade.modelsInstall(${JSON.stringify(added.entry.id)})`
             )) as { modelReady: boolean; mmprojReady: boolean }
-            console.log(
+            log.info(
               `[smoke] download personalizzato: modello ${st.modelReady}, mmproj ${st.mmprojReady}`
             )
             const list = (await js('window.triade.modelsCatalog()')) as {
               id: string
               installed: boolean
             }[]
-            console.log(`[smoke] catalogo ora: ${list.length} modelli, ${list.filter((m) => m.installed).length} installati`)
+            log.info(`[smoke] catalogo ora: ${list.length} modelli, ${list.filter((m) => m.installed).length} installati`)
           }
 
-          console.log('[smoke] OK')
+          log.info('[smoke] OK')
 
           if (process.env.TRIADE_SMOKE === '2') {
-            console.log('[smoke] avvio dibattito reale…')
+            log.info('[smoke] avvio dibattito reale…')
             await js(
               `window.triade.startDebate('Smoke test: in due frasi, quale modello locale e quale GPU conviene per un agente di ricerca?', [], ${JSON.stringify(process.env.TRIADE_SMOKE_PERSONA ?? '')})`
             )
@@ -309,9 +310,9 @@ function createWindow(): void {
               turns = cur?.turns?.length ?? 0
               if (turns >= 3 || cur?.state === 'concluded' || cur?.state === 'error') {
                 for (const t of cur?.turns ?? []) {
-                  console.log(`[smoke] turno ${t.name} (${t.tokensIn} tok prompt): ${t.text.slice(0, 140).replace(/\s+/g, ' ')}`)
+                  log.info(`[smoke] turno ${t.name} (${t.tokensIn} tok prompt): ${t.text.slice(0, 140).replace(/\s+/g, ' ')}`)
                 }
-                console.log(`[smoke] stato finale: ${cur?.state}, turni: ${turns}`)
+                log.info(`[smoke] stato finale: ${cur?.state}, turni: ${turns}`)
                 break
               }
             }
@@ -319,7 +320,7 @@ function createWindow(): void {
             if (turns < 1) throw new Error('il dibattito non ha prodotto turni')
           }
         } catch (err) {
-          console.error('[smoke] FALLITO:', (err as Error).message)
+          log.error('[smoke] FALLITO:', (err as Error).message)
           process.exitCode = 1
         }
         // i llama-server figli vanno fermati prima di uscire, altrimenti restano in VRAM
@@ -357,7 +358,7 @@ if (process.platform === 'linux') {
 }
 
 process.on('unhandledRejection', (reason) => {
-  console.error('[main] promise non gestita:', reason instanceof Error ? reason.message : reason)
+  log.error('[main] promise non gestita:', reason instanceof Error ? reason.message : reason)
 })
 
 const t = (key: string, params?: Record<string, string | number>): string =>
@@ -467,7 +468,7 @@ app.whenReady().then(async () => {
       const { memory } = await import('./memory/store')
       await memory.prepare()
     } catch (err) {
-      console.error('[memoria] preparazione embedding fallita:', (err as Error).message)
+      log.error('[memoria] preparazione embedding fallita:', (err as Error).message)
     }
   })()
   registerIpc()
@@ -486,7 +487,7 @@ app.whenReady().then(async () => {
 
   void import('./housekeep').then(({ evictCache }) => {
     const freed = evictCache()
-    if (freed > 0) console.log(`[cache] liberati ${(freed / 1024 ** 2).toFixed(1)} MiB`)
+    if (freed > 0) log.info(`[cache] liberati ${(freed / 1024 ** 2).toFixed(1)} MiB`)
   })
 
   createWindow()

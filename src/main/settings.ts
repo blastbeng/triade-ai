@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS, type Settings } from '../shared/types'
 import { areDefaultPersonas, defaultPersonas } from '../shared/personas'
 import { settingsFile } from './paths'
 import { safeStorage } from 'electron'
+import { log } from './log'
 
 const SECRET_PREFIX = 'enc1:'
 
@@ -131,7 +132,7 @@ export function getSettings(): Settings {
       } catch {
         /* ignore */
       }
-      console.error(`[impostazioni] file illeggibile (${(err as Error).message}): uso i default`)
+      log.error(`[impostazioni] file illeggibile (${(err as Error).message}): uso i default`)
       raw = {}
     }
       loaded = merge(DEFAULT_SETTINGS, raw)
