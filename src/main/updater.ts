@@ -144,6 +144,10 @@ export async function downloadUpdate(info: UpdateInfo, onPct?: (p: number) => vo
   )
   if (!candidate) throw new Error('archivio aggiornamento senza eseguibile')
   const nuovo = path.join(unpack, candidate)
+  const size = fs.statSync(nuovo).size
+  if (size < 20 * 1024 * 1024) {
+    throw new Error(`l’eseguibile scaricato sembra incompleto (${(size / 1024 ** 2).toFixed(1)} MiB)`)
+  }
   if (process.platform !== 'win32') fs.chmodSync(nuovo, 0o755)
   return nuovo
 }
@@ -216,6 +220,12 @@ export function applyUpdate(newExe: string, version = ''): void {
     return
   }
   const current = process.env.APPIMAGE ?? process.execPath
+  if (!process.env.APPIMAGE && app.isPackaged) {
+    // estratta con --appimage-extract o simile: non c'è un file AppImage da sostituire
+    throw new Error(
+      'stai eseguendo una copia estratta dell’AppImage: scarica il nuovo .AppImage dalla pagina Releases'
+    )
+  }
   const backup = `${current}.old`
   markPending(version, backup)
   try {
