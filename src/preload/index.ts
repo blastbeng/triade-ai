@@ -40,6 +40,14 @@ const api = {
   modelsCatalog: (): Promise<CatalogEntry[]> => ipcRenderer.invoke('models:catalog'),
   modelsInstall: (id: string): Promise<ModelStatus> => ipcRenderer.invoke('models:install', id),
   modelsRemove: (id: string): Promise<ModelStatus[]> => ipcRenderer.invoke('models:remove', id),
+  hfSearch: (query: string): Promise<{ repo: string; downloads: number; tags: string[] }[]> =>
+    ipcRenderer.invoke('hf:search', query),
+  hfInspect: (repo: string): Promise<Record<string, unknown>> => ipcRenderer.invoke('hf:inspect', repo),
+  modelsAddCustom: (
+    repo: string,
+    quant: string
+  ): Promise<{ settings: Settings; entry: { id: string }; verdict: Record<string, unknown> }> =>
+    ipcRenderer.invoke('models:addCustom', { repo, quant }),
   modelsSetActive: (id: string): Promise<Settings> => ipcRenderer.invoke('models:setActive', id),
   modelsAssign: (personaId: string, modelId: string): Promise<Settings> =>
     ipcRenderer.invoke('models:assign', { personaId, modelId }),

@@ -13,7 +13,11 @@ function merge(base: Settings, patch: Partial<Settings>): Settings {
     textScale: patch.textScale ?? base.textScale,
     search: { ...base.search, ...(patch.search ?? {}) },
     asr: { ...base.asr, ...(patch.asr ?? {}) },
-    models: { ...base.models, ...(patch.models ?? {}) },
+    models: {
+      ...base.models,
+      ...(patch.models ?? {}),
+      custom: patch.models?.custom ?? base.models.custom
+    },
     onboardingDone: patch.onboardingDone ?? base.onboardingDone,
     gpus: { ...base.gpus, ...(patch.gpus ?? {}) },
     personas:

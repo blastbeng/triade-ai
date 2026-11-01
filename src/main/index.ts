@@ -87,6 +87,23 @@ function createWindow(): void {
           console.log(`[smoke] modello ${model.id} pronto: ${model.modelReady}`)
           const catalog = (await js('window.triade.modelsCatalog()')) as unknown[]
           console.log(`[smoke] catalogo: ${catalog.length} modelli`)
+
+          const found = (await js(`window.triade.hfSearch('qwen2.5-vl')`)) as { repo: string }[]
+          console.log(`[smoke] ricerca HuggingFace: ${found.length} risultati`)
+          if (found[0]) {
+            const v = (await js(`window.triade.hfInspect(${JSON.stringify(found[0].repo)})`)) as {
+              ok: boolean
+              vision: boolean
+              quant: string | null
+              totalMiB: number
+              availableMiB: number
+              reason: string
+            }
+            console.log(
+              `[smoke] verdetto ${found[0].repo}: ok=${v.ok} vision=${v.vision} quant=${v.quant} ` +
+                `${v.totalMiB}/${v.availableMiB} MiB — ${v.reason}`
+            )
+          }
           const memory = (await js('window.triade.memoryStats()')) as { entries: number }
           console.log(`[smoke] memoria: ${memory.entries} elementi`)
           const list = (await js('window.triade.listSessions()')) as { id: string }[]

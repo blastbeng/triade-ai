@@ -7,7 +7,8 @@ import { deleteSession, listSessions, loadSession } from './debate/store'
 import { ingest } from './media/attachments'
 import { memory } from './memory/store'
 import { bestDevice, detectGpus, hasCudaBuild } from './gpu/devices'
-import { CATALOG, catalogModel, defaultModelId } from './models/registry'
+import { CATALOG, catalogModel, defaultModelId, listModels } from './models/registry'
+import { inspectRepo, searchGgufModels, systemRamMiB } from './hf/hf'
 import type { Attachment, DebateEvent, Settings } from '../shared/types'
 
 function broadcast(event: DebateEvent): void {
@@ -36,7 +37,7 @@ export function registerIpc(): void {
   ipcMain.handle('models:catalog', async () => {
     const statuses = await catalogStatus()
     const s = getSettings()
-    return CATALOG.map((m) => {
+    return listModels().map((m) => {
       const st = statuses.find((x) => x.id === m.id)
       return {
         ...m,
@@ -65,11 +66,89 @@ export function registerIpc(): void {
   ipcMain.handle('models:remove', async (_e, id: string) => {
     await removeModel(id)
     const s = getSettings()
+    const custom = (s.models.custom ?? []).filter((c) => c.id !== id)
+    const byPersona = { ...s.models.byPersona }
+    for (const [personaId, modelId] of Object.entries(byPersona)) {
+      if (modelId === id) delete byPersona[personaId]
+    }
     saveSettings({
-      models: { ...s.models, installed: s.models.installed.filter((x) => x !== id) }
+      models: {
+        ...s.models,
+        installed: s.models.installed.filter((x) => x !== id),
+        custom,
+        byPersona,
+        active: s.models.active === id ? defaultModelId() : s.models.active
+      }
     })
     return catalogStatus()
   })
+
+  /** Ricerca su HuggingFace: solo repo GGUF, poi verifica fattibilità sul PC dell'utente. */
+  ipcMain.handle('hf:search', async (_e, query: string) => {
+    const rows = await searchGgufModels(String(query ?? '').trim(), 24)
+    return rows.map((r) => ({
+      repo: r.modelId ?? r.id ?? '',
+      downloads: r.downloads ?? 0,
+      tags: (r.tags ?? []).filter((t) => ['gguf', 'image-text-to-text', 'vision'].includes(t))
+    }))
+  })
+
+  ipcMain.handle('hf:inspect', async (_e, repo: string) => {
+    const s = getSettings()
+    const { usable } = await detectGpus()
+    const device = bestDevice(usable)
+    const distinct = new Set(
+      s.personas.map((p) => s.models.byPersona[p.id] ?? s.models.active)
+    ).size
+    const verdict = await inspectRepo(repo, {
+      device,
+      contextSize: s.contextSize,
+      concurrentModels: Math.max(1, distinct + 1)
+    })
+    return {
+      ...verdict,
+      ramMiB: systemRamMiB(),
+      deviceName: device?.name ?? null
+    }
+  })
+
+  /** Aggiunge un modello scelto dalla ricerca: rivalidato qui, mai fidandosi della UI. */
+  ipcMain.handle(
+    'models:addCustom',
+    async (_e, payload: { repo: string; quant: string }) => {
+      const s = getSettings()
+      const { usable } = await detectGpus()
+      const device = bestDevice(usable)
+      const distinct = new Set(
+        s.personas.map((p) => s.models.byPersona[p.id] ?? s.models.active)
+      ).size
+      const verdict = await inspectRepo(payload.repo, {
+        device,
+        contextSize: s.contextSize,
+        concurrentModels: Math.max(1, distinct + 1)
+      })
+      if (!verdict.ok || !verdict.modelFile) {
+        throw new Error(`modello non utilizzabile su questa macchina: ${verdict.reason}`)
+      }
+      const variant = verdict.variants.find((v) => v.quant === payload.quant) ?? null
+      const quant = variant?.quant ?? verdict.quant ?? 'GGUF'
+      const file = variant?.file ?? verdict.modelFile
+      const id = `${payload.repo}::${quant}`.toLowerCase()
+      const entry = {
+        id,
+        name: verdict.name,
+        repo: payload.repo,
+        quant,
+        modelFile: file,
+        mmprojFile: verdict.mmprojFile ?? undefined,
+        bytes: (variant?.bytes ?? verdict.downloadBytes) + verdict.mmprojBytes,
+        vision: verdict.vision
+      }
+      const custom = [...(s.models.custom ?? []).filter((c) => c.id !== id), entry]
+      const next = saveSettings({ models: { ...s.models, custom } })
+      return { settings: next, entry, verdict }
+    }
+  )
 
   ipcMain.handle('models:setActive', (_e, id: string) => {
     const s = getSettings()

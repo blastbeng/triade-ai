@@ -1377,3 +1377,118 @@ button.ghost {
   font-size: 11.5px;
   margin-left: 2px;
 }
+
+/* ---------- ricerca modelli HuggingFace ---------- */
+.modelsearch {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  background: #0c1219;
+}
+
+.searchtitle {
+  font-size: 1rem;
+  margin: 10px 0 2px;
+  color: #dbe6f3;
+}
+
+.lead.small {
+  font-size: 0.86rem;
+  margin: 0 0 6px;
+}
+
+.hfresults {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hfrepo {
+  width: 100%;
+  text-align: left;
+  background: #111a25;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 9px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hfrepo:hover {
+  border-color: #2c4a5c;
+  background: #13202c;
+}
+
+.hfrepo .repo {
+  color: #cfe3f7;
+  font-size: 0.9rem;
+}
+
+.hfrepo .meta {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.verdict {
+  border-radius: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.verdict.ok {
+  border-color: #1d5b60;
+  background: #0d1a1e;
+}
+
+.verdict.ko {
+  border-color: #5b2626;
+  background: #1a0f0f;
+}
+
+.verdict .vhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.verdict p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #c3d0de;
+}
+
+.tag.ko {
+  color: #fca5a5;
+  border-color: #5b2626;
+}
+
+.verdict label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.verdict select {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: var(--text);
+  font-family: inherit;
+}

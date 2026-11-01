@@ -20,6 +20,17 @@ export interface SearchSettings {
   maxResults: number
 }
 
+export interface CustomModelEntry {
+  id: string
+  name: string
+  repo: string
+  quant: string
+  modelFile: string
+  mmprojFile?: string
+  bytes: number
+  vision: boolean
+}
+
 export interface Settings {
   /** Dimensione contesto (token) condivisa dalle 3 chat. */
   contextSize: number
@@ -44,6 +55,8 @@ export interface Settings {
     installed: string[]
     active: string
     byPersona: Record<string, string>
+    /** modelli scelti dalla ricerca HuggingFace, verificati prima dell'aggiunta */
+    custom: CustomModelEntry[]
   }
   /** false al primo avvio: mostra la scelta del modello. */
   onboardingDone: boolean
@@ -223,7 +236,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   personas: DEFAULT_PERSONAS,
   asr: { enabled: true, modelFile: 'ggml-base.bin', language: 'it' },
-  models: { installed: [], active: 'ornith-1.5-9b', byPersona: {} },
+  models: { installed: [], active: 'ornith-1.5-9b', byPersona: {}, custom: [] },
   onboardingDone: false,
   gpus: { byPersona: {} }
 }

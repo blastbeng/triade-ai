@@ -40,6 +40,28 @@ interface Api {
   modelsCatalog(): Promise<CatalogEntry[]>
   modelsInstall(id: string): Promise<ModelStatus>
   modelsRemove(id: string): Promise<ModelStatus[]>
+  hfSearch(query: string): Promise<{ repo: string; downloads: number; tags: string[] }[]>
+  hfInspect(repo: string): Promise<{
+    repo: string
+    name: string
+    paramsB: number
+    vision: boolean
+    quant: string | null
+    modelFile: string | null
+    mmprojFile: string | null
+    downloadBytes: number
+    totalMiB: number
+    availableMiB: number
+    ramMiB: number
+    deviceName: string | null
+    ok: boolean
+    reason: string
+    variants: { quant: string; file: string; bytes: number; totalMiB: number; fits: boolean }[]
+  }>
+  modelsAddCustom(
+    repo: string,
+    quant: string
+  ): Promise<{ settings: Settings; entry: { id: string }; verdict: unknown }>
   modelsSetActive(id: string): Promise<Settings>
   modelsAssign(personaId: string, modelId: string): Promise<Settings>
   modelStatus(): Promise<ModelStatus>

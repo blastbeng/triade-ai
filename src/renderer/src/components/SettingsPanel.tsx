@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Persona, SearchProvider, Settings } from '../../../shared/types'
 import type { CatalogEntry } from '../env'
+import ModelSearch from './ModelSearch'
 
 interface Props {
   settings: Settings

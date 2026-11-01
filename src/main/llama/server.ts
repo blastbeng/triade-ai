@@ -9,6 +9,7 @@ import { getSettings } from '../settings'
 import { catalogModel, defaultModelId } from '../models/registry'
 import { bestDevice, detectGpus, llamaBinaryFor, type Backend, type GpuDevice } from '../gpu/devices'
 import { planLaunch } from './tuning'
+import { planPool } from './pool-budget'
 import type { ServerStatus } from '../../shared/types'
 
 export interface ServerInfo {
@@ -38,6 +39,8 @@ const BIND_FAILURE = /address already in use|failed to bind|permission denied/i
 class LlamaInstance extends EventEmitter {
   readonly modelId: string
   readonly device: GpuDevice | null
+  /** contesto deciso dal pool (può essere ridotto per far convivere più modelli) */
+  readonly ctxOverride?: number
   private child: ChildProcessWithoutNullStreams | null = null
   private port: number | null = null
   private logLines: string[] = []
@@ -45,10 +48,11 @@ class LlamaInstance extends EventEmitter {
   private deviceLabel = 'sconosciuto'
   private pidFile: string | null = null
 
-  constructor(modelId: string, device: GpuDevice | null) {
+  constructor(modelId: string, device: GpuDevice | null, ctxOverride?: number) {
     super()
     this.modelId = modelId
     this.device = device
+    this.ctxOverride = ctxOverride
   }
 
   get key(): string {
@@ -169,7 +173,7 @@ class LlamaInstance extends EventEmitter {
       const mmprojPath = model.files.mmproj ? path.join(modelsDir(), model.files.mmproj.name) : ''
       const plan = planLaunch({
         device: this.device,
-        contextSize: s.contextSize,
+        contextSize: this.ctxOverride ?? s.contextSize,
         kvPreference: s.kvCacheType,
         gpuLayers: s.gpuLayers,
         modelPath,
@@ -297,17 +301,60 @@ class LlamaPool extends EventEmitter {
     return bestDevice(usable)
   }
 
+  /** Contesto assegnato a questa coppia modello+GPU, tenendo conto delle altre chat. */
+  private async ctxFor(modelId: string, device: GpuDevice | null): Promise<number | undefined> {
+    if (!device) return undefined
+    const s = getSettings()
+    const targets: { key: string; modelPath: string; mmprojPath?: string }[] = []
+    for (const persona of s.personas) {
+      const model = catalogModel(s.models.byPersona[persona.id] ?? s.models.active)
+      const personaDevice = await this.resolveDevice(s.gpus.byPersona[persona.id])
+      // solo i modelli che finiscono sulla stessa GPU di questa istanza
+      if ((personaDevice?.key ?? 'auto') !== (device.key ?? 'auto')) continue
+      if (targets.some((t) => t.key === `${model.id}|${device.key}`)) continue
+      targets.push({
+        key: `${model.id}|${device.key}`,
+        modelPath: path.join(modelsDir(), model.files.model.name),
+        mmprojPath: model.files.mmproj ? path.join(modelsDir(), model.files.mmproj.name) : undefined
+      })
+    }
+    // la coppia richiesta deve essere nel piano anche se nessuna chat la usa ancora
+    if (!targets.some((t) => t.key === `${modelId}|${device.key}`)) {
+      const model = catalogModel(modelId)
+      targets.push({
+        key: `${modelId}|${device.key}`,
+        modelPath: path.join(modelsDir(), model.files.model.name),
+        mmprojPath: model.files.mmproj ? path.join(modelsDir(), model.files.mmproj.name) : undefined
+      })
+    }
+    try {
+      const plan = planPool(targets, device, s.contextSize, s.kvCacheType)
+      const signature = [...plan.contextByKey.entries()].map(([k, v]) => `${k}=${v}`).join(',')
+      if (signature !== this.lastPlanSignature) {
+        this.lastPlanSignature = signature
+        for (const note of plan.notes) this.emit('log', `[pool] ${note}`)
+      }
+      return plan.contextByKey.get(`${modelId}|${device.key}`)
+    } catch (err) {
+      this.emit('log', `[pool] ${(err as Error).message}`)
+      throw err
+    }
+  }
+
   private async instance(modelId: string, deviceKey?: string): Promise<LlamaInstance> {
     const device = await this.resolveDevice(deviceKey)
     const key = `${modelId}|${device?.key ?? 'auto'}`
     let inst = this.instances.get(key)
     if (!inst) {
-      inst = new LlamaInstance(modelId, device)
+      const ctx = await this.ctxFor(modelId, device)
+      inst = new LlamaInstance(modelId, device, ctx)
       inst.on('log', (line: string) => this.emit('log', line))
       this.instances.set(key, inst)
     }
     return inst
   }
+
+  private lastPlanSignature = ''
 
   async ensure(modelId?: string, deviceKey?: string): Promise<ServerInfo> {
     const id = modelId ?? getSettings().models.active ?? defaultModelId()

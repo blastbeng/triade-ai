@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { CatalogEntry } from '../env'
+import ModelSearch from './ModelSearch'
 
 interface Props {
   catalog: CatalogEntry[]
@@ -81,6 +82,19 @@ export default function Onboarding({ catalog, onDone, onProgress }: Props): JSX.
             </li>
           ))}
         </ul>
+
+        <h3 className="searchtitle">oppure cerca un altro modello su HuggingFace</h3>
+        <p className="lead small">
+          Ogni candidato viene verificato prima di essere proposto: se non ha la vision (mmproj) o se
+          nessun quant entra nella tua GPU, viene escluso con il motivo.
+        </p>
+        <ModelSearch
+          onInstalled={async (id) => {
+            setSelected((prev) => (prev.includes(id) ? prev : [...prev, id]))
+            await onProgress()
+          }}
+          onError={setError}
+        />
 
         {working && (
           <p className="note">

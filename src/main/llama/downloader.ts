@@ -3,7 +3,7 @@ import path from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { modelsDir } from '../paths'
-import { CATALOG, catalogModel, type CatalogModel } from '../models/registry'
+import { catalogModel, listModels, type CatalogModel } from '../models/registry'
 import type { ModelStatus } from '../../shared/types'
 
 type ProgressCb = (status: ModelStatus) => void
@@ -72,7 +72,7 @@ export async function statusFor(id: string): Promise<ModelStatus> {
 
 export async function catalogStatus(): Promise<ModelStatus[]> {
   const out: ModelStatus[] = []
-  for (const m of CATALOG) out.push(await statusFor(m.id))
+  for (const m of listModels()) out.push(await statusFor(m.id))
   return out
 }
 
