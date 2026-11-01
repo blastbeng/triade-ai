@@ -124,8 +124,18 @@ class VectorMemory {
         this.needsReindex = true
         return
       }
-      if (buf.byteLength < n * dim * 4) return
-      const flat = new Float32Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + n * dim * 4))
+      const need = n * dim * 4
+      if (buf.byteLength < need) {
+        // file parziale: si tiene solo il testo e si ri-indicizza
+        this.entries = meta.entries
+        this.hashes = new Set(meta.hashes)
+        this.vectors = meta.entries.map(() => new Float32Array(0))
+        this.needsReindex = true
+        return
+      }
+      const flat = new Float32Array(
+        buf.buffer.slice(buf.byteOffset, Math.min(buf.byteOffset + need, buf.byteOffset + buf.byteLength))
+      )
       this.entries = meta.entries
       this.hashes = new Set(meta.hashes)
       this.vectors = []
