@@ -255,12 +255,44 @@ async function whisperModel() {
 }
 
 const targets = only ? [only] : ['win', 'linux']
-await whisperModel()
+const problems = []
+
+// whisper (modello ASR) è opzionale: se manca, l'app avvisa ma non si blocca
+try {
+  await whisperModel()
+} catch (err) {
+  problems.push(`modello whisper: ${err.message}`)
+}
+
 for (const t of targets) {
   log(`--- ${t} ---`)
-  await llama(t)
-  await llamaCuda(t)
-  await ffmpeg(t)
-  await whisper(t)
+  // llama-server è INDISPENSABILE: se fallisce lo segnaliamo subito
+  try {
+    await llama(t)
+  } catch (err) {
+    problems.push(`llama-server (${t}): ${err.message}`)
+  }
+  for (const [nome, fn] of [['cuda', llamaCuda], ['ffmpeg', ffmpeg], ['whisper', whisper]]) {
+    try {
+      await fn(t)
+    } catch (err) {
+      problems.push(`${nome} (${t}): ${err.message}`)
+    }
+  }
+}
+
+if (problems.length) {
+  console.error('[bin] PROBLEMI:')
+  for (const p of problems) console.error('  - ' + p)
+  // blocchiamo solo se manca davvero llama-server per i target richiesti
+  const missing = targets.filter((t) => {
+    const exe = t === 'win' ? 'llama-server.exe' : 'llama-server'
+    return !fs.existsSync(path.join(BIN, t, exe))
+  })
+  if (missing.length) {
+    console.error(`[bin] llama-server mancante per: ${missing.join(', ')}`)
+    process.exit(1)
+  }
+  console.error('[bin] componenti opzionali mancanti: la build prosegue')
 }
 log('fatto')
