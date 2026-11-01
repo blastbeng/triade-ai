@@ -30,8 +30,15 @@ CUDA, per GPU NVIDIA. Nessun supporto ROCm/HIP.
 - **Chi risponde.** Una select nel composer permette di scegliere quale delle tre personalità deve
   rispondere al messaggio; le altre ricevono il turno dopo, in rotazione. La colonna di chi ha la
   parola è segnalata, e chi viene chiamato con `@Nome` mostra "chiamato da …".
-- **Gruppo consapevole.** Ogni agente conosce il roster degli altri due (nome e ruolo) e può
-  chiamarli con `@Nome` spiegando il motivo: la motivazione viene mostrata come chip nel turno.
+- **Gruppo consapevole e turni decisi dagli agenti.** Ogni agente conosce il roster degli altri due
+  (nome e ruolo) e sceglie **chi parla dopo**: la menzione `@Nome` (con il motivo, mostrato come chip)
+  mette quella personalità in coda al turno successivo. Con `[[PASSA A: Nome]]` cede la parola
+  **a metà frase**: la generazione viene interrotta appena il marcatore è completo, il testo già
+  scritto resta nel turno (badge "ha passato la parola a …") e parla l'altro. È così che nasce
+  l'interruzione reale in un dibattito a tre, senza costringere la rotazione fissa.
+- **Scheduling verificabile.** La scelta dell'interlocutore è una funzione pura
+  (`debate/schedule.ts`): priorità alla richiesta esplicita, poi rotazione, mai due volte di fila lo
+  stesso agente.
 - **Testo regolabile e markdown.** Dimensione del testo configurabile (85–160%), grassetto, corsivo,
   codice, titoli, liste, citazioni e link resi leggibili.
 - **Vision, video, audio.** Immagini lette via mmproj (`qwen3vl_merger`), video scomposti in frame
