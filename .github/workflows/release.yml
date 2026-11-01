@@ -26,13 +26,17 @@ jobs:
       - name: alignment check
         run: |
           set -euo pipefail
-          git fetch origin main release --depth=1
+          git fetch origin main --depth=50
           REL=$(git rev-parse HEAD)
           MAIN=$(git rev-parse origin/main)
           echo "release=$REL main=$MAIN"
-          if [ "$REL" != "$MAIN" ]; then
-            echo "::error::Il branch release non è identico a main: le release devono nascere da main senza modifiche aggiuntive."
+          # regola: il branch release non deve contenere commit che non siano in main
+          if ! git merge-base --is-ancestor "$REL" "$MAIN"; then
+            echo "::error::Il branch release contiene commit assenti in main: le release devono nascere da main senza modifiche aggiuntive."
             exit 1
+          fi
+          if [ "$REL" != "$MAIN" ]; then
+            echo "::notice::main è avanzato dopo la promozione ($REL ≠ $MAIN): la release costruisce il commit promosso."
           fi
       - name: already released?
         id: exists
