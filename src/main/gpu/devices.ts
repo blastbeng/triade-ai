@@ -159,7 +159,7 @@ export async function detectGpus(force = false): Promise<DetectedGpus> {
     usable: classified.filter((d) => !d.integrated && d.backend !== 'cuda'),
     excluded: classified.filter((d) => d.integrated),
     backends,
-    error: classified.length ? undefined : `nessuna GPU Vulkan rilevata (${diag})`
+    error: classified.length ? undefined : `nessuna GPU Vulkan rilevata (CUDA e ROCm/HIP non sono supportati) — ${diag}`
   }
   cache = { at: Date.now(), value }
   return value

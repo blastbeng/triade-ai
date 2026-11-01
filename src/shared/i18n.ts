@@ -190,7 +190,7 @@ const en: Dict = {
   'settings.autoDevice': 'automatic',
   'settings.gpuNote':
     'Each chat can use a different GPU: the pool starts one llama-server per model+GPU pair. Integrated GPUs (e.g. the Ryzen Radeon) are excluded. No ROCm/HIP: Vulkan only, plus CUDA if the build is present.',
-  'settings.cudaMissing': 'CUDA build not installed (fetch with fetch:bin --cuda).',
+  'settings.cudaMissing': 'Vulkan GPU required: CUDA is not supported.',
   'settings.oneGpu':
     'Only one usable dedicated GPU: per-chat selection is disabled, all chats use {name}.',
   'settings.personaModel': 'model of this chat',
@@ -447,7 +447,7 @@ const it: Dict = {
   'settings.autoDevice': 'automatica',
   'settings.gpuNote':
     'Ogni chat può usare una GPU diversa: il pool avvia un llama-server per ogni coppia modello+GPU. Le GPU integrate (es. Radeon del Ryzen) sono escluse. Nessun supporto ROCm/HIP: solo Vulkan e, se la build è presente, CUDA.',
-  'settings.cudaMissing': 'Build CUDA non installata (si scarica con fetch:bin --cuda).',
+  'settings.cudaMissing': 'Serve una GPU Vulkan: CUDA non è supportato.',
   'settings.oneGpu': 'Una sola GPU dedicata utilizzabile: la scelta per chat è disattivata, tutte le chat usano {name}.',
   'settings.personaModel': 'modello di questa chat',
   'settings.personasNote':
@@ -701,7 +701,7 @@ const de: Dict = {
   'settings.autoDevice': 'automatisch',
   'settings.gpuNote':
     'Jeder Chat kann eine andere GPU nutzen: der Pool startet einen llama-server pro Modell+GPU-Paar. Integrierte GPUs sind ausgeschlossen. Kein ROCm/HIP: nur Vulkan, und CUDA falls vorhanden.',
-  'settings.cudaMissing': 'CUDA-Build nicht installiert (fetch:bin --cuda).',
+  'settings.cudaMissing': 'Vulkan-GPU erforderlich: CUDA wird nicht unterstützt.',
   'settings.oneGpu': 'Nur eine nutzbare dedizierte GPU: Auswahl pro Chat deaktiviert, alle Chats nutzen {name}.',
   'settings.personaModel': 'Modell dieses Chats',
   'settings.personasNote':
@@ -955,7 +955,7 @@ const fr: Dict = {
   'settings.autoDevice': 'automatique',
   'settings.gpuNote':
     'Chaque chat peut utiliser un GPU différent : le pool lance un llama-server par paire modèle+GPU. Les GPU intégrés sont exclus. Pas de ROCm/HIP : Vulkan, plus CUDA si présent.',
-  'settings.cudaMissing': 'Build CUDA non installée (fetch:bin --cuda).',
+  'settings.cudaMissing': 'GPU Vulkan requise : CUDA n\'est pas supporté.',
   'settings.oneGpu': 'Un seul GPU dédié utilisable : sélection par chat désactivée, tous les chats utilisent {name}.',
   'settings.personaModel': 'modèle de ce chat',
   'settings.personasNote':
@@ -1209,7 +1209,7 @@ const es: Dict = {
   'settings.autoDevice': 'automática',
   'settings.gpuNote':
     'Cada chat puede usar una GPU distinta: el pool inicia un llama-server por par modelo+GPU. Las GPU integradas se excluyen. Sin ROCm/HIP: solo Vulkan y CUDA si está presente.',
-  'settings.cudaMissing': 'Build CUDA no instalada (fetch:bin --cuda).',
+  'settings.cudaMissing': 'Se requiere GPU Vulkan: CUDA no está soportado.',
   'settings.oneGpu': 'Solo una GPU dedicada utilizable: selección por chat desactivada, todos los chats usan {name}.',
   'settings.personaModel': 'modelo de este chat',
   'settings.personasNote':
