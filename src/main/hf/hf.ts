@@ -37,7 +37,8 @@ export interface HfVerdict {
   downloads?: number
 }
 
-const QUANT_RE = /\b(IQ\d+(?:_[A-Z0-9]+)+|Q\d+_K(?:_[SML])?|Q\d+_\d|Q\d+_K|Q8_0|Q6_K|Q5_K_[SM]|F16|BF16|FP16)\b/i
+const QUANT_RE =
+  /\b(IQ\d+(?:_[A-Z0-9]+)+|Q\d+_K(?:_[A-Z]{1,3})*|Q\d+_[01]|Q8_0|Q6_K|Q5_K(?:_[SM])?|F16|BF16|FP16)\b/i
 
 function paramsFromName(text: string): number {
   const m = /(?:^|[^\d.])(\d+(?:\.\d+)?)\s?B(?![a-z])/i.exec(text)
@@ -139,7 +140,7 @@ export async function inspectRepo(
   const variants: QuantVariant[] = []
   const seen = new Set<string>()
   for (const file of ggufs.sort((a, b) => b.size - a.size)) {
-    const label = QUANT_RE.exec(file.path)?.[1]?.toUpperCase() ?? 'GGUF'
+    const label = (QUANT_RE.exec(file.path)?.[1]?.toUpperCase() ?? 'GGUF').replace(/^UD-/, '')
     if (seen.has(label)) continue
     seen.add(label)
     const nameParams = paramsFromName(`${repo} ${file.path}`)

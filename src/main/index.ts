@@ -125,6 +125,28 @@ function createWindow(): void {
               `[smoke] eliminazione voce di memoria: ${before.entries} -> ${removed.stats.entries}`
             )
           }
+          if (process.env.TRIADE_SMOKE === '5') {
+            // prova completa: aggiunta da HuggingFace + download effettivo
+            const repo = process.env.TRIADE_SMOKE_REPO ?? 'ggml-org/SmolVLM2-256M-Video-Instruct-GGUF'
+            const added = (await js(
+              `window.triade.modelsAddCustom(${JSON.stringify(repo)}, ${JSON.stringify(
+                process.env.TRIADE_SMOKE_QUANT ?? 'F16'
+              )})`
+            )) as { entry: { id: string } }
+            console.log(`[smoke] aggiunto modello personalizzato: ${added.entry.id}`)
+            const st = (await js(
+              `window.triade.modelsInstall(${JSON.stringify(added.entry.id)})`
+            )) as { modelReady: boolean; mmprojReady: boolean }
+            console.log(
+              `[smoke] download personalizzato: modello ${st.modelReady}, mmproj ${st.mmprojReady}`
+            )
+            const list = (await js('window.triade.modelsCatalog()')) as {
+              id: string
+              installed: boolean
+            }[]
+            console.log(`[smoke] catalogo ora: ${list.length} modelli, ${list.filter((m) => m.installed).length} installati`)
+          }
+
           console.log('[smoke] OK')
 
           if (process.env.TRIADE_SMOKE === '2') {
