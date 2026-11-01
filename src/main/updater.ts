@@ -357,8 +357,30 @@ export function progressWindow(title: string): { update: (p: number) => void; cl
  * Rimuove backup e residui di aggiornamenti falliti (`<exe>.failed`).
  * Il `.old` dell'ultimo aggiornamento resta: serve al rollback manuale.
  */
-export function cleanupUpdateLeftovers(maxAgeDays = 3): number {
+export function cleanupUpdateLeftovers(maxAgeDays = 1): number {
   let removed = 0
+  // archivio estratto e pacchetti scaricati: non devono restare per sempre
+  try {
+    const dir = path.join(dataDir(), 'aggiornamenti')
+    const now = Date.now()
+    for (const name of fs.readdirSync(dir)) {
+      const file = path.join(dir, name)
+      try {
+        const st = fs.statSync(file)
+        const old = now - st.mtimeMs > maxAgeDays * 24 * 60 * 60 * 1000
+        const isUnpack = name === 'nuovo'
+        const isArchive = /\.(zip|tar\.gz|AppImage)$/i.test(name)
+        if (old && (isUnpack || isArchive)) {
+          fs.rmSync(file, { recursive: true, force: true })
+          removed++
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  } catch {
+    /* ignore */
+  }
   try {
     const exe = process.env.APPIMAGE ?? process.execPath
     const dir = path.dirname(exe)

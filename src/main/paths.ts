@@ -138,13 +138,36 @@ function copyTree(from: string, to: string): void {
 export function ensureBinaries(): string {
   const target = path.join(dataDir(), 'bin')
   const exe = process.platform === 'win32' ? 'llama-server.exe' : 'llama-server'
-  if (fs.existsSync(path.join(target, exe))) return target
   const source = packagedBinDir()
+  const stampFile = path.join(target, '.stamp')
+
+  // identità dei binari inclusi nel pacchetto: se cambia, si ricopia.
+  // `dati/` sopravvive agli aggiornamenti, quindi senza questo controllo una
+  // release con un llama.cpp nuovo continuerebbe a usare i binari vecchi.
+  let stamp = ''
+  try {
+    const st = fs.statSync(path.join(source, exe))
+    stamp = `${st.size}-${Math.round(st.mtimeMs)}`
+  } catch {
+    stamp = ''
+  }
+
+  const present = fs.existsSync(path.join(target, exe))
+  let current = ''
+  try {
+    current = fs.readFileSync(stampFile, 'utf8').trim()
+  } catch {
+    current = ''
+  }
+
+  if (present && (!stamp || current === stamp)) return target
   if (!fs.existsSync(source)) return target
+
   try {
     fs.mkdirSync(target, { recursive: true })
     copyTree(source, target)
-    log.info(`[paths] binari copiati in ${target}`)
+    if (stamp) fs.writeFileSync(stampFile, stamp, 'utf8')
+    log.info(`[paths] binari ${present ? 'aggiornati' : 'copiati'} in ${target}`)
   } catch (err) {
     log.error(`[paths] copia binari fallita: ${(err as Error).message}`)
   }
