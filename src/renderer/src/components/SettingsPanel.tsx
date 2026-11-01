@@ -318,7 +318,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
             </label>
 
             <div className="uipreview">
-              <strong>Anteprima</strong>
+              <span className="previewtitle">Anteprima</span>
               <p>
                 Testo normale con <strong>grassetto</strong>, <em>corsivo</em> e <code>codice</code>.
               </p>
