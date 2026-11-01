@@ -50,6 +50,19 @@ class LlamaInstance extends EventEmitter {
   private logLines: string[] = []
   private starting = false
   private deviceLabel = 'sconosciuto'
+
+  /**
+   * Argomento per `--device`: llama.cpp accetta l'identificatore del backend
+   * (`Vulkan0`, `Vulkan1`), NON il nome commerciale della scheda. I device
+   * dedotti dal driver (WMI) non hanno un indice affidabile: in quel caso
+   * si omette il flag e decide llama.cpp (auto).
+   */
+  private deviceArg(): string | null {
+    if (!this.device) return null
+    if ((this.device as { estimated?: boolean }).estimated) return null
+    if (this.device.backend === 'vulkan') return `Vulkan${this.device.index}`
+    return this.device.label
+  }
   private effectiveCtx = 0
   private modelMaxCtx = 0
   private pidFile: string | null = null
@@ -234,7 +247,7 @@ class LlamaInstance extends EventEmitter {
         const port = await freePort()
         const args = [
           '-m', modelPath,
-          ...(this.device ? ['--device', this.device.label] : []),
+          ...(this.deviceArg() ? ['--device', this.deviceArg()] : []),
           ...(mmprojPath ? ['--mmproj', mmprojPath] : []),
           // +1024 di slack: il conteggio lato app è una stima, il server non deve mai rifiutare
           '-c', String(plan.ctx + 1024),
