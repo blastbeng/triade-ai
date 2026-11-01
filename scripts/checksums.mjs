@@ -8,7 +8,13 @@ const dist = path.join(process.cwd(), 'dist')
 const files = fs.existsSync(dist)
   ? fs
       .readdirSync(dist)
-      .filter((f) => !f.endsWith('.txt') && !f.endsWith('.blockmap') && !f.endsWith('.yml'))
+      .filter(
+        (f) =>
+          !f.endsWith('.txt') &&
+          !f.endsWith('.blockmap') &&
+          !f.endsWith('.yml') &&
+          fs.statSync(path.join(dist, f)).isFile()
+      )
   : []
 
 const lines = files.map((name) => {
