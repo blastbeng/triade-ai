@@ -84,13 +84,13 @@ jobs:
       - run: npm run stage:${{ matrix.target }}
       - name: package
         run: npx electron-builder --${{ matrix.target }} --publish never
-      - name: sign (best effort: non blocca la release)
+      - name: 'sign (best effort, non blocca la release)'
         continue-on-error: true
         run: npm run sign:win
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-      - name: verifica firma (informativa)
+      - name: 'verifica firma (informativa)'
         if: runner.os == 'Windows'
         continue-on-error: true
         run: npm run check:sign
