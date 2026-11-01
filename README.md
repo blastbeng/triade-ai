@@ -17,7 +17,9 @@ CUDA, per GPU NVIDIA. Nessun supporto ROCm/HIP.
   precedenti; selezionando una chat vecchia si continua da lì.
 - **Memoria persistente + vector DB.** Ogni turno finisce in un indice vettoriale locale
   (`dati/memoria/`), e a fine sessione il modello distilla i "fatti" riutilizzabili. Le sessioni
-  successive li richiamano per similarità nel system prompt.
+  successive li richiamano per similarità nel system prompt. Dalla pagina "memoria condivisa" si
+  eliminano le singole voci; eliminando una chat (× nella sidebar) spariscono anche **tutte** le
+  voci di memoria che quella chat ha prodotto.
 - **Reasoning visibile.** Il ragionamento del modello resta attivo quando il template lo supporta:
   nel turno compare un blocco "ragionamento" richiuso, espandibile. Anche i tool call sono card
   richiudibili con argomenti e risultato.
