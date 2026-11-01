@@ -89,6 +89,10 @@ jobs:
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      - name: verifica firma dell'eseguibile (fallisce se non firmato)
+        if: runner.os == 'Windows'
+        run: npm run check:sign
+
       - run: npm run package:release
       - run: npm run checksums
       - uses: actions/upload-artifact@v7

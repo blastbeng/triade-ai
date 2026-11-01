@@ -1,6 +1,6 @@
 {
   "name": "triade-ai",
-  "version": "0.20.1",
+  "version": "0.20.2",
   "description": "Tre personalita, un solo modello, un dibattito che arriva a una conclusione",
   "main": "./out/main/index.js",
   "author": "blast",
@@ -27,7 +27,8 @@
     "make:icon": "bash scripts/make-icon.sh",
     "package:release": "node scripts/package-release.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check:sign": "node scripts/check-sign.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
