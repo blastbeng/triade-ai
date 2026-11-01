@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import type { Attachment } from '../../../shared/types'
+import type { Attachment, Persona } from '../../../shared/types'
 
 interface Props {
   disabled: boolean
@@ -9,7 +9,10 @@ interface Props {
   onAttach: () => Promise<void>
   onDropFiles: (files: string[]) => Promise<void>
   onRemove: (index: number) => void
-  onSend: (topic: string) => Promise<void>
+  onSend: (topic: string, personaId?: string) => Promise<void>
+  personas: Persona[]
+  /** modello associato a ciascuna chat, per l'etichetta della select */
+  modelOf: (personaId: string) => string
 }
 
 export default function Composer({
@@ -20,9 +23,12 @@ export default function Composer({
   onAttach,
   onDropFiles,
   onRemove,
-  onSend
+  onSend,
+  personas,
+  modelOf
 }: Props): JSX.Element {
   const [text, setText] = useState('')
+  const [responder, setResponder] = useState<string>('auto')
   const [dragging, setDragging] = useState(false)
   const areaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -30,7 +36,7 @@ export default function Composer({
     const topic = text.trim()
     if (!topic || disabled) return
     setText('')
-    await onSend(topic)
+    await onSend(topic, responder === 'auto' ? undefined : responder)
   }
 
   return (
@@ -67,6 +73,17 @@ export default function Composer({
         <button className="ghost attach" onClick={() => void onAttach()} disabled={disabled}>
           +
         </button>
+        <label className="responder" title="Scegli quale personalità risponde al tuo messaggio">
+          <span>risponde</span>
+          <select value={responder} onChange={(e) => setResponder(e.target.value)} disabled={running}>
+            <option value="auto">turno automatico</option>
+            {personas.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.emoji} {p.name} · {modelOf(p.id)}
+              </option>
+            ))}
+          </select>
+        </label>
         <textarea
           ref={areaRef}
           value={text}

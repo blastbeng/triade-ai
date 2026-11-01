@@ -110,6 +110,8 @@ export interface Session {
   memory: string
   /** Indice del primo turno incluso nel prompt: la trascrizione completa non si perde mai. */
   contextFrom?: number
+  /** Sfasamento della rotazione: chi parla al prossimo turno (scelta dell'utente). */
+  rotationOffset?: number
   consensus?: Consensus
   lastError?: string
   /** Immagini da mostrare al prossimo turno (ricerca immagini / frame video). */

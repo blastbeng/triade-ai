@@ -93,7 +93,22 @@ export class DebateEngine extends EventEmitter {
    * Come in ChatGPT: se c'è una chat caricata si continua quella (messaggio utente
    * in coda), altrimenti se ne apre una nuova.
    */
-  async submit(text: string, attachments: Attachment[] = []): Promise<Session> {
+  /** Imposta chi deve parlare al prossimo turno (select in chat). */
+  private setNextSpeaker(personaId?: string): void {
+    if (!this.session || !personaId) return
+    const personas = getSettings().personas
+    const idx = personas.findIndex((p) => p.id === personaId)
+    if (idx < 0) return
+    const agentTurns = this.session.turns.filter((t) => t.agentId !== 'utente').length
+    this.session.rotationOffset = ((idx - agentTurns) % personas.length + personas.length) % personas.length
+    saveSession(this.session)
+    this.emitEvent({
+      type: 'log',
+      message: `prossimo turno assegnato a ${personas[idx].name}`
+    })
+  }
+
+  async submit(text: string, attachments: Attachment[] = [], startWith?: string): Promise<Session> {
     if (this.session && this.session.turns.length > 0 && this.session.state !== 'running') {
       const session = this.session
       const turn: Turn = {
@@ -121,12 +136,13 @@ export class DebateEngine extends EventEmitter {
       }
       saveSession(session)
       rememberUserNote(session, text)
+      this.setNextSpeaker(startWith)
       this.emitEvent({ type: 'session', session })
       this.setState('running')
       void this.loop()
       return session
     }
-    return this.start(text, attachments)
+    return this.start(text, attachments, startWith)
   }
 
   private distillInBackground(session: Session): void {
@@ -142,7 +158,7 @@ export class DebateEngine extends EventEmitter {
     })()
   }
 
-  async start(topic: string, attachments: Attachment[] = []): Promise<Session> {
+  async start(topic: string, attachments: Attachment[] = [], startWith?: string): Promise<Session> {
     await this.halt()
     const session = newSession(topic)
     session.attachments = attachments
@@ -158,6 +174,11 @@ export class DebateEngine extends EventEmitter {
       .join('\n\n')
     if (context) session.topic = `${topic}\n\nMateriale fornito dall'utente:\n${context}`
     this.session = session
+    if (startWith) {
+      const personas = getSettings().personas
+      const idx = personas.findIndex((p) => p.id === startWith)
+      if (idx >= 0) session.rotationOffset = idx
+    }
     saveSession(session)
     this.emitEvent({ type: 'session', session })
     this.setState('running')
@@ -216,7 +237,8 @@ export class DebateEngine extends EventEmitter {
           this.distillInBackground(finished)
           break
         }
-        const persona = personas[turnIndex % personas.length]
+        const offset = this.session.rotationOffset ?? 0
+        const persona = personas[(turnIndex + offset) % personas.length]
         const { baseUrl } = await llamaPool.ensure(this.modelFor(persona), this.deviceFor(persona))
         this.emitEvent({
           type: 'log',

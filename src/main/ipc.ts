@@ -128,20 +128,26 @@ export function registerIpc(): void {
     return listSessions()
   })
 
-  ipcMain.handle('debate:start', async (_e, payload: { topic: string; files: string[] }) => {
-    const attachments: Attachment[] = []
-    for (const file of payload.files ?? []) {
-      attachments.push(await ingest(file, (m) => broadcast({ type: 'log', message: m })))
+  ipcMain.handle(
+    'debate:start',
+    async (_e, payload: { topic: string; files: string[]; personaId?: string }) => {
+      const attachments: Attachment[] = []
+      for (const file of payload.files ?? []) {
+        attachments.push(await ingest(file, (m) => broadcast({ type: 'log', message: m })))
+      }
+      return engine.start(payload.topic, attachments, payload.personaId)
     }
-    return engine.start(payload.topic, attachments)
-  })
-  ipcMain.handle('debate:submit', async (_e, payload: { topic: string; files: string[] }) => {
-    const attachments: Attachment[] = []
-    for (const file of payload.files ?? []) {
-      attachments.push(await ingest(file, (m) => broadcast({ type: 'log', message: m })))
+  )
+  ipcMain.handle(
+    'debate:submit',
+    async (_e, payload: { topic: string; files: string[]; personaId?: string }) => {
+      const attachments: Attachment[] = []
+      for (const file of payload.files ?? []) {
+        attachments.push(await ingest(file, (m) => broadcast({ type: 'log', message: m })))
+      }
+      return engine.submit(payload.topic, attachments, payload.personaId)
     }
-    return engine.submit(payload.topic, attachments)
-  })
+  )
   ipcMain.handle('debate:pause', async () => {
     await engine.pause()
     return engine.current

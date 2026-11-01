@@ -62,10 +62,10 @@ const api = {
   deleteSession: (id: string): Promise<{ id: string; topic: string; updatedAt: number; state: string; turns: number }[]> =>
     ipcRenderer.invoke('session:delete', id),
 
-  startDebate: (topic: string, files: string[]): Promise<Session> =>
-    ipcRenderer.invoke('debate:start', { topic, files }),
-  submit: (topic: string, files: string[]): Promise<Session> =>
-    ipcRenderer.invoke('debate:submit', { topic, files }),
+  startDebate: (topic: string, files: string[], personaId?: string): Promise<Session> =>
+    ipcRenderer.invoke('debate:start', { topic, files, personaId }),
+  submit: (topic: string, files: string[], personaId?: string): Promise<Session> =>
+    ipcRenderer.invoke('debate:submit', { topic, files, personaId }),
   pauseDebate: (): Promise<Session | null> => ipcRenderer.invoke('debate:pause'),
   resumeDebate: (id: string): Promise<Session> => ipcRenderer.invoke('debate:resume', id),
   newChat: (): Promise<boolean> => ipcRenderer.invoke('debate:new'),

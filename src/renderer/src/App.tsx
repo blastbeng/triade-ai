@@ -164,13 +164,20 @@ export default function App(): JSX.Element {
     }
   }
 
-  const send = async (topic: string): Promise<void> => {
+  const modelLabelOf = (personaId: string): string => {
+    const s = settings
+    if (!s) return '—'
+    const id = s.models.byPersona[personaId] ?? s.models.active
+    return catalog.find((m) => m.id === id)?.name ?? id
+  }
+
+  const send = async (topic: string, personaId?: string): Promise<void> => {
     setBusy(true)
     setNotice(null)
     try {
       await ensureReady()
       const files = attachments.map((a) => a.path)
-      const created = await window.triade.submit(topic, files)
+      const created = await window.triade.submit(topic, files, personaId)
       setSession(created)
       setAttachments([])
       setSessions(await window.triade.listSessions())
@@ -302,6 +309,14 @@ export default function App(): JSX.Element {
               streaming={stream?.agentId === persona.id ? stream.text : null}
               streamReasoning={streamReasoning?.agentId === persona.id ? streamReasoning.text : null}
               phase={phases[persona.id] ?? null}
+              nextUp={
+                session?.state === 'running' &&
+                personas[
+                  (session.turns.filter((t) => t.agentId !== 'utente').length +
+                    (session.rotationOffset ?? 0)) %
+                    Math.max(1, personas.length)
+                ]?.id === persona.id
+              }
               calledBy={
                 session?.turns[session.turns.length - 1]?.mentions?.find((m) => m.targetId === persona.id)
                   ? session?.turns[session.turns.length - 1]?.name ?? null
@@ -337,6 +352,8 @@ export default function App(): JSX.Element {
           }}
           onRemove={(i) => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
           onSend={send}
+          personas={personas}
+          modelOf={modelLabelOf}
         />
 
         {showLog && (

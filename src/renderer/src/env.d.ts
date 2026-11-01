@@ -61,8 +61,8 @@ interface Api {
   loadSession(id: string): Promise<Session | null>
   currentSession(): Promise<Session | null>
   deleteSession(id: string): Promise<{ id: string; topic: string; updatedAt: number; state: string; turns: number }[]>
-  startDebate(topic: string, files: string[]): Promise<Session>
-  submit(topic: string, files: string[]): Promise<Session>
+  startDebate(topic: string, files: string[], personaId?: string): Promise<Session>
+  submit(topic: string, files: string[], personaId?: string): Promise<Session>
   pauseDebate(): Promise<Session | null>
   resumeDebate(id: string): Promise<Session>
   newChat(): Promise<boolean>

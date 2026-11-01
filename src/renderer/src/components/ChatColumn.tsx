@@ -19,6 +19,7 @@ interface Props {
   streamReasoning: string | null
   phase: Phase | null
   calledBy: string | null
+  nextUp?: boolean
   active: boolean
 }
 
@@ -29,6 +30,7 @@ export default function ChatColumn({
   streamReasoning,
   phase,
   calledBy,
+  nextUp,
   active
 }: Props): JSX.Element {
   const boxRef = useRef<HTMLDivElement>(null)
@@ -64,6 +66,7 @@ export default function ChatColumn({
           </span>
         )}
         {!busy && calledBy && <span className="calledby">chiamato da {calledBy}</span>}
+        {!busy && !calledBy && nextUp && <span className="nextup">ha la parola</span>}
         <span className="count">{turns.length}</span>
       </header>
 

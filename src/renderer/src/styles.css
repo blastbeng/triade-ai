@@ -1227,3 +1227,53 @@ button.ghost {
 .streamingText .md {
   opacity: 0.98;
 }
+
+/* ---------- select "chi risponde" ---------- */
+.responder {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--muted);
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 6px 8px;
+  height: 40px;
+}
+
+.responder span {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.responder select {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  max-width: 190px;
+  outline: none;
+  cursor: pointer;
+}
+
+.responder select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.responder option {
+  background: #121a26;
+  color: var(--text);
+}
+
+.nextup {
+  font-size: 10px;
+  color: #86efac;
+  border: 1px solid #1c4a3a;
+  background: #0f241c;
+  border-radius: 999px;
+  padding: 1px 7px;
+  white-space: nowrap;
+}
