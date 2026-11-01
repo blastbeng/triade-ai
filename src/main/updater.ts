@@ -202,7 +202,8 @@ export function applyUpdate(newExe: string, version = ''): void {
       'del /Q "%~f0"'
     ].join('\r\n')
     fs.writeFileSync(helper, `${script}\r\n`)
-    spawn('cmd.exe', ['/c', helper], { detached: true, stdio: 'ignore' }).unref()
+    // il percorso può contenere spazi: va passato quotato a cmd.exe
+    spawn('cmd.exe', ['/c', `"${helper}"`], { detached: true, stdio: 'ignore' }).unref()
     app.exit(0)
     return
   }
