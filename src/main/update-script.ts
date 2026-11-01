@@ -1,8 +1,9 @@
 /**
- * Generatore dello script PowerShell che installa un aggiornamento su Windows.
+ * Generatori degli script che installano un aggiornamento (Windows: PowerShell,
+ * Linux/macOS: POSIX sh).
  *
  * È un modulo puro (nessun import di Electron): così lo script che finisce sul
- * disco è esattamente quello verificato dai test, su Windows compresi. Deve
+ * disco è esattamente quello verificato dai test, su Windows e su Linux. Deve
  * restare tale — niente `dataDir()`/`app` qui dentro, i percorsi arrivano come
  * parametri.
  */
@@ -18,7 +19,7 @@ export interface UpdateScriptOptions {
   /** pid dell'app che ha lanciato il supervisore */
   pid: number
   /** pid del padre (il launcher portable, che tiene aperta l'estrazione) */
-  parentPid: number
+  parentPid?: number
   pending: string
   esito: string
   logFile: string
@@ -122,7 +123,7 @@ export function powershellSupervisor(o: UpdateScriptOptions): string {
     '  if ((Test-Path -LiteralPath $backup) -and -not (Test-Path -LiteralPath $target)) {',
     '    try { Move-Item -LiteralPath $backup -Destination $target -Force } catch {}',
     '  }',
-    '  try { Remove-Item -LiteralPath $pending -Force -ErrorAction SilentlyContinue } catch {}',
+    '# pending.json resta: è l app, al riavvio, a dire che l aggiornamento non è stato applicato',
     '  try { Start-Process -FilePath $target -WorkingDirectory (Split-Path -Parent $target) } catch {}',
     '  exit 0',
     '}',
@@ -165,4 +166,128 @@ export function powershellSupervisor(o: UpdateScriptOptions): string {
     '}',
     'try { Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue } catch {}'
   ].join('\r\n')
+}
+
+/** Letterale per `sh`: apice singolo, con `'\''` per gli apici interni. */
+export function shLiteral(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
+/**
+ * Supervisore POSIX (AppImage) dell'aggiornamento.
+ *
+ * Stessa regola del Windows: sostituisce il file **in place** (stesso nome, così
+ * collegamenti e lanciatori continuano a funzionare), avvia la nuova versione e
+ * torna indietro solo se il marker di avvio non compare. Senza questo script, un
+ * AppImage che non parte lascerebbe l'utente con l'app rotta e nessuno in grado
+ * di ripristinare: `recoverFailedUpdate()` gira dentro l'app, che è proprio
+ * quella che non parte.
+ */
+export function posixSupervisor(o: UpdateScriptOptions & { args?: string[] }): string {
+  const exitTries = Math.max(1, Math.round((o.exitWaitSec ?? 120) * 2))
+  const swapTries = Math.max(1, Math.round(o.swapRetries ?? 60))
+  const markerWait = Math.max(1, Math.round(o.markerWaitSec ?? 300))
+  const args = (o.args ?? []).map(shLiteral).join(' ')
+  return `#!/bin/sh
+# Supervisore di aggiornamento generato da TriadeAI. Si elimina da solo.
+set -u
+
+target=${shLiteral(o.target)}
+newexe=${shLiteral(o.newExe)}
+marker=${shLiteral(o.marker)}
+pending=${shLiteral(o.pending)}
+esito=${shLiteral(o.esito)}
+logfile=${shLiteral(o.logFile)}
+version=${shLiteral(o.version)}
+backup="$target.old"
+failed="$target.failed"
+oldpid=${o.pid}
+exit_tries=${exitTries}
+swap_tries=${swapTries}
+marker_wait=${markerWait}
+
+log() { printf '[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >>"$logfile" 2>/dev/null; }
+write_esito() { printf '{"result":"%s","version":"%s","reason":"%s","at":"%s"}' "$1" "$version" "$2" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$esito" 2>/dev/null; }
+marker_ok() { [ -e "$marker" ]; }
+launch() {
+  [ -x "$target" ] || return 0
+  "$target" ${args} >>"$logfile" 2>&1 &
+  app_pid=$!
+}
+
+log "avvio: attendo la chiusura dell app (pid $oldpid)"
+i=0
+while [ "$i" -lt "$exit_tries" ]; do
+  kill -0 "$oldpid" 2>/dev/null || break
+  sleep 0.5
+  i=$((i + 1))
+done
+sleep 1
+
+# l'AppImage in esecuzione è montato: si rinomina (stesso filesystem) e si mette
+# il nuovo al suo posto, senza mai copiare sopra un file in uso (ETXTBSY)
+log "sostituzione di $target"
+swapped=0
+i=0
+while [ "$i" -lt "$swap_tries" ]; do
+  if [ ! -f "$newexe" ]; then
+    log "nuovo eseguibile assente"
+    break
+  fi
+  if [ -f "$target" ]; then
+    rm -f "$backup" 2>/dev/null
+    mv -f "$target" "$backup" 2>/dev/null || { i=$((i + 1)); sleep 1; continue; }
+  fi
+  if mv -f "$newexe" "$target" 2>/dev/null; then
+    swapped=1
+    break
+  fi
+  # ripristino parziale: il vecchio non deve restare fuori posto
+  if [ ! -f "$target" ] && [ -f "$backup" ]; then mv -f "$backup" "$target" 2>/dev/null; fi
+  i=$((i + 1))
+  sleep 1
+done
+chmod 755 "$target" 2>/dev/null
+
+if [ "$swapped" -ne 1 ]; then
+  log "sostituzione non riuscita: resta la versione in uso"
+  write_esito "swap-failed" "il file non era sostituibile"
+  # pending.json resta: è l app, al riavvio, a dire che l aggiornamento non è stato applicato
+  launch
+  rm -f "$0" 2>/dev/null
+  exit 0
+fi
+
+log "sostituzione fatta: avvio della nuova versione"
+app_pid=""
+launch
+
+deadline=$(( $(date +%s) + marker_wait ))
+while [ "$(date +%s)" -lt "$deadline" ]; do
+  marker_ok && break
+  # il processo avviato è morto: se ha fatto in tempo a scrivere il marker
+  # l'aggiornamento è riuscito, altrimenti inutile aspettare
+  if [ -n "$app_pid" ] && ! kill -0 "$app_pid" 2>/dev/null; then
+    marker_ok && break
+    log "la nuova versione è terminata senza segnare l avvio"
+    break
+  fi
+  sleep 2
+done
+
+if marker_ok; then
+  log "marker presente: aggiornamento completato"
+  rm -f "$backup" "$pending" "$esito" 2>/dev/null
+else
+  log "marker assente: ripristino la versione precedente"
+  write_esito "rolledback" "la nuova versione non si e avviata"
+  if [ -f "$target" ]; then mv -f "$target" "$failed" 2>/dev/null; fi
+  if [ -f "$backup" ]; then mv -f "$backup" "$target" 2>/dev/null; fi
+  chmod 755 "$target" 2>/dev/null
+  app_pid=""
+  launch
+fi
+rm -f "$0" 2>/dev/null
+exit 0
+`
 }

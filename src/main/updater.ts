@@ -12,7 +12,7 @@ import {
   type PendingUpdate,
   type UpdateOutcome
 } from './update-plan'
-import { powershellSupervisor } from './update-script'
+import { posixSupervisor, powershellSupervisor } from './update-script'
 
 const REPO = 'blastbeng/triade-ai'
 const TIMEOUT_MS = 7000
@@ -41,6 +41,9 @@ function isNewer(candidate: string, current: string): boolean {
 
 /** Interroga GitHub per l'ultima release; timeout breve, errori silenziosi. */
 export async function checkForUpdate(): Promise<UpdateInfo | null> {
+  // in sviluppo non si aggiorna niente: il "bersaglio" sarebbe l'eseguibile di
+  // Electron, non l'app
+  if (!app.isPackaged) return null
   const settings = getSettings()
   if (settings.updates?.enabled === false) return null
   try {
@@ -190,7 +193,15 @@ export function updateTarget(): string {
     if (portable) return portable
     return process.execPath
   }
-  return process.env.APPIMAGE ?? process.execPath
+  // un collegamento simbolico (es. /usr/local/bin/triade) non va sostituito:
+  // si aggiorna il file a cui punta
+  const appImage = process.env.APPIMAGE
+  if (!appImage) return process.execPath
+  try {
+    return fs.realpathSync(appImage)
+  } catch {
+    return appImage
+  }
 }
 
 /** true se stiamo girando da una copia temporanea (portable non rilevato). */
@@ -221,6 +232,14 @@ function writeJson(file: string, data: unknown): void {
 
 /** Segna un aggiornamento in corso: è la base per capire, al riavvio, com'è andata. */
 function markPending(version: string, target: string): void {
+  // il marker di un tentativo precedente della STESSA versione non è una prova:
+  // se restasse, il supervisore dichiarerebbe riuscito un aggiornamento che non
+  // è mai partito (e cancellerebbe la copia di riserva)
+  try {
+    fs.rmSync(bootMarker(version), { force: true })
+  } catch {
+    /* ignore */
+  }
   writeJson(pendingFile(), {
     version,
     target,
@@ -377,37 +396,43 @@ export function applyUpdate(newExe: string, version = ''): void {
       'stai eseguendo una copia estratta dell’AppImage: scarica il nuovo .AppImage dalla pagina Releases'
     )
   }
-  const backup = `${current}.old`
-  const finalPath = path.join(path.dirname(current), path.basename(newExe))
-  writeJson(pendingFile(), {
-    version,
-    target: finalPath,
-    backup,
-    at: Date.now()
-  } satisfies PendingUpdate)
+  // se la cartella non è scrivibile (AppImage in /opt o /usr/local/bin) il
+  // supervisore fallirebbe a metà, dopo aver chiuso l'app: meglio dirlo subito
+  const currentDir = path.dirname(current)
   try {
-    // copiare sopra un eseguibile in esecuzione dà ETXTBSY: si sposta il vecchio
-    // e si mette il nuovo al suo posto (rename atomico, stesso filesystem).
-    fs.rmSync(backup, { force: true })
-    if (fs.existsSync(current)) fs.renameSync(current, backup)
-    try {
-      fs.renameSync(newExe, finalPath)
-    } catch {
-      fs.copyFileSync(newExe, finalPath)
-      fs.rmSync(newExe, { force: true })
-    }
-    fs.chmodSync(finalPath, 0o755)
-  } catch (err) {
-    // ripristino immediato se qualcosa è andato storto a metà
-    try {
-      if (!fs.existsSync(finalPath) && fs.existsSync(backup)) fs.renameSync(backup, current)
-    } catch {
-      /* ignore */
-    }
-    throw new Error(`sostituzione dell'eseguibile fallita: ${(err as Error).message}`)
+    fs.accessSync(currentDir, fs.constants.W_OK)
+  } catch {
+    throw new Error(
+      `la cartella dell’AppImage (${currentDir}) non è scrivibile: ` +
+        'sposta il file in una cartella tua (es. ~/App) e riprova, ' +
+        'oppure scarica la nuova versione dalla pagina Releases'
+    )
   }
-  // conserva gli argomenti di avvio (es. --no-sandbox dove il sandbox SUID manca)
-  app.relaunch({ execPath: finalPath, args: process.argv.slice(1) })
+  // si sostituisce IN PLACE (stesso nome): cambialo e i lanciatori/collegamenti
+  // dell'utente punterebbero a un file che non esiste più
+  markPending(version, current)
+  // l'app deve chiudersi prima di toccare il file (ETXTBSY): lo fa un
+  // supervisore che resta vivo anche se la nuova versione non dovesse partire
+  const helper = path.join(updateDir(), 'aggiorna.sh')
+  fs.mkdirSync(updateDir(), { recursive: true })
+  fs.writeFileSync(
+    helper,
+    posixSupervisor({
+      target: current,
+      newExe,
+      marker: bootMarker(version),
+      version,
+      pid: process.pid,
+      pending: pendingFile(),
+      esito: esitoFile(),
+      logFile: path.join(updateDir(), 'aggiorna.log'),
+      // conserva gli argomenti di avvio (es. --no-sandbox dove il sandbox SUID manca)
+      args: process.argv.slice(1)
+    }),
+    { mode: 0o755 }
+  )
+  log.info(`[update] sostituzione di ${current} affidata a ${helper}`)
+  spawn('sh', [helper], { detached: true, stdio: 'ignore' }).unref()
   app.exit(0)
 }
 
@@ -471,7 +496,8 @@ export function cleanupUpdateLeftovers(maxAgeDays = 1): number {
         const st = fs.statSync(file)
         const old = now - st.mtimeMs > maxAgeDays * 24 * 60 * 60 * 1000
         const isUnpack = name === 'nuovo'
-        const isArchive = /\.(zip|tar\.gz|AppImage)$/i.test(name) || /^aggiorna\.(ps1|cmd|log)$/i.test(name)
+        const isArchive =
+          /\.(zip|tar\.gz|AppImage)$/i.test(name) || /^aggiorna\.(ps1|cmd|sh|log)$/i.test(name)
         if (old && (isUnpack || isArchive)) {
           fs.rmSync(file, { recursive: true, force: true })
           removed++

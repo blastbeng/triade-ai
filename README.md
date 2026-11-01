@@ -237,6 +237,10 @@ credentials are committed.
 
 ### Troubleshooting: `llama-server` doesn't start (0xC0000139)
 
+On Linux the update is applied by a small `sh` supervisor (`dati/aggiornamenti/aggiorna.sh`) that replaces
+the AppImage **in place** (same file name, so shortcuts keep working) and restores `<name>.old` if the new
+version does not write its boot marker — the same rule as Windows.
+
 If the log says *entrypoint not found* (`0xC0000139`) or *llama-server non ha risposto*, a DLL of a
 different build (whisper.cpp, CUDA) ended up next to `llama-server.exe`. The app now compares the whole
 tree in `dati/bin` with the bundled one at every start, realigns it and removes foreign files, then

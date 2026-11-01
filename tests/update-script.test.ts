@@ -62,6 +62,11 @@ describe('supervisore PowerShell: contratto dello script', () => {
     expect(updater).toContain('PORTABLE_EXECUTABLE_FILE')
     expect(updater).toContain('/[\\\\/]Temp[\\\\/]/i.test(process.execPath)')
   })
+
+  it('non si fida del marker di un tentativo precedente della stessa versione', () => {
+    const updater = read('src/main/updater.ts')
+    expect(updater).toContain('fs.rmSync(bootMarker(version), { force: true })')
+  })
 })
 
 /**
@@ -170,6 +175,8 @@ describe.skipIf(process.platform !== 'win32')('supervisore PowerShell: esecuzion
     expect(fs.readFileSync(s.target, 'utf8')).toBe('OLD')
     const esito = JSON.parse(fs.readFileSync(s.esito, 'utf8').replace(/^\uFEFF/, ''))
     expect(esito.result).toBe('swap-failed')
-    expect(fs.existsSync(s.pending)).toBe(false)
+    // pending.json resta: è l'app, al riavvio, a dire che l'aggiornamento non
+    // è stato applicato (prima restava intatta ma in silenzio)
+    expect(fs.existsSync(s.pending)).toBe(true)
   }, 60_000)
 })
