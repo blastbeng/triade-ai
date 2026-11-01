@@ -35,7 +35,11 @@ async function download(url, dest) {
   }
   fs.mkdirSync(path.dirname(dest), { recursive: true })
   log(`scarico ${url}`)
-  const res = await fetch(url, { redirect: 'follow' })
+  const headers = { 'User-Agent': 'triade-ai' }
+  if (url.includes('api.github.com') && process.env.GITHUB_TOKEN) {
+    headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`
+  }
+  const res = await fetch(url, { redirect: 'follow', headers })
   if (!res.ok) throw new Error(`HTTP ${res.status} su ${url}`)
   const total = Number(res.headers.get('content-length') ?? 0)
   const tmp = `${dest}.part`
@@ -86,10 +90,10 @@ function flatten(dir) {
 
 /** Trova l'URL di un asset nelle release recenti (i nomi dei file cambiano spesso). */
 async function githubAsset(repo, pattern) {
-  const res = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=6`, {
-    headers: { 'User-Agent': 'triade-ai' }
-  })
-  if (!res.ok) throw new Error(`GitHub API ${res.status}`)
+  const headers = { 'User-Agent': 'triade-ai', Accept: 'application/vnd.github+json' }
+  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`
+  const res = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=6`, { headers })
+  if (!res.ok) throw new Error(`GitHub API ${res.status} su ${repo} (rate limit? serve GITHUB_TOKEN)`)
   const releases = await res.json()
   for (const rel of releases) {
     for (const asset of rel.assets ?? []) {
