@@ -11,6 +11,9 @@ export const LOCALES: { id: Locale; label: string; flag: string }[] = [
 export type Dict = Record<string, string>
 
 const en: Dict = {
+  'settings.corruptBadge': "corrupted file",
+  'settings.repair': "repair (re-download)",
+  'settings.corruptNotRepairable': "no source available: choose another model",
   'embeddings.title': "Embeddings (memory and documents)",
   'embeddings.engine': "Embedding engine",
   'embeddings.model': "Embedding model",
@@ -257,6 +260,9 @@ const en: Dict = {
 }
 
 const it: Dict = {
+  'settings.corruptBadge': "file corrotto",
+  'settings.repair': "ripara (riscarica)",
+  'settings.corruptNotRepairable': "nessuna sorgente disponibile: scegli un altro modello",
   'embeddings.title': "Embedding (memoria e documenti)",
   'embeddings.engine': "Motore di embedding",
   'embeddings.model': "Modello di embedding",
@@ -500,6 +506,9 @@ const it: Dict = {
 }
 
 const de: Dict = {
+  'settings.corruptBadge': "beschädigte Datei",
+  'settings.repair': "reparieren (neu laden)",
+  'settings.corruptNotRepairable': "keine Quelle verfügbar: anderes Modell wählen",
   'embeddings.title': "Embeddings (Gedächtnis und Dokumente)",
   'embeddings.engine': "Embedding-Engine",
   'embeddings.model': "Embedding-Modell",
@@ -742,6 +751,9 @@ const de: Dict = {
 }
 
 const fr: Dict = {
+  'settings.corruptBadge': "fichier corrompu",
+  'settings.repair': "réparer (retélécharger)",
+  'settings.corruptNotRepairable': "aucune source disponible : choisissez un autre modèle",
   'embeddings.title': "Embeddings (mémoire et documents)",
   'embeddings.engine': "Moteur d'embedding",
   'embeddings.model': "Modèle d'embedding",
@@ -984,6 +996,9 @@ const fr: Dict = {
 }
 
 const es: Dict = {
+  'settings.corruptBadge': "archivo corrupto",
+  'settings.repair': "reparar (redescargar)",
+  'settings.corruptNotRepairable': "sin origen disponible: elige otro modelo",
   'embeddings.title': "Embeddings (memoria y documentos)",
   'embeddings.engine': "Motor de embeddings",
   'embeddings.model': "Modelo de embeddings",

@@ -51,6 +51,24 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
   const [gpu, setGpu] = useState<GpuInfo | null>(null)
   const [gpuDraft, setGpuDraft] = useState<Record<string, string>>({})
   const [embedProbe, setEmbedProbe] = useState<string | null>(null)
+  const [integrity, setIntegrity] = useState<
+    { id: string; name: string; ok: boolean; reason?: string; repairable: boolean }[]
+  >([])
+
+  const refreshIntegrity = async (): Promise<void> => {
+    try {
+      setIntegrity(await window.triade.modelsIntegrity())
+    } catch {
+      setIntegrity([])
+    }
+  }
+
+  useEffect(() => {
+    void refreshIntegrity()
+  }, [])
+
+  const reportOf = (id: string): { ok: boolean; reason?: string; repairable: boolean } | undefined =>
+    integrity.find((r) => r.id === id)
   const [probeQuery, setProbeQuery] = useState('vulkan amd')
   const [probe, setProbe] = useState<{ engine: string; hits: { title: string; url: string }[] } | null>(null)
   const [probeBusy, setProbeBusy] = useState(false)
@@ -821,6 +839,28 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                 </div>
                 {m.assignedTo.length > 0 && (
                   <p className="note">{t('settings.inUseBy', { names: m.assignedTo.join(', ') })}</p>
+                )}
+                {reportOf(m.id) && !reportOf(m.id)!.ok && (
+                  <p className="note warn">
+                    {t('settings.corruptBadge')} · {reportOf(m.id)!.reason}
+                    {reportOf(m.id)!.repairable ? (
+                      <button
+                        className="ghost"
+                        onClick={async () => {
+                          setDownloading(m.id)
+                          const ok = await window.triade.modelsRepair(m.id)
+                          await refreshIntegrity()
+                          await onRefresh()
+                          setDownloading(null)
+                          if (!ok) window.alert(t('settings.corruptNotRepairable'))
+                        }}
+                      >
+                        {t('settings.repair')}
+                      </button>
+                    ) : (
+                      <span> — {t('settings.corruptNotRepairable')}</span>
+                    )}
+                  </p>
                 )}
               </div>
             ))}

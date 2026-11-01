@@ -183,3 +183,57 @@ export async function removeModel(id: string): Promise<void> {
     }
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * Integrità dei modelli scaricati
+ * ------------------------------------------------------------------ */
+
+export interface IntegrityReport {
+  id: string
+  name: string
+  modelFile: string
+  ok: boolean
+  reason?: string
+  /** true se esiste una sorgente da cui riscaricare il file */
+  repairable: boolean
+  bytes: number
+}
+
+/** Elenco dei modelli installati con il loro stato di integrità. */
+export async function integrityReport(): Promise<IntegrityReport[]> {
+  const list = listModels()
+  const out: IntegrityReport[] = []
+  for (const m of list) {
+    const modelFile = path.join(modelsDir(), m.files.model.name)
+    if (!fs.existsSync(modelFile)) continue
+    const check = validateGgufFile(modelFile)
+    const mmprojPath = m.files.mmproj ? path.join(modelsDir(), m.files.mmproj.name) : ''
+    const visionOk = mmprojPath ? validateGgufFile(mmprojPath).ok : true
+    out.push({
+      id: m.id,
+      name: m.name,
+      modelFile: m.files.model.name,
+      ok: check.ok && visionOk,
+      reason: check.ok ? (visionOk ? undefined : 'mmproj corrotto') : check.reason,
+      repairable: Boolean(m.files.model.url),
+      bytes: fs.statSync(modelFile).size
+    })
+  }
+  return out
+}
+
+/**
+ * Ripara un modello corrotto: elimina i file e li riscarica dalla sorgente.
+ * Ritorna false se non esiste una sorgente (modello custom senza repo).
+ */
+export async function repairModel(id: string, onProgress?: ProgressCb): Promise<boolean> {
+  const entry = listModels().find((m) => m.id === id)
+  if (!entry || !entry.files.model.url) return false
+  try {
+    removeModel(id)
+  } catch {
+    // file già assenti
+  }
+  const status = await installModel(id, onProgress)
+  return status.modelReady && status.mmprojReady
+}

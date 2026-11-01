@@ -98,6 +98,10 @@ interface Api {
   stopServer(): Promise<ServerStatus[]>
   listSessions(): Promise<{ id: string; topic: string; updatedAt: number; state: string; turns: number }[]>
   loadSession(id: string): Promise<Session | null>
+  modelsIntegrity(): Promise<
+    { id: string; name: string; ok: boolean; reason?: string; repairable: boolean; bytes: number }[]
+  >
+  modelsRepair(id: string): Promise<boolean>
   embeddingsProbe(): Promise<{ ok: boolean; detail: string; dim: number }>
   version(): Promise<string>
   remoteModels(backend: string, baseUrl?: string, apiKey?: string): Promise<string[]>

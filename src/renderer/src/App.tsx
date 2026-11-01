@@ -210,6 +210,48 @@ export default function App(): JSX.Element {
     return last ? Math.min(1, last.tokensIn / ctx) : 0
   }, [session, settings])
 
+  /** File GGUF corrotti: avvisa, ripara se possibile, altrimenti chiede un altro modello. */
+  const checkIntegrity = async (): Promise<boolean> => {
+    let reports: Awaited<ReturnType<typeof window.triade.modelsIntegrity>> = []
+    try {
+      reports = await window.triade.modelsIntegrity()
+    } catch {
+      return true
+    }
+    const broken = reports.filter((r) => !r.ok)
+    if (!broken.length) return true
+    const target =
+      broken.find((r) => r.id === (settings?.models.active ?? '')) ?? broken[0]
+    pushLog(`modello corrotto: ${target.name} (${target.reason ?? 'motivo sconosciuto'})`)
+    setNotice(`${target.name}: file corrotto (${target.reason ?? 'illeggibile'}) — avvio verifica…`)
+    if (!target.repairable) {
+      setNotice(
+        `${target.name} è corrotto e non è riparabile (sorgente non disponibile): scegli un altro modello nelle impostazioni.`
+      )
+      setShowSettings(true)
+      return false
+    }
+    try {
+      const fixed = await window.triade.modelsRepair(target.id)
+      setCatalog(await window.triade.modelsCatalog())
+      setServers(await window.triade.serverStatus())
+      if (!fixed) {
+        setNotice(
+          `Riparazione di ${target.name} fallita: scegli un altro modello nelle impostazioni.`
+        )
+        setShowSettings(true)
+        return false
+      }
+      setNotice(`${target.name} verificato e ripristinato.`)
+      pushLog(`modello riparato: ${target.name}`)
+      return true
+    } catch (err) {
+      setNotice(`Riparazione di ${target.name} fallita: ${(err as Error).message}`)
+      setShowSettings(true)
+      return false
+    }
+  }
+
   const ensureReady = async (): Promise<void> => {
     if (!settings) return
     const missing = personas.some((p) => {
@@ -240,6 +282,7 @@ export default function App(): JSX.Element {
     setBusy(true)
     setNotice(null)
     try {
+      if (!(await checkIntegrity())) return
       await ensureReady()
       const files = attachments.map((a) => a.path)
       const created = await window.triade.submit(topic, files, personaId)

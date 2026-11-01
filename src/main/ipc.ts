@@ -321,6 +321,22 @@ export function registerIpc(): void {
     }
   )
 
+  ipcMain.handle('models:integrity', async () => {
+    const { integrityReport } = await import('./llama/downloader')
+    return integrityReport()
+  })
+
+  ipcMain.handle('models:repair', async (_e, id: string) => {
+    const { repairModel } = await import('./llama/downloader')
+    const ok = await repairModel(id, (status) =>
+      broadcast({
+        type: 'log',
+        message: `riparazione ${id}: ${Math.round((status.progress ?? 0) * 100)}% (${status.phase})`
+      })
+    )
+    return ok
+  })
+
   ipcMain.handle('embeddings:probe', async () => {
     const { probeEmbeddings } = await import('./memory/embed-client')
     return probeEmbeddings()

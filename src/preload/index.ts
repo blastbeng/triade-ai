@@ -73,6 +73,10 @@ const api = {
 
   listSessions: (): Promise<{ id: string; topic: string; updatedAt: number; state: string; turns: number }[]> =>
     ipcRenderer.invoke('session:list'),
+  modelsIntegrity: (): Promise<
+    { id: string; name: string; ok: boolean; reason?: string; repairable: boolean; bytes: number }[]
+  > => ipcRenderer.invoke('models:integrity'),
+  modelsRepair: (id: string): Promise<boolean> => ipcRenderer.invoke('models:repair', id),
   embeddingsProbe: (): Promise<{ ok: boolean; detail: string; dim: number }> =>
     ipcRenderer.invoke('embeddings:probe'),
   version: (): Promise<string> => ipcRenderer.invoke('app:version'),
