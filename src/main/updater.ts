@@ -202,15 +202,18 @@ export function applyUpdate(newExe: string, version = ''): void {
     const script = [
       '@echo off',
       'setlocal',
+      `set LOG=%~dp0aggiorna.log`,
+      `echo [%DATE% %TIME%] avvio sostituzione >> "%LOG%" 2>&1`,
       'ping 127.0.0.1 -n 4 >nul',
-      `move /Y "${target}" "${target}.old" >nul 2>&1`,
+      `move /Y "${target}" "${target}.old" >> "%LOG%" 2>&1`,
       'for /L %%i in (1,1,15) do (',
-      `  move /Y "${newExe}" "${target}" >nul 2>&1`,
+      `  move /Y "${newExe}" "${target}" >> "%LOG%" 2>&1`,
       `  if exist "${target}" goto started`,
       '  ping 127.0.0.1 -n 2 >nul',
       ')',
       ':started',
       `if not exist "${target}" move /Y "${target}.old" "${target}" >nul 2>&1`,
+      `echo [%DATE% %TIME%] avvio nuova versione >> "%LOG%" 2>&1`,
       `start "" "${target}"`,
       'del /Q "%~f0"'
     ].join('\r\n')
@@ -249,7 +252,8 @@ export function applyUpdate(newExe: string, version = ''): void {
     }
     throw new Error(`sostituzione dell'eseguibile fallita: ${(err as Error).message}`)
   }
-  app.relaunch({ execPath: current, args: [] })
+  // conserva gli argomenti di avvio (es. --no-sandbox dove il sandbox SUID manca)
+  app.relaunch({ execPath: current, args: process.argv.slice(1) })
   app.exit(0)
 }
 
