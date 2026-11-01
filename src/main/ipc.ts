@@ -4,6 +4,7 @@ import { activePersonas } from '../shared/personas'
 import type { Backend } from '../shared/types'
 import { catalogStatus, installModel, removeModel, statusFor } from './llama/downloader'
 import { llamaPool } from './llama/server'
+import { humanizeError } from './errors'
 import { engine } from './debate/engine'
 import { deleteSession, listSessions, loadSession } from './debate/store'
 import { ingest } from './media/attachments'
@@ -177,8 +178,13 @@ export function registerIpc(): void {
 
   ipcMain.handle('server:status', () => llamaPool.status())
   ipcMain.handle('server:start', async () => {
-    for (const t of llamaPool.requiredTargets()) await llamaPool.ensure(t.modelId, t.deviceKey)
-    return llamaPool.status()
+    try {
+      for (const t of llamaPool.requiredTargets()) await llamaPool.ensure(t.modelId, t.deviceKey)
+      return llamaPool.status()
+    } catch (err) {
+      // l'utente deve leggere cosa fare, non "llama-server non ha risposto"
+      throw new Error(humanizeError(err))
+    }
   })
 
   ipcMain.handle('gpu:list', async (_e, force: boolean) => {
