@@ -291,6 +291,25 @@ class LlamaInstance extends EventEmitter {
         child.stderr.on('data', onData)
         child.on('exit', (code, signal) => {
           this.push(`[server terminato, codice ${code}, segnale ${signal ?? 'nessuno'}]`)
+          // 0xC0000139 = STATUS_ENTRYPOINT_NOT_FOUND: quasi sempre una DLL del backend
+          // mancante o di versione diversa accanto all'exe. Elenchiamo cosa c'è davvero.
+          if (code === 3221225785 || code === -1073741515) {
+            try {
+              const dir = path.dirname(exe)
+              const libs = fs
+                .readdirSync(dir)
+                .filter((f) => /\.(dll|exe)$/i.test(f))
+                .sort()
+              this.push(
+                `[dll] entrypoint non trovato: in ${dir} ci sono ${libs.length} file (${libs.join(', ') || 'nessuno'})`
+              )
+              this.push(
+                '[dll] servono accanto a llama-server.exe: llama.dll, ggml.dll, ggml-base.dll, ggml-cpu.dll, ggml-vulkan.dll'
+              )
+            } catch {
+              /* ignore */
+            }
+          }
           if (this.child === child) {
             this.child = null
             this.port = null
