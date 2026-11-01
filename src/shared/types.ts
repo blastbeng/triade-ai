@@ -201,13 +201,13 @@ export const DEFAULT_PERSONAS: Persona[] = [
 ]
 
 export const DEFAULT_SETTINGS: Settings = {
-  contextSize: 65536,
+  contextSize: 131072,
   compressionThreshold: 0.75,
   gpuLayers: 999,
   autoTune: true,
   flashAttention: true,
   kvCacheType: 'q8_0',
-  maxTokensPerTurn: 16384,
+  maxTokensPerTurn: 0,
   maxTurns: 40,
   temperature: 0.85,
   textScale: 1,

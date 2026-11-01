@@ -39,8 +39,9 @@ CUDA, per GPU NVIDIA. Nessun supporto ROCm/HIP.
 - **Tool web:** `web_search`, `fetch_page`, `image_search`, `find_media` via tool calling nativo.
   Backend: SearXNG (default), Brave, Tavily, Google CSE con chiavi API; catena di riserva senza
   chiavi (DuckDuckGo Instant Answer, Wikipedia) quando il motore principale non risponde.
-- **Contesto configurabile:** 65536 token di default, uguale per le tre chat; tetto di sicurezza per
-  turno 16384 token (il vero limite resta il contesto). Al **75%** parte il
+- **Contesto configurabile:** **131072 token di default** (il modello ne dichiara 262144), uguale per
+  le tre chat. Il turno non ha tetto: può usare tutto lo spazio disponibile, e il vero limite resta
+  il contesto. Al **75%** parte il
   prompt compression (sommario + finestra scorrevole). Il testo del turno non viene mai troncato a
   priori: la generazione si ferma solo se il modello entra in loop (ripetizione ossessiva) o se il
   budget di contesto si esaurisce.
@@ -66,7 +67,7 @@ CUDA, per GPU NVIDIA. Nessun supporto ROCm/HIP.
 
 | Cosa | Dettaglio |
 |---|---|
-| GPU | AMD RDNA2/RDNA3 con Vulkan (RX 7600 XT: 16 GB comodi per 5.6 GB + mmproj) |
+| GPU | AMD RDNA2/RDNA3 con Vulkan (RX 7600 XT: 16 GB — pesi 5.6 GB + mmproj 0.6 GB + KV q8_0 di 131072 token ≈ 2.2 GB, totale ~8.7 GB) |
 | Driver | Adrenalin aggiornati (runtime Vulkan di sistema) |
 | Disco | ~7 GB modello + mmproj, ~1 GB whisper + binari |
 | OS | Windows 10/11 x64, Linux x64 |
@@ -157,7 +158,7 @@ Per Azure Trusted Signing si aggiunge `win.azureSignOptions` in `electron-builde
 1. Primo avvio: scelta del modello (multi-selezione; per ora solo Ornith) e download.
 2. Scrivi l'argomento, allega eventualmente media, premi **avvia**.
 3. Le tre colonne si riempiono a turno; `pausa` ferma subito, `riprendi` continua.
-4. Impostazioni → generale: contesto, soglia di compressione (75%), tetto token per turno, limite
+4. Impostazioni → generale: contesto, soglia di compressione (75%), tetto token per turno (0 = nessuno), limite
    turni, temperatura, dimensione del testo, strati GPU, flash attention, KV cache, auto-tuning.
 5. Impostazioni → ricerca: provider e chiavi. → gpu: GPU per chat. → personalità: i tre prompt e il
    modello di ciascuna chat. → modelli: download, modello attivo, eliminazione file.

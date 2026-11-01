@@ -302,9 +302,11 @@ export class DebateEngine extends EventEmitter {
         let toolRounds = 0
         let cut: 'loop' | 'budget' | undefined
         // budget per turno: il contesto disponibile fino al 75% (soglia di compressione)
+        // nessun tetto per turno: il limite reale è lo spazio di contesto disponibile
         const room = Math.max(128, settings.contextSize - tokens - 384)
-        const turnCap = Math.min(settings.maxTokensPerTurn, room)
-        if (turnCap < 256) cut = 'budget'
+        const configured = settings.maxTokensPerTurn > 0 ? settings.maxTokensPerTurn : room
+        const turnCap = Math.max(128, Math.min(configured, room))
+        if (room < 256) cut = 'budget'
         for (let attempt = 0; attempt < 3; attempt++) {
           const budget = turnCap
           if (attempt > 0) setPhase('prefill', 'nuovo tentativo')

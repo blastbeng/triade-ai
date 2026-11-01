@@ -92,11 +92,11 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
               </div>
             </label>
             <label>
-              Max token per turno (tetto di sicurezza, il vero limite è il contesto)
+              Max token per turno (0 = nessun tetto, il limite è solo il contesto)
               <input
                 type="number"
-                min={256}
-                max={65536}
+                min={0}
+                max={262144}
                 step={512}
                 value={draft.maxTokensPerTurn}
                 onChange={(e) => setDraft({ ...draft, maxTokensPerTurn: Number(e.target.value) })}
