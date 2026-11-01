@@ -12,6 +12,8 @@ export interface LaunchPlan {
   batch: number
   ubatch: number
   mmprojOffload: boolean
+  /** true = non passiamo -ngl e lasciamo che llama.cpp adatti i layer alla VRAM libera */
+  autoFit: boolean
   threads: number
   notes: string[]
   estimate: { weightsMiB: number; kvMiB: number; overheadMiB: number; totalMiB: number; availableMiB: number }
@@ -69,6 +71,7 @@ export function planLaunch(input: PlanInput): LaunchPlan {
       batch: 2048,
       ubatch: 512,
       mmprojOffload: true,
+      autoFit: false,
       threads,
       notes: ['auto-tuning disattivato: uso i valori delle impostazioni'],
       estimate: {
@@ -95,6 +98,7 @@ export function planLaunch(input: PlanInput): LaunchPlan {
       batch: 2048,
       ubatch: 256,
       mmprojOffload,
+      autoFit: false,
       threads,
       notes,
       estimate: {
@@ -173,5 +177,7 @@ export function planLaunch(input: PlanInput): LaunchPlan {
     )
   }
 
-  return { ctx, kvType, ngl, batch, ubatch, mmprojOffload, threads, notes, estimate }
+  // con auto-tuning lasciamo a llama.cpp la scelta dei layer da mettere in GPU:
+  // è l'unico che conosce la VRAM realmente libera in quel momento
+  return { ctx, kvType, ngl, batch, ubatch, mmprojOffload, autoFit: true, threads, notes, estimate }
 }

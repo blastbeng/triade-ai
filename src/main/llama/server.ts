@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
-import { cacheDir, dataDir, findBinary, modelsDir } from '../paths'
+import { cacheDir, dataDir, findBinary, modelsDir, runDir } from '../paths'
 import { getSettings } from '../settings'
 import { catalogModel, defaultModelId } from '../models/registry'
 import { detectGpus, llamaBinaryFor, type Backend, type GpuDevice } from '../gpu/devices'
@@ -43,6 +43,7 @@ class LlamaInstance extends EventEmitter {
   private logLines: string[] = []
   private starting = false
   private deviceLabel = 'sconosciuto'
+  private pidFile: string | null = null
 
   constructor(modelId: string, device: GpuDevice | null) {
     super()
@@ -52,6 +53,27 @@ class LlamaInstance extends EventEmitter {
 
   get key(): string {
     return `${this.modelId}|${this.device?.key ?? 'auto'}`
+  }
+
+  private writePidFile(pid?: number): string | null {
+    if (!pid) return null
+    try {
+      const file = path.join(runDir(), `llama-${this.modelId}-${pid}.pid`)
+      fs.writeFileSync(file, String(pid), 'utf8')
+      return file
+    } catch {
+      return null
+    }
+  }
+
+  private clearPidFile(): void {
+    if (!this.pidFile) return
+    try {
+      fs.rmSync(this.pidFile, { force: true })
+    } catch {
+      /* ignore */
+    }
+    this.pidFile = null
   }
 
   status(): ServerStatus {
@@ -93,6 +115,7 @@ class LlamaInstance extends EventEmitter {
     const child = this.child
     this.child = null
     this.port = null
+    this.clearPidFile()
     if (!child || child.killed) return
     try {
       if (process.platform === 'win32') {
@@ -168,7 +191,7 @@ class LlamaInstance extends EventEmitter {
           ...(mmprojPath ? ['--mmproj', mmprojPath] : []),
           // +1024 di slack: il conteggio lato app è una stima, il server non deve mai rifiutare
           '-c', String(plan.ctx + 1024),
-          '-ngl', String(plan.ngl),
+          ...(plan.autoFit ? [] : ['-ngl', String(plan.ngl)]),
           '-b', String(plan.batch),
           '-ub', String(plan.ubatch),
           '-np', '1',
@@ -196,6 +219,7 @@ class LlamaInstance extends EventEmitter {
         const child = spawn(exe, args, { windowsHide: true, cwd: path.dirname(exe) })
         this.child = child
         this.port = port
+        this.pidFile = this.writePidFile(child.pid)
         const onData = (buf: Buffer): void => {
           for (const line of buf.toString('utf8').split('\n')) this.push(line)
         }
@@ -306,6 +330,39 @@ class LlamaPool extends EventEmitter {
 
   status(): ServerStatus[] {
     return [...this.instances.values()].map((i) => i.status())
+  }
+
+  /**
+   * All'avvio chiude i llama-server rimasti da un'esecuzione precedente:
+   * altrimenti la VRAM resta occupata e il nuovo modello non entra.
+   */
+  async cleanupOrphans(): Promise<number> {
+    let killed = 0
+    try {
+      const dir = runDir()
+      for (const name of fs.readdirSync(dir)) {
+        if (!name.endsWith('.pid')) continue
+        const file = path.join(dir, name)
+        const pid = Number(fs.readFileSync(file, 'utf8').trim())
+        if (pid > 0) {
+          try {
+            if (process.platform === 'win32') {
+              spawn('taskkill', ['/pid', String(pid), '/f', '/t'], { windowsHide: true })
+            } else {
+              process.kill(pid, 'SIGKILL')
+            }
+            killed++
+            this.emit('log', `[cleanup] chiuso llama-server orfano (pid ${pid})`)
+          } catch {
+            /* già morto */
+          }
+        }
+        fs.rmSync(file, { force: true })
+      }
+    } catch {
+      /* niente da pulire */
+    }
+    return killed
   }
 
   /** Coppie (modello, GPU) richieste dalle 3 chat: una sola istanza per coppia. */

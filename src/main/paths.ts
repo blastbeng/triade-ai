@@ -91,6 +91,12 @@ export function memoryDir(): string {
   return dir
 }
 
+export function runDir(): string {
+  const dir = path.join(dataDir(), 'run')
+  fs.mkdirSync(dir, { recursive: true })
+  return dir
+}
+
 export function cacheDir(): string {
   const dir = path.join(dataDir(), 'cache')
   fs.mkdirSync(dir, { recursive: true })

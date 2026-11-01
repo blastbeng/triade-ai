@@ -160,6 +160,7 @@ app.whenReady().then(async () => {
     app.exit(1)
     return
   }
+  await llamaPool.cleanupOrphans()
   registerIpc()
   createWindow()
   app.on('activate', () => {
