@@ -43,7 +43,7 @@ export default function ChatColumn({
   calledBy,
   nextUp,
   ui,
-  active
+  active,
   modelLabel,
   port,
   ctx
