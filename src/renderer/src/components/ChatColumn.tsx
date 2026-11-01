@@ -123,6 +123,9 @@ export default function ChatColumn({
               {turn.agentId === 'utente' ? t('chat.you') : t('chat.turn')}
               {(ui?.showTimestamps ?? true) && ` · ${new Date(turn.ts).toLocaleTimeString('it-IT')}`}
               {turn.agentId === 'utente' && <span className="tok"> · {t('chat.sent')}</span>}
+              {turn.agentId === 'utente' && turn.toPersonaId === persona.id && (
+                <span className="tok"> · → {persona.name}</span>
+              )}
               {(ui?.showTokens ?? true) && turn.tokensIn > 0 && (
                 <span className="tok"> · {t('chat.promptTokens', { n: turn.tokensIn })}</span>
               )}

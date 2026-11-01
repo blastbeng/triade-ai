@@ -67,6 +67,20 @@ function createWindow(): void {
               `window.triade.startDebate('Screenshot: come progettiamo un agente locale che usa la GPU AMD per la ricerca?', [], ${JSON.stringify(process.env.TRIADE_SHOT_PERSONA ?? '')})`
             )
           }
+          if (process.env.TRIADE_SHOT_NEXT) {
+            // verifica del flusso "continua": seconda domanda indirizzata a un'altra personalità
+            await new Promise((r) => setTimeout(r, 4000))
+            await js(
+              `window.triade.submit(${JSON.stringify(process.env.TRIADE_SHOT_NEXT)}, [], ${JSON.stringify(process.env.TRIADE_SHOT_NEXT_PERSONA ?? '')})`
+            )
+            const owners = await js(
+              `(async () => {
+                 const cur = await window.triade.currentSession();
+                 return (cur?.turns ?? []).filter((x) => x.agentId === 'utente').map((x) => x.toPersonaId + ':' + x.text.slice(0, 16)).join(' | ');
+               })()`
+            )
+            console.log(`[shot] turni utente -> ${String(owners)}`)
+          }
           await new Promise((r) => setTimeout(r, Number(process.env.TRIADE_SHOT_DELAY ?? 30000)))
           if (process.env.TRIADE_SHOT_SCROLL === 'top') {
             await js(

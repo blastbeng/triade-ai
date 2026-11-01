@@ -177,16 +177,22 @@ export default function App(): JSX.Element {
   /** Turni visibili in una colonna: quelli dell'agente più i messaggi dell'utente rivolti a lui. */
   const turnsFor = (personaId: string): Turn[] => {
     const all = session?.turns ?? []
+    const known = new Set(personas.map((p) => p.id))
     const out: Turn[] = []
+    // un messaggio utente non deve mai restare invisibile: se il destinatario non esiste
+    // più (chat vecchie, personalità rinominate) lo si attribuisce a chi risponde dopo
+    const targetOf = (t: Turn, i: number): string => {
+      if (t.toPersonaId && known.has(t.toPersonaId)) return t.toPersonaId
+      const next = all.slice(i + 1).find((x) => x.agentId !== 'utente')?.agentId
+      if (next && known.has(next)) return next
+      return personas[0]?.id ?? ''
+    }
     all.forEach((t, i) => {
       if (t.agentId === personaId) {
         out.push(t)
         return
       }
-      if (t.agentId === 'utente') {
-        const target = t.toPersonaId ?? all.slice(i + 1).find((x) => x.agentId !== 'utente')?.agentId
-        if (target === personaId) out.push(t)
-      }
+      if (t.agentId === 'utente' && targetOf(t, i) === personaId) out.push(t)
     })
     return out
   }
