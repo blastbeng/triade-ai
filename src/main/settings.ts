@@ -62,15 +62,24 @@ export function getSettings(): Settings {
 export function saveSettings(patch: Partial<Settings>): Settings {
   const previous = getSettings()
   const next = merge(previous, patch)
+  const clean = JSON.parse(JSON.stringify(next)) as Settings
+
+  // un array di personalità vuoto o incompleto non deve mai sovrascrivere quelle esistenti
+  if (!clean.personas || clean.personas.length !== 3) {
+    clean.personas =
+      previous.personas?.length === 3
+        ? previous.personas
+        : defaultPersonas(clean.ui?.language ?? 'en')
+  }
+
   // se l'utente cambia lingua e le personalità sono ancora quelle predefinite,
-  // i tre system prompt seguono la nuova lingua
+  // i tre system prompt seguono la nuova lingua (gli id restano stabili)
   const languageChanged =
     patch.ui?.language !== undefined && patch.ui.language !== previous.ui.language
-  if (languageChanged && areDefaultPersonas(next.personas)) {
-    // gli id restano gli stessi: modelli e GPU assegnati per chat non si perdono
-    next.personas = defaultPersonas(next.ui.language)
+  if (languageChanged && areDefaultPersonas(clean.personas)) {
+    clean.personas = defaultPersonas(clean.ui.language)
   }
-  const clean = JSON.parse(JSON.stringify(next)) as Settings
+
   const file = settingsFile()
   fs.mkdirSync(path.dirname(file), { recursive: true })
   fs.writeFileSync(`${file}.tmp`, JSON.stringify(clean, null, 2), 'utf8')
@@ -78,3 +87,4 @@ export function saveSettings(patch: Partial<Settings>): Settings {
   cached = clean
   return clean
 }
+
