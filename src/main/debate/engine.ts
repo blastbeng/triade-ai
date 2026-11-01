@@ -10,10 +10,11 @@ import { buildMessages, summarize, tokenCountOf } from './context'
 import { loadSession, newSession, saveSession } from './store'
 import { distillSession, rememberTurn, rememberUserNote } from '../memory/integrate'
 import { TOOL_SPECS, runTool } from './tools'
+import { HANDOFF, chooseNextSpeaker, parseHandoff } from './schedule'
 
 const CONSENSUS = /\[\[\s*CONSENSO\s*(?::([\s\S]*?))?\s*\]\]/i
 /** cessione della parola: [[PASSA A: Nome]] */
-const HANDOFF = /\[\[\s*PASSA\s+A:\s*([^\]\n]{1,40})\]\]/i
+
 const MAX_TOOL_ROUNDS = 2
 
 function escapeRegExp(text: string): string {
@@ -96,31 +97,16 @@ export class DebateEngine extends EventEmitter {
    * Come in ChatGPT: se c'è una chat caricata si continua quella (messaggio utente
    * in coda), altrimenti se ne apre una nuova.
    */
-  /**
-   * Chi parla adesso: prima l'interlocutore richiesto (menzione o cessione di parola),
-   * altrimenti la rotazione, evitando di dare la parola a chi ha appena parlato.
-   */
+  /** Chi parla adesso (helper puro, testabile). */
   private pickSpeaker(personas: Persona[]): Persona {
-    const agentTurns = (this.session?.turns ?? []).filter((t) => t.agentId !== 'utente').length
-    const recent = (this.session?.turns ?? [])
-      .filter((t) => t.agentId !== 'utente')
-      .slice(-1)
-      .map((t) => t.agentId)
-
-    const requested = this.session?.nextSpeakerId
-    if (requested) {
-      const found = personas.find((p) => p.id === requested)
-      this.session!.nextSpeakerId = undefined
-      if (found && !recent.includes(found.id)) return found
-      if (found) return found
-    }
-
-    const offset = this.session?.rotationOffset ?? 0
-    for (let step = 0; step < personas.length; step++) {
-      const candidate = personas[(agentTurns + offset + step) % personas.length]
-      if (!recent.includes(candidate.id)) return candidate
-    }
-    return personas[(agentTurns + offset) % personas.length]
+    const chosen = chooseNextSpeaker({
+      personas,
+      turns: this.session?.turns ?? [],
+      nextSpeakerId: this.session?.nextSpeakerId,
+      rotationOffset: this.session?.rotationOffset
+    })
+    if (this.session) this.session.nextSpeakerId = undefined
+    return chosen
   }
 
   /** Imposta chi deve parlare al prossimo turno (select in chat). */
@@ -344,6 +330,7 @@ export class DebateEngine extends EventEmitter {
         let text = ''
         let reasoning = ''
         let handoffTo: string | undefined
+        let handoffSeen = false
         const tools: Turn['tools'] = []
         let images: string[] = this.session.pendingImages ?? []
         this.session.pendingImages = []
@@ -367,8 +354,6 @@ export class DebateEngine extends EventEmitter {
               temperature: settings.temperature,
               maxTokens: budget,
               tools: settings.toolsEnabled ? TOOL_SPECS : undefined,
-              // l'agente può cedere la parola a metà frase: la generazione si ferma lì
-              stops: ['[[PASSA A:'],
               // dal secondo tentativo niente reasoning: serve solo la risposta finale
               noThinking: attempt > 0,
               signal: controller.signal,
@@ -398,8 +383,8 @@ export class DebateEngine extends EventEmitter {
             throw err
           }
           if (result.interrupted) {
-            interrupted = true
             text += result.content
+            if (!handoffSeen) interrupted = true
             break
           }
           if (result.stopReason === 'loop') {
@@ -503,21 +488,12 @@ export class DebateEngine extends EventEmitter {
 
         this.emitEvent({ type: 'phase', agentId: persona.id, phase: 'idle' })
 
-        const handoff = HANDOFF.exec(text)
-        if (handoff) {
-          const wanted = handoff[1].trim().toLowerCase()
-          const target =
-            personas.find((p) => p.id !== persona.id && p.name.toLowerCase().startsWith(wanted.slice(0, 6))) ??
-            personas.find((p) => p.id !== persona.id && wanted.includes(p.name.toLowerCase().slice(0, 5)))
-          if (target) {
-            handoffTo = target.id
-            this.session.nextSpeakerId = target.id
-            cut = 'handoff'
-            this.emitEvent({
-              type: 'log',
-              message: `${persona.name} passa la parola a ${target.name}`
-            })
-          }
+        const target = parseHandoff(text, personas, persona.id)
+        if (target) {
+          handoffTo = target.id
+          this.session.nextSpeakerId = target.id
+          cut = 'handoff'
+          this.emitEvent({ type: 'log', message: `${persona.name} passa la parola a ${target.name}` })
         }
 
         const clean = text
