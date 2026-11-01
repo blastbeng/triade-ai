@@ -1,3 +1,4 @@
+icon: build/icon.png
 appId: dev.blast.triadeai
 productName: TriadeAI
 directories:
@@ -14,6 +15,7 @@ extraResources:
 asar: true
 compression: normal
 win:
+  icon: build/icon.ico
   target:
     - target: portable
       arch:
@@ -29,6 +31,7 @@ win:
 portable:
   unpackDirName: TriadeAI
 linux:
+  icon: build/icon.png
   target:
     - target: AppImage
       arch:

@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1220"/>
+      <stop offset="100%" stop-color="#070a10"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="42%" r="62%">
+      <stop offset="0%" stop-color="#5eead4" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#5eead4" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5eead4" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#5eead4" stop-opacity="0.25"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1024" height="1024" rx="212" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1024" height="1024" rx="212" fill="url(#glow)"/>
+  <rect x="26" y="26" width="972" height="972" rx="190" fill="none" stroke="#222c3c" stroke-width="8"/>
+
+  <!-- triangolo del dibattito -->
+  <g stroke="url(#edge)" stroke-width="14" stroke-linecap="round" fill="none">
+    <path d="M512 268 L742 672 L282 672 Z"/>
+  </g>
+
+  <!-- nodo 1: Architetto (diamante) -->
+  <g transform="translate(512 246)">
+    <path d="M0 -96 L92 0 L0 96 L-92 0 Z" fill="#7aa2f7"/>
+    <path d="M0 -44 L44 0 L0 44 L-44 0 Z" fill="#0d1220" opacity="0.55"/>
+  </g>
+
+  <!-- nodo 2: Avvocato del diavolo (triangolo) -->
+  <g transform="translate(268 704)">
+    <path d="M0 -92 L96 72 L-96 72 Z" fill="#f7768e"/>
+    <path d="M0 -36 L38 28 L-38 28 Z" fill="#0d1220" opacity="0.55"/>
+  </g>
+
+  <!-- nodo 3: Ricercatore (cerchio) -->
+  <g transform="translate(756 704)">
+    <circle r="92" fill="#9ece6a"/>
+    <circle r="38" fill="#0d1220" opacity="0.55"/>
+  </g>
+
+  <!-- nucleo: consenso -->
+  <g transform="translate(512 586)">
+    <circle r="46" fill="#5eead4" opacity="0.16"/>
+    <circle r="20" fill="#5eead4"/>
+  </g>
+</svg>

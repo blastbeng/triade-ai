@@ -1,6 +1,6 @@
 {
   "name": "triade-ai",
-  "version": "0.6.5",
+  "version": "0.6.6",
   "description": "Tre personalita, un solo modello, un dibattito che arriva a una conclusione",
   "main": "./out/main/index.js",
   "author": "blast",
@@ -24,7 +24,8 @@
     "sign:win": "node scripts/sign-win.mjs",
     "checksums": "node scripts/checksums.mjs",
     "package:zips": "node scripts/package-zips.mjs",
-    "release:artifacts": "npm run dist:linux && npm run dist:win && npm run sign:win && npm run checksums && npm run package:zips"
+    "release:artifacts": "npm run dist:linux && npm run dist:win && npm run sign:win && npm run checksums && npm run package:zips",
+    "make:icon": "bash scripts/make-icon.sh"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
