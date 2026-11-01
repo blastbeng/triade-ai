@@ -372,7 +372,7 @@ const liveWindow = (): BrowserWindow | null =>
 /** true = aggiornamento applicato e app in chiusura (non mostrare nulla) */
 async function maybeUpdate(): Promise<boolean> {
   try {
-    const { checkForUpdate, downloadUpdate, applyUpdate, updateTexts, skipVersion } =
+    const { checkForUpdate, downloadUpdate, applyUpdate, updateTexts, skipVersion, progressWindow } =
       await import('./updater')
     const info = await checkForUpdate()
     if (!info) return false
@@ -394,12 +394,17 @@ async function maybeUpdate(): Promise<boolean> {
     if (choice !== 0) return false
 
     liveWindow()?.hide()
-    liveWindow()?.setTitle(`TriadeAI — download aggiornamento…`)
-    const nuovo = await downloadUpdate(info, (p) => {
-      liveWindow()?.setProgressBar(Math.min(1, p))
-      liveWindow()?.setTitle(`TriadeAI — aggiornamento ${Math.round(p * 100)}%`)
-    })
-    liveWindow()?.setProgressBar(-1)
+    const pw = progressWindow(t.title)
+    let nuovo = ''
+    try {
+      nuovo = await downloadUpdate(info, (p) => {
+        pw.update(p)
+        liveWindow()?.setProgressBar(Math.min(1, p))
+      })
+    } finally {
+      pw.close()
+      liveWindow()?.setProgressBar(-1)
+    }
     applyUpdate(nuovo, info.version)
     // da qui l'app sta per chiudersi: nessun accesso alla finestra
     return true

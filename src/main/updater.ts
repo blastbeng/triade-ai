@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { execFileSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { app } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import { translate } from '../shared/i18n'
 import { getSettings, saveSettings } from './settings'
 import { dataDir } from './paths'
@@ -241,6 +241,50 @@ export function applyUpdate(newExe: string, version = ''): void {
   }
   app.relaunch({ execPath: current, args: [] })
   app.exit(0)
+}
+
+/**
+ * Finestrella di avanzamento dell'aggiornamento: barra vera, sempre in primo piano.
+ * Non serve IPC: la pagina è inline e la percentuale viene iniettata.
+ */
+export function progressWindow(title: string): { update: (p: number) => void; close: () => void } {
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+  html,body{margin:0;height:100%;background:#0b0e14;color:#e6edf3;font:13px system-ui,sans-serif}
+  body{display:flex;flex-direction:column;justify-content:center;gap:10px;padding:18px;box-sizing:border-box}
+  #t{font-weight:600}#bar{height:8px;background:#1b2230;border-radius:6px;overflow:hidden}
+  #fill{height:100%;width:0;background:#5eead4;transition:width .25s ease}
+  #p{font-size:11px;color:#8b97a8}
+  </style></head><body>
+  <div id="t">${title}</div>
+  <div id="bar"><div id="fill"></div></div>
+  <div id="p">0%</div>
+  <script>function setProgress(x){document.getElementById('fill').style.width=(x*100).toFixed(1)+'%';document.getElementById('p').textContent=Math.round(x*100)+'%'}</script>
+  </body></html>`
+  const win = new BrowserWindow({
+    width: 460,
+    height: 130,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    alwaysOnTop: true,
+    frame: true,
+    title,
+    backgroundColor: '#0b0e14',
+    webPreferences: { contextIsolation: true, nodeIntegration: false }
+  })
+  void win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+  return {
+    update: (p: number) => {
+      if (win.isDestroyed()) return
+      const pct = Math.max(0, Math.min(1, Number.isFinite(p) ? p : 0))
+      void win.webContents
+        .executeJavaScript(`setProgress(${pct})`)
+        .catch(() => undefined)
+    },
+    close: () => {
+      if (!win.isDestroyed()) win.destroy()
+    }
+  }
 }
 
 /** Testo localizzato per il dialogo di aggiornamento. */
