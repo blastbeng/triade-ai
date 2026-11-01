@@ -187,6 +187,10 @@ export interface ServerStatus {
   starting: boolean
   port: number | null
   device: string
+  /** contesto realmente usato dal server (già limitato al massimo del modello) */
+  contextSize: number
+  /** contesto massimo dichiarato dal GGUF (0 = non dichiarato) */
+  modelMaxCtx: number
   log: string
 }
 

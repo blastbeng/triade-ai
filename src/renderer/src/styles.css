@@ -1680,3 +1680,9 @@ body[data-density='compact'] .reasoning pre {
   border-color: #5c4a1c;
   background: #221c0d;
 }
+
+.warnbadge {
+  color: #fcd34d;
+  border-color: #5c4a1c;
+  background: #221c0d;
+}

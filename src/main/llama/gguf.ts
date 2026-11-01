@@ -11,6 +11,8 @@ export interface GgufHints {
   keyLength: number
   valueLength: number
   hybrid: boolean
+  /** contesto massimo dichiarato dal modello (0 = non dichiarato) */
+  contextLength: number
 }
 
 /** Architetture con esperti (MoE): solo una parte dei pesi è attiva per token. */
@@ -27,7 +29,8 @@ const DEFAULTS: GgufHints = {
   headCountKv: 8,
   keyLength: 128,
   valueLength: 128,
-  hybrid: false
+  hybrid: false,
+  contextLength: 0
 }
 
 const SIZES: Record<number, number> = { 0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8 }
@@ -160,7 +163,8 @@ export function parseGgufBuffer(buf: Buffer): GgufHints {
       headCountKv: num('attention.head_count_kv', DEFAULTS.headCountKv),
       keyLength: num('attention.key_length', 0),
       valueLength: num('attention.value_length', 0),
-      hybrid
+      hybrid,
+      contextLength: num('context_length', 0)
     }
   } catch {
     return DEFAULTS

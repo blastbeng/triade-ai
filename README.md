@@ -40,9 +40,11 @@ CUDA, per GPU NVIDIA. Nessun supporto ROCm/HIP.
 - **Tool web:** `web_search`, `fetch_page`, `image_search`, `find_media` via tool calling nativo.
   Backend: SearXNG (default), Brave, Tavily, Google CSE con chiavi API; catena di riserva senza
   chiavi (DuckDuckGo Instant Answer, Wikipedia) quando il motore principale non risponde.
-- **Contesto configurabile:** **131072 token di default** (il modello ne dichiara 262144), uguale per
-  le tre chat. Il turno non ha tetto: può usare tutto lo spazio disponibile, e il vero limite resta
-  il contesto. Al **75%** parte il
+- **Contesto configurabile:** **131072 token di default**, uguale per le tre chat, ma sempre
+  **limitato al massimo dichiarato dal modello** nell'header GGUF (`context_length`): se scegli un
+  modello da 32k il contesto effettivo scende a 32k, con nota nel log e badge "(max modello)"
+  nell'interfaccia. La compressione scatta al 75% **del contesto effettivo**, non di quello
+  richiesto. Il turno non ha tetto: può usare tutto lo spazio disponibile. Al **75%** parte il
   prompt compression (sommario + finestra scorrevole). Il testo del turno non viene mai troncato a
   priori: la generazione si ferma solo se il modello entra in loop (ripetizione ossessiva) o se il
   budget di contesto si esaurisce.
@@ -96,7 +98,7 @@ Regole di ammissione, applicate anche lato main process (la UI non è fidata):
 | Vision | serve un `mmproj` nel repo: senza, il modello è **escluso** ("non supporta immagini/video") |
 | Quant | si scelgono i quant dal più grande al più piccolo e si prende **il migliore che entra**; se nessuno entra il modello è escluso con i MiB richiesti/disponibili |
 | VRAM | stima = pesi + mmproj + KV(contesto) + buffer (≈9% dei pesi); confronto con la GPU migliore |
-| **KV esatta** | l'app scarica i primi 8 MB del GGUF con `Range` e legge l'header: layer di attenzione, head KV, dimensioni K/V, `full_attention_interval`. La stima del contesto è quindi quella reale, non una proporzione sui parametri |
+| **KV esatta** | l'app scarica i primi 8 MB del GGUF con `Range` e legge l'header: layer di attenzione, head KV, dimensioni K/V, `full_attention_interval` e **`context_length`**. La stima del contesto è quella reale e non viene mai proposto un contesto superiore al massimo del modello |
 | **MoE** | architetture con esperti (`*moe`, `A3B`, `NxM`) possono girare **con gli esperti su CPU**: in GPU va ~55% dei pesi. Se il quant non entra interamente, il modello viene accettato in modalità *parziale* con il **contesto consigliato** calcolato (es. Qwen3-VL-30B-A3B Q4_K_M su 16 GB → 9.7 GB VRAM, 18.5 GB RAM, ctx 81920) |
 | RAM | per i MoE è un requisito reale: i pesi restano in RAM (max 80% della RAM di sistema) |
 

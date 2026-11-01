@@ -10,6 +10,7 @@ import { catalogModel, defaultModelId } from '../models/registry'
 import { bestDevice, detectGpus, llamaBinaryFor, type Backend, type GpuDevice } from '../gpu/devices'
 import { planLaunch } from './tuning'
 import { planPool } from './pool-budget'
+import { readGgufHints } from './gguf'
 import type { ServerStatus } from '../../shared/types'
 
 export interface ServerInfo {
@@ -46,6 +47,8 @@ class LlamaInstance extends EventEmitter {
   private logLines: string[] = []
   private starting = false
   private deviceLabel = 'sconosciuto'
+  private effectiveCtx = 0
+  private modelMaxCtx = 0
   private pidFile: string | null = null
 
   constructor(modelId: string, device: GpuDevice | null, ctxOverride?: number) {
@@ -87,6 +90,8 @@ class LlamaInstance extends EventEmitter {
       starting: this.starting,
       port: this.port,
       device: this.deviceLabel + (this.device ? ` · ${this.device.name}` : ''),
+      contextSize: this.effectiveCtx,
+      modelMaxCtx: this.modelMaxCtx,
       log: this.logLines.slice(-120).join('\n')
     }
   }
@@ -180,6 +185,8 @@ class LlamaInstance extends EventEmitter {
         mmprojPath: mmprojPath || undefined,
         autoTune: s.autoTune
       })
+      this.effectiveCtx = plan.ctx
+      this.modelMaxCtx = readGgufHints(modelPath).contextLength
       for (const note of plan.notes) this.push(`[tuning] ${note}`)
       this.push(
         `[tuning] ctx=${plan.ctx} kv=${plan.kvType} ngl=${plan.ngl} ubatch=${plan.ubatch} ` +
@@ -374,6 +381,19 @@ class LlamaPool extends EventEmitter {
   async stopAll(): Promise<void> {
     await Promise.all([...this.instances.values()].map((i) => i.stop()))
     this.instances.clear()
+  }
+
+  /** Contesto realmente utilizzabile per un modello (limite dichiarato dal GGUF incluso). */
+  effectiveContext(modelId: string): number {
+    const s = getSettings()
+    const model = catalogModel(modelId)
+    let declared = 0
+    try {
+      declared = readGgufHints(path.join(modelsDir(), model.files.model.name)).contextLength
+    } catch {
+      declared = 0
+    }
+    return declared > 0 ? Math.min(s.contextSize, declared) : s.contextSize
   }
 
   status(): ServerStatus[] {

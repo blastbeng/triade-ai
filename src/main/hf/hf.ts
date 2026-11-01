@@ -38,6 +38,8 @@ export interface HfVerdict {
   /** contesto consigliato per il quant scelto */
   contextSuggestion: number
   arch: string
+  /** contesto massimo dichiarato dal modello GGUF (0 = non dichiarato) */
+  modelMaxCtx: number
   /** RAM necessaria per tenere i pesi quando gli esperti vanno su CPU */
   ramNeededMiB: number
   /** quant consigliato (il migliore che entra) */
@@ -189,6 +191,9 @@ export async function inspectRepo(
     ? await remoteHints(`https://huggingface.co/${repo}/resolve/main/${encodeURI(smallest.path)}`)
     : null
   const arch = hints?.architecture ?? 'unknown'
+  // non si può stimare/consigliare più contesto di quello dichiarato dal modello
+  const modelMaxCtx = hints?.contextLength ?? 0
+  const ctxForEstimate = modelMaxCtx > 0 ? Math.min(compat.contextSize, modelMaxCtx) : compat.contextSize
   const moe = looksMoe(repo, arch, smallest?.path ?? '')
   const ramMiB = systemRamMiB()
 
@@ -202,7 +207,7 @@ export async function inspectRepo(
     const paramsB = nameParams || Math.max(0.5, file.size / 1e9 / 0.6)
     const overheadMiB = 450 + (file.size / 1024 ** 2) * 0.08
     const perToken = hints ? kvPerTokenFromHints(hints) : kvPerTokenMiB(paramsB)
-    const kvMiB = (perToken * compat.contextSize) / Math.max(1, compat.concurrentModels ?? 1)
+    const kvMiB = (perToken * ctxForEstimate) / Math.max(1, compat.concurrentModels ?? 1)
     const weightsMiB = file.size / 1024 ** 2 + (mmproj?.size ?? 0) / 1024 ** 2
     const totalMiB = Math.round(weightsMiB + kvMiB + overheadMiB)
     const available = compat.device ? compat.device.vramMiB - RESERVE_MIB : 0
@@ -219,11 +224,11 @@ export async function inspectRepo(
       file: file.path,
       bytes: file.size,
       totalMiB,
-      fits: available > 0 && ctxFull >= compat.contextSize,
+      fits: available > 0 && ctxFull >= ctxForEstimate,
       fitsPartial:
         moe &&
         available > 0 &&
-        ctxPartial >= (compat.contextSize >= 32768 ? 16384 : 8192) &&
+        ctxPartial >= (ctxForEstimate >= 32768 ? 16384 : 8192) &&
         ramMiB > 0 &&
         ramNeededMiB <= ramMiB * 0.8,
       ctxFull: Math.max(0, ctxFull),
@@ -238,7 +243,7 @@ export async function inspectRepo(
   const contextSuggestion = !best
     ? 0
     : Math.min(
-        compat.contextSize,
+        ctxForEstimate,
         Math.max(2048, Math.floor((best.fits ? best.ctxFull : best.ctxPartial) / 1024) * 1024)
       )
   const smallestVariant = variants.length ? variants.reduce((a, b) => (a.bytes < b.bytes ? a : b)) : null
@@ -261,6 +266,9 @@ export async function inspectRepo(
     ok = true
     if (mode === 'full') {
       reason = `usabile, tutto in GPU: ${best.quant} occupa circa ${best.totalMiB} MiB su ${available} MiB`
+      if (modelMaxCtx > 0 && modelMaxCtx < compat.contextSize) {
+        reason += ` — contesto max del modello ${modelMaxCtx}`
+      }
       if (best.quant !== variants[0].quant) {
         reason += ` — il quant più grande (${variants[0].quant}) non entrerebbe`
       }
@@ -269,8 +277,8 @@ export async function inspectRepo(
         `usabile con offload parziale (MoE): ${best.quant} tiene gli esperti in CPU — ` +
         `~${Math.round((best.bytes / 1024 ** 2) * 0.55)} MiB di VRAM su ${available} MiB, ` +
         `contesto consigliato ${contextSuggestion} token`
-      if (contextSuggestion < compat.contextSize) {
-        reason += ` (i ${compat.contextSize} pieni non entrerebbero)`
+      if (contextSuggestion < ctxForEstimate) {
+        reason += ` (i ${ctxForEstimate} pieni non entrerebbero)`
       }
     }
     if (visionTag && !mmproj) reason += ' (tag vision senza projector)'
@@ -284,6 +292,7 @@ export async function inspectRepo(
     moe,
     mode,
     arch,
+    modelMaxCtx,
     ramNeededMiB,
     quant: best?.quant ?? null,
     modelFile: best?.file ?? null,

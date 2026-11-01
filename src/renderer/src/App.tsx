@@ -319,7 +319,20 @@ export default function App(): JSX.Element {
                   {s.modelId} :{s.port} {s.device.includes('Vulkan') ? 'vulkan' : ''}
                 </span>
               ))}
-            <span className="badge">ctx {settings?.contextSize ?? '—'}</span>
+            <span
+              className={`badge ${servers.some((s) => s.modelMaxCtx > 0 && s.modelMaxCtx < (settings?.contextSize ?? 0)) ? 'warnbadge' : ''}`}
+              title={
+                servers[0]?.modelMaxCtx
+                  ? `massimo del modello: ${servers[0].modelMaxCtx} token`
+                  : 'contesto richiesto nelle impostazioni'
+              }
+            >
+              ctx{' '}
+              {servers.find((s) => s.running)?.contextSize || settings?.contextSize || '—'}
+              {servers.some(
+                (s) => s.modelMaxCtx > 0 && s.modelMaxCtx < (settings?.contextSize ?? 0)
+              ) && ' (max modello)'}
+            </span>
             <span
               className="badge ctxbadge"
               title={`token del prompt nell'ultimo turno su ${settings?.contextSize ?? 0}`}

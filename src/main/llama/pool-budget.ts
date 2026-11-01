@@ -87,7 +87,11 @@ export function planPool(
   const share = kvBudget / targets.length
   for (const target of targets) {
     const perToken = kvPerTokenMiB(target.modelPath, kv)
-    const ctx = Math.max(MIN_CTX, Math.min(requestedCtx, Math.floor(share / perToken)))
+    const modelMax = readGgufHints(target.modelPath).contextLength || requestedCtx
+    const ctx = Math.max(
+      MIN_CTX,
+      Math.min(requestedCtx, modelMax, Math.floor(share / perToken))
+    )
     contextByKey.set(target.key, ctx)
     if (ctx < requestedCtx) {
       notes.push(

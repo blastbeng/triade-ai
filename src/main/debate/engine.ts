@@ -49,6 +49,7 @@ export class DebateEngine extends EventEmitter {
   private session: Session | null = null
   private abort: AbortController | null = null
   private loopPromise: Promise<void> | null = null
+  private clampedNoticed = false
 
   get current(): Session | null {
     return this.session
@@ -257,11 +258,21 @@ export class DebateEngine extends EventEmitter {
 
         // --- prompt compression quando si supera la soglia (75% di default) ---
         const toolOverhead = settings.toolsEnabled ? 900 : 0
+        // se il modello dichiara un massimo più basso, la compressione scatta prima
+        const modelIdForTurn = this.modelFor(persona)
+        const effectiveCtx = Math.max(2048, llamaPool.effectiveContext(modelIdForTurn))
+        if (effectiveCtx < settings.contextSize && !this.clampedNoticed) {
+          this.clampedNoticed = true
+          this.emitEvent({
+            type: 'log',
+            message: `${modelIdForTurn}: contesto limitato a ${effectiveCtx} token (massimo del modello)`
+          })
+        }
         let messages = buildMessages(persona, this.session, settings, personas)
         let tokens = await tokenCountOf(baseUrl, messages, toolOverhead)
-        const limit = Math.floor(settings.contextSize * settings.compressionThreshold)
+        const limit = Math.floor(effectiveCtx * settings.compressionThreshold)
         // margine per la generazione dentro il contesto reale del server
-        const hardLimit = settings.contextSize - 512
+        const hardLimit = effectiveCtx - 512
         if (tokens > limit || tokens > hardLimit) {
           this.emitEvent({
             type: 'compression',
@@ -313,7 +324,7 @@ export class DebateEngine extends EventEmitter {
         let cut: 'loop' | 'budget' | undefined
         // budget per turno: il contesto disponibile fino al 75% (soglia di compressione)
         // nessun tetto per turno: il limite reale è lo spazio di contesto disponibile
-        const room = Math.max(128, settings.contextSize - tokens - 384)
+        const room = Math.max(128, effectiveCtx - tokens - 384)
         const configured = settings.maxTokensPerTurn > 0 ? settings.maxTokensPerTurn : room
         const turnCap = Math.max(128, Math.min(configured, room))
         if (room < 256) cut = 'budget'

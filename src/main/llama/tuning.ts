@@ -90,7 +90,13 @@ export function planLaunch(input: PlanInput): LaunchPlan {
     }
   }
 
+  // il contesto non può superare quello dichiarato dal modello nell'header GGUF
+  const modelMax = hints.contextLength > 0 ? hints.contextLength : 0
   let ctx = Math.max(2048, input.contextSize)
+  if (modelMax > 0 && ctx > modelMax) {
+    notes.push(`contesto ridotto a ${modelMax}: è il massimo dichiarato dal modello`)
+    ctx = modelMax
+  }
   let kvType: keyof typeof ELEM_BYTES = input.kvPreference
   let mmprojOffload = true
   let ngl = input.gpuLayers
