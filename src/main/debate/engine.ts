@@ -219,8 +219,9 @@ export class DebateEngine extends EventEmitter {
       saveSession(session)
       this.emitEvent({ type: 'session', session })
       this.emitEvent({ type: 'log', message: `titolo chat: ${title}` })
-    } catch {
+    } catch (err) {
       // resta il titolo provvisorio ricavato dal messaggio
+      this.emitEvent({ type: 'log', message: `titolo non generato: ${(err as Error).message}` })
     }
   }
 
@@ -280,6 +281,9 @@ export class DebateEngine extends EventEmitter {
     session.turnIndex = session.turns.length
     saveSession(session)
     this.emitEvent({ type: 'session', session })
+    // il titolo si genera subito dal messaggio iniziale (il server è già in caricamento)
+    const firstPersona = personasForStart.find((p) => p.id === firstSpeaker)
+    if (firstPersona) void this.generateTitle(firstPersona)
     this.setState('running')
     void this.loop()
     return session
