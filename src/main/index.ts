@@ -393,24 +393,39 @@ async function maybeUpdate(): Promise<boolean> {
     }
     if (choice !== 0) return false
 
-    liveWindow()?.hide()
-    const pw = progressWindow(t.title)
+    // la finestra principale resta visibile: se la finestrella di progresso non
+    // si apre (o il download è lento) l'utente deve comunque vedere che succede
+    let pw: { update: (p: number) => void; close: () => void } | null = null
+    try {
+      pw = progressWindow(t.title)
+    } catch (err) {
+      log.warn(`[update] finestrella non disponibile: ${(err as Error).message}`)
+    }
+    log.info('[update] download avviato')
     let nuovo = ''
     try {
       nuovo = await downloadUpdate(info, (p) => {
-        pw.update(p)
+        pw?.update(p)
         liveWindow()?.setProgressBar(Math.min(1, p))
+        liveWindow()?.setTitle(`TriadeAI — aggiornamento ${Math.round(p * 100)}%`)
       })
+      log.info('[update] download completato, applico')
     } finally {
-      pw.close()
+      pw?.close()
       liveWindow()?.setProgressBar(-1)
+      liveWindow()?.setTitle(`TriadeAI v${app.getVersion()}`)
     }
     applyUpdate(nuovo, info.version)
     // da qui l'app sta per chiudersi: nessun accesso alla finestra
     return true
   } catch (err) {
     liveWindow()?.setProgressBar(-1)
-    if (!liveWindow()) return false
+    log.error(`[update] fallito: ${(err as Error).message}`)
+    if (!liveWindow()) {
+      // senza finestra l'errore deve comunque essere visibile
+      dialog.showErrorBox(t('update.errorTitle'), String((err as Error).message))
+      return false
+    }
     dialog.showMessageBoxSync(liveWindow()!, {
       type: 'error',
       title: t('update.errorTitle'),
