@@ -7,7 +7,7 @@ import { mediaUrl } from '../paths'
 import { defaultModelId } from '../models/registry'
 import type { Attachment, DebateEvent, Mention, Persona, Session, Turn } from '../../shared/types'
 import { buildMessages, summarize, tokenCountOf } from './context'
-import { loadSession, newSession, saveSession } from './store'
+import { loadSession, newSession, provisionalTitle, saveSession } from './store'
 import { distillSession, rememberTurn, rememberUserNote } from '../memory/integrate'
 import { TOOL_SPECS, runTool } from './tools'
 import { HANDOFF, chooseNextSpeaker, parseHandoff } from './schedule'
@@ -173,6 +173,55 @@ export class DebateEngine extends EventEmitter {
       return session
     }
     return this.start(text, attachments, startWith)
+  }
+
+  /** Titolo della chat generato dal modello all'avvio, in background. */
+  private async generateTitle(persona: Persona): Promise<void> {
+    const session = this.session
+    if (!session || session.titleGenerated) return
+    const languageNames: Record<string, string> = {
+      en: 'English',
+      it: 'italiano',
+      de: 'Deutsch',
+      fr: 'français',
+      es: 'español'
+    }
+    const lang = languageNames[getSettings().ui?.language ?? 'en'] ?? 'English'
+    try {
+      const { baseUrl } = await llamaPool.ensure(this.modelFor(persona), this.deviceFor(persona))
+      const firstTurn = session.turns.find((t) => t.agentId !== 'utente')?.text ?? ''
+      const res = await chat(baseUrl, {
+        messages: [
+          {
+            role: 'system',
+            content: `Write the title of a conversation in ${lang}. Max 6 words, no quotes, no ending punctuation, no preamble.`
+          },
+          {
+            role: 'user',
+            content: `Topic: ${session.topic.slice(0, 600)}\n\nFirst reply: ${firstTurn.slice(0, 400)}`
+          }
+        ],
+        temperature: 0.2,
+        maxTokens: 24,
+        noThinking: true
+      })
+      let title = (res.content ?? '')
+        .replace(/["“”'`]/g, '')
+        .replace(/\s+/g, ' ')
+        .replace(/[.:;,]+$/, '')
+        .split('\n')[0]
+        .trim()
+      if (!title) return
+      if (title.length > 62) title = provisionalTitle(title)
+      session.title = title
+      session.titleGenerated = true
+      session.updatedAt = Date.now()
+      saveSession(session)
+      this.emitEvent({ type: 'session', session })
+      this.emitEvent({ type: 'log', message: `titolo chat: ${title}` })
+    } catch {
+      // resta il titolo provvisorio ricavato dal messaggio
+    }
   }
 
   private distillInBackground(session: Session): void {
@@ -565,6 +614,9 @@ export class DebateEngine extends EventEmitter {
           if (target) this.session.nextSpeakerId = target.targetId
         }
         saveSession(this.session)
+        if (!emptyInterrupted && !this.session.titleGenerated) {
+          void this.generateTitle(persona)
+        }
         if (!emptyInterrupted) {
           rememberTurn(this.session, turn)
           this.emitEvent({ type: 'turn', turn })

@@ -4,11 +4,27 @@ import { randomUUID } from 'node:crypto'
 import { sessionsDir } from '../paths'
 import type { Session } from '../../shared/types'
 
+/** Titolo provvisorio: prime parole del messaggio, tagliate a fine parola. */
+export function provisionalTitle(topic: string): string {
+  const flat = topic
+    .replace(/ALLEGATO:[^\n]*/g, ' ')
+    .replace(/Materiale fornito dall'utente:?/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const sentence = flat.split(/(?<=[.!?])\s/)[0] ?? flat
+  const base = sentence.length > 8 ? sentence : flat
+  if (base.length <= 58) return base || 'nuova chat'
+  const cut = base.slice(0, 58)
+  const lastSpace = cut.lastIndexOf(' ')
+  return `${(lastSpace > 24 ? cut.slice(0, lastSpace) : cut).trim()}…`
+}
+
 export function newSession(topic: string): Session {
   const now = Date.now()
   return {
     id: randomUUID(),
     topic,
+    title: provisionalTitle(topic),
     createdAt: now,
     updatedAt: now,
     state: 'paused',
@@ -41,6 +57,7 @@ export function loadSession(id: string): Session | null {
 export interface SessionSummary {
   id: string
   topic: string
+  title: string
   updatedAt: number
   state: Session['state']
   turns: number
@@ -54,7 +71,14 @@ export function listSessions(): SessionSummary[] {
     .map((f) => {
       try {
         const s = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) as Session
-        return { id: s.id, topic: s.topic, updatedAt: s.updatedAt, state: s.state, turns: s.turns.length }
+        return {
+          id: s.id,
+          topic: s.topic,
+          title: s.title ?? provisionalTitle(s.topic),
+          updatedAt: s.updatedAt,
+          state: s.state,
+          turns: s.turns.length
+        }
       } catch {
         return null
       }

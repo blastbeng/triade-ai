@@ -141,6 +141,10 @@ export interface Consensus {
 }
 
 export interface Session {
+  /** titolo breve generato all'avvio (stile ChatGPT/OpenWebUI) */
+  title?: string
+  /** true se il titolo è stato prodotto dal modello */
+  titleGenerated?: boolean
   id: string
   topic: string
   createdAt: number

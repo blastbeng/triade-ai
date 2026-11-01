@@ -100,7 +100,14 @@ interface Api {
   loadSession(id: string): Promise<Session | null>
   currentSession(): Promise<Session | null>
   deleteSession(id: string): Promise<{
-    sessions: { id: string; topic: string; updatedAt: number; state: string; turns: number }[]
+    sessions: {
+    id: string
+    topic: string
+    title: string
+    updatedAt: number
+    state: string
+    turns: number
+  }[]
     memory: MemoryStats
   }>
   startDebate(topic: string, files: string[], personaId?: string): Promise<Session>

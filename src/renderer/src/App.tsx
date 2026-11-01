@@ -27,6 +27,7 @@ function fmtBytes(n: number): string {
 interface SessionRow {
   id: string
   topic: string
+  title?: string
   updatedAt: number
   state: string
   turns: number
@@ -309,7 +310,7 @@ export default function App(): JSX.Element {
             <div key={s.id} className={`sessionrow ${session?.id === s.id ? 'selected' : ''}`}>
               <button className="rowbtn" onClick={() => void openSession(s.id)}>
                 <span className="title" title={s.topic}>
-                  {s.topic.split('\n')[0].slice(0, 90)}
+                  {s.title || s.topic.split('\n')[0]}
                 </span>
                 <span className="sub">
                   {t('app.turns', { n: s.turns })} · {s.state} ·{' '}
