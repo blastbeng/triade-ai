@@ -251,7 +251,7 @@ export class DebateEngine extends EventEmitter {
         // budget per turno: il contesto disponibile fino al 75% (soglia di compressione)
         const room = Math.max(128, settings.contextSize - tokens - 384)
         const turnCap = Math.min(settings.maxTokensPerTurn, room)
-        if (turnCap < settings.maxTokensPerTurn) cut = 'budget'
+        if (turnCap < 256) cut = 'budget'
         for (let attempt = 0; attempt < 3; attempt++) {
           const budget = turnCap
           let result
