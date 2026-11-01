@@ -21,26 +21,40 @@ CUDA, per GPU NVIDIA. Nessun supporto ROCm/HIP.
 - **Reasoning visibile.** Il ragionamento del modello resta attivo quando il template lo supporta:
   nel turno compare un blocco "ragionamento" richiuso, espandibile. Anche i tool call sono card
   richiudibili con argomenti e risultato.
+- **Stato di lavoro per chat.** Ogni colonna mostra cosa sta facendo (preparazione del prompt,
+  ragionamento, scrittura, uso di un tool) con spinner e cronometro; la vista segue i token in
+  arrivo e smette di seguire appena risali.
+- **Chi risponde.** Una select nel composer permette di scegliere quale delle tre personalità deve
+  rispondere al messaggio; le altre ricevono il turno dopo, in rotazione. La colonna di chi ha la
+  parola è segnalata, e chi viene chiamato con `@Nome` mostra "chiamato da …".
+- **Gruppo consapevole.** Ogni agente conosce il roster degli altri due (nome e ruolo) e può
+  chiamarli con `@Nome` spiegando il motivo: la motivazione viene mostrata come chip nel turno.
+- **Testo regolabile e markdown.** Dimensione del testo configurabile (85–160%), grassetto, corsivo,
+  codice, titoli, liste, citazioni e link resi leggibili.
 - **Vision, video, audio.** Immagini lette via mmproj (`qwen3vl_merger`), video scomposti in frame
   con ffmpeg (+ trascrizione traccia audio), audio trascritto con whisper.cpp.
 - **Upload media in chat** con file picker o drag&drop.
 - **Tool web:** `web_search`, `fetch_page`, `image_search`, `find_media` via tool calling nativo.
   Backend: SearXNG (default), Brave, Tavily, Google CSE con chiavi API; catena di riserva senza
   chiavi (DuckDuckGo Instant Answer, Wikipedia) quando il motore principale non risponde.
-- **Contesto configurabile:** 65536 token di default, uguale per le tre chat. Al **75%** parte il
+- **Contesto configurabile:** 65536 token di default, uguale per le tre chat; tetto di sicurezza per
+  turno 16384 token (il vero limite resta il contesto). Al **75%** parte il
   prompt compression (sommario + finestra scorrevole). Il testo del turno non viene mai troncato a
   priori: la generazione si ferma solo se il modello entra in loop (ripetizione ossessiva) o se il
   budget di contesto si esaurisce.
 - **Uno o più llama-server.** Un processo per ogni coppia modello+GPU: 3 chat sullo stesso modello =
-  1 processo; modelli o GPU diverse = un processo ciascuna.
+  1 processo; modelli o GPU diverse = un processo ciascuna. All'avvio i processi rimasti da
+  un'esecuzione precedente vengono chiusi (pidfile in `dati/run/`), così la VRAM è libera.
 - **Scelta GPU per chat.** Le GPU vengono elencate dal backend (Vulkan/CUDA), le integrate sono
   riconosciute e escluse **senza nomi hardcoded** (tipo dichiarato dal driver Vulkan, memoria
   dedicata riportata dal sistema, euristica sulla memoria condivisa). Con una sola GPU la scelta è
   disabilitata.
 - **Auto-tuning anti-OOM.** Prima di avviare `llama-server` legge l'header GGUF (numero di layer,
   head KV, dimensioni K/V, `full_attention_interval` per i modelli ibridi) e stima KV cache, pesi e
-  buffer; poi sceglie contesto effettivo, tipo KV (`f16 → q8_0 → q4_0`), offload del mmproj, `-ngl`
-  parziale e `ubatch`. Le decisioni finiscono nel log come `[tuning]`.
+  buffer; poi sceglie contesto effettivo, tipo KV (`f16 → q8_0 → q4_0`), offload del mmproj e
+  `ubatch`. Con l'auto-tuning attivo la scelta di quanti layer mettere in GPU è lasciata a
+  llama.cpp (`fit`), che è l'unico a conoscere la VRAM libera in quell'istante. Le decisioni
+  finiscono nel log come `[tuning]`.
 - **Avvio protetto.** Senza GPU dedicata l'app mostra un avviso esplicito ed esce subito.
 - **All-in-one.** Se il modello non c'è, viene scaricato in `dati/modelli/` accanto all'eseguibile,
   con `.part` e `Range` per riprendere un download interrotto. Nessun download CUDA se non c'è una
@@ -142,7 +156,7 @@ Per Azure Trusted Signing si aggiunge `win.azureSignOptions` in `electron-builde
 2. Scrivi l'argomento, allega eventualmente media, premi **avvia**.
 3. Le tre colonne si riempiono a turno; `pausa` ferma subito, `riprendi` continua.
 4. Impostazioni → generale: contesto, soglia di compressione (75%), tetto token per turno, limite
-   turni, temperatura, strati GPU, flash attention, KV cache, auto-tuning.
+   turni, temperatura, dimensione del testo, strati GPU, flash attention, KV cache, auto-tuning.
 5. Impostazioni → ricerca: provider e chiavi. → gpu: GPU per chat. → personalità: i tre prompt e il
    modello di ciascuna chat. → modelli: download, modello attivo, eliminazione file.
 
