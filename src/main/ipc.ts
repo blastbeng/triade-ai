@@ -319,9 +319,11 @@ export function registerIpc(): void {
         }
         throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
       }
-      const data = JSON.parse(text) as {
-        data?: { id: string }[]
-        models?: { name: string }[]
+      let data: { data?: { id: string }[]; models?: { name: string }[] } = {}
+      try {
+        data = JSON.parse(text) as typeof data
+      } catch {
+        throw new Error('risposta non JSON dal provider: controlla base URL e chiave')
       }
       const ids = (data.data ?? []).map((m) => m.id)
       const names = (data.models ?? []).map((m) => m.name ?? '')

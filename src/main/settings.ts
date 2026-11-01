@@ -11,7 +11,8 @@ function merge(base: Settings, patch: Partial<Settings>): Settings {
     ...base,
     ...patch,
     autoTune: patch.autoTune ?? base.autoTune,
-    textScale: patch.textScale ?? patch.ui?.fontScale ?? base.textScale,
+    // derivato da ui.fontScale: il vecchio campo resta solo per compatibilità
+    textScale: patch.ui?.fontScale ?? patch.textScale ?? base.ui.fontScale,
     ui: {
       ...base.ui,
       ...(patch.ui ?? {}),
@@ -19,6 +20,15 @@ function merge(base: Settings, patch: Partial<Settings>): Settings {
       fontScale: patch.ui?.fontScale ?? patch.textScale ?? base.ui.fontScale
     },
     search: { ...base.search, ...(patch.search ?? {}) },
+    // deep merge: un salvataggio parziale non deve azzerare i campi fratelli
+    remote: {
+      openai: { ...base.remote.openai, ...(patch.remote?.openai ?? {}) },
+      anthropic: { ...base.remote.anthropic, ...(patch.remote?.anthropic ?? {}) },
+      ollama: { ...base.remote.ollama, ...(patch.remote?.ollama ?? {}) }
+    },
+    embeddings: { ...base.embeddings, ...(patch.embeddings ?? {}) },
+    updates: { ...base.updates, ...(patch.updates ?? {}) },
+    backendByPersona: patch.backendByPersona ?? base.backendByPersona,
     asr: { ...base.asr, ...(patch.asr ?? {}) },
     models: {
       ...base.models,
@@ -44,7 +54,19 @@ export function getSettings(): Settings {
   let loaded: Settings = DEFAULT_SETTINGS
   try {
     if (fs.existsSync(file)) {
-      const raw = JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<Settings>
+      let raw: Partial<Settings> = {}
+    try {
+      raw = JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<Settings>
+    } catch (err) {
+      // file troncato o non JSON: si conserva una copia e si riparte dai default
+      try {
+        fs.copyFileSync(file, `${file}.corrupt-${Date.now()}`)
+      } catch {
+        /* ignore */
+      }
+      console.error(`[impostazioni] file illeggibile (${(err as Error).message}): uso i default`)
+      raw = {}
+    }
       loaded = merge(DEFAULT_SETTINGS, raw)
     }
   } catch {

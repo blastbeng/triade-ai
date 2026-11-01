@@ -4,6 +4,7 @@ import { chat, type LlmMessage } from '../llama/client'
 import { llamaPool } from '../llama/server'
 import { getSettings } from '../settings'
 import { activePersonas } from '../../shared/personas'
+import { humanizeError } from '../errors'
 import { mediaUrl } from '../paths'
 import { defaultModelId } from '../models/registry'
 import type { Attachment, Backend, DebateEvent, Mention, Persona, Session, Turn } from '../../shared/types'
@@ -695,7 +696,8 @@ export class DebateEngine extends EventEmitter {
         this.session.lastError = message
         this.setState('error')
       }
-      this.emitEvent({ type: 'error', message })
+      const backend = getSettings().backend ?? 'llama'
+      this.emitEvent({ type: 'error', message: humanizeError(message, backend) })
     } finally {
       this.abort = null
     }

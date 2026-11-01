@@ -1,6 +1,6 @@
 {
   "name": "triade-ai",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "description": "Tre personalita, un solo modello, un dibattito che arriva a una conclusione",
   "main": "./out/main/index.js",
   "author": "blast",
