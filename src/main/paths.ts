@@ -10,6 +10,9 @@ export function appRoot(): string {
   // Windows portable: la cartella reale dell'exe, non quella di scompattazione
   const portable = process.env.PORTABLE_EXECUTABLE_DIR
   if (portable) return portable
+  // variante usata da alcune versioni di electron-builder portable
+  const portableFile = process.env.PORTABLE_EXECUTABLE_FILE
+  if (portableFile) return path.dirname(portableFile)
   // AppImage: l'exe gira da un mount temporaneo, i dati stanno accanto al file .AppImage
   const appImage = process.env.APPIMAGE
   if (appImage) return path.dirname(appImage)
@@ -51,8 +54,14 @@ export function appRoot(): string {
 export function dataDir(): string {
   const dir = path.join(appRoot(), 'dati')
   fs.mkdirSync(dir, { recursive: true })
+  if (!loggedDataDir) {
+    loggedDataDir = true
+    console.log(`[paths] cartella dati: ${dir}`)
+  }
   return dir
 }
+
+let loggedDataDir = false
 
 export function modelsDir(): string {
   const dir = path.join(dataDir(), 'modelli')
