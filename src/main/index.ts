@@ -52,12 +52,16 @@ function createWindow(): void {
             await js(
               "(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === 'impostazioni'); if (b) b.click(); return true })()"
             )
-            await new Promise((r) => setTimeout(r, 600))
-            await js(
-              `(() => { const t = [...document.querySelectorAll('button.tab')].find((x) => x.textContent.trim() === ${JSON.stringify(
-                process.env.TRIADE_SHOT_TAB
-              )}); if (t) t.click(); return true })()`
+            await new Promise((r) => setTimeout(r, 1500))
+            const clicked = await js(
+              `(() => {
+                 const tabs = [...document.querySelectorAll('button.tab')];
+                 const target = tabs.find((x) => x.textContent.trim() === ${JSON.stringify(process.env.TRIADE_SHOT_TAB)});
+                 if (target) target.click();
+                 return tabs.map((t) => t.textContent.trim()).join(',') + ' -> ' + (target ? 'cliccata' : 'non trovata');
+               })()`
             )
+            console.log(`[shot] tab: ${String(clicked)}`)
           } else {
             await js(
               `window.triade.startDebate('Screenshot: come progettiamo un agente locale che usa la GPU AMD per la ricerca?', [], ${JSON.stringify(process.env.TRIADE_SHOT_PERSONA ?? '')})`
