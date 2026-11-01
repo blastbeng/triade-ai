@@ -105,16 +105,26 @@ async function downloadWithResume(
   const res = await fetch(url, { headers, redirect: 'follow', signal: state.abort?.signal })
   if (!res.ok && res.status !== 206) throw new Error(`download fallito (${res.status}) da ${url}`)
   if (res.status !== 206) start = 0
+  // HuggingFace spesso reindirizza senza content-length: ricaviamo il totale
+  // da Content-Range oppure dal content-length della risposta effettiva,
+  // altrimenti la barra resterebbe ferma a 0%.
+  let totalKnown = total
+  if (totalKnown <= 0) {
+    const range = res.headers.get('content-range')
+    const fromRange = range ? Number(range.split('/')[1]) : 0
+    const length = Number(res.headers.get('content-length') ?? 0)
+    totalKnown = Number.isFinite(fromRange) && fromRange > 0 ? fromRange : start + (length || 0)
+  }
   if (!res.body) throw new Error('risposta senza corpo')
   const sink = fs.createWriteStream(part, { flags: start > 0 ? 'a' : 'w' })
   let received = start
   const source = Readable.fromWeb(res.body as any)
   source.on('data', (chunk: Buffer) => {
     received += chunk.length
-    if (total > 0) onPct(Math.min(0.999, received / total))
+    if (totalKnown > 0) onPct(Math.min(0.999, received / totalKnown))
   })
   await pipeline(source, sink)
-  if (total > 0 && fs.statSync(part).size < total * 0.995) {
+  if (totalKnown > 0 && fs.statSync(part).size < totalKnown * 0.995) {
     throw new Error('download incompleto: rilancia, riprenderà da dove si era fermato')
   }
   fs.renameSync(part, dest)
