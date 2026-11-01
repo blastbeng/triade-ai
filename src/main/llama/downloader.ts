@@ -165,7 +165,13 @@ async function downloadWithResume(
 }
 
 /** Verifica finale unica: dimensione esatta, sidecar .size, header GGUF. */
-async function finalize(part: string, dest: string, expected: number, url = ''): Promise<void> {
+async function finalize(
+  part: string,
+  dest: string,
+  expected: number,
+  url = '',
+  knownHash?: string
+): Promise<void> {
   fs.renameSync(part, dest)
   if (expected > 0) {
     const actual = fs.statSync(dest).size
@@ -194,14 +200,14 @@ async function finalize(part: string, dest: string, expected: number, url = ''):
     throw new Error('download non verificabile (né dimensione né hash): riprova')
   }
   if (expectedHash) {
-    // streaming: un modello da 5,6 GB non deve mai finire intero in RAM
-    const actual = await new Promise<string>((resolve, reject) => {
+    // se l'hash è già stato calcolato durante il download, non si rilegge il file
+    const actual = knownHash ?? (await new Promise<string>((resolve, reject) => {
       const h = createHash('sha256')
       const rs = fs.createReadStream(dest)
       rs.on('data', (c) => h.update(c))
       rs.on('error', reject)
       rs.on('end', () => resolve(h.digest('hex')))
-    })
+    }))
     if (actual !== expectedHash) {
       fs.rmSync(dest, { force: true })
       throw new Error(
@@ -212,40 +218,12 @@ async function finalize(part: string, dest: string, expected: number, url = ''):
   }
 }
 
-const BLOCK = 64 * 1024 * 1024
-
 /**
- * Scarica un blocco con Range e verifica che la lunghezza sia ESATTAMENTE quella
- * richiesta: un proxy o una CDN che tronca/riavvolge i byte viene scoperto qui,
- * blocco per blocco, e non a fine download.
+ * Download in streaming singolo (una sola connessione, il più veloce possibile)
+ * con ripresa via Range e hash SHA-256 calcolato man mano. La verifica finale
+ * (dimensione al byte + hash ufficiale) intercetta comunque ogni corruzione:
+ * i blocchi da 64 MB rallentavano su Windows e rendevano la barra a scatti.
  */
-async function fetchBlock(url: string, from: number, to: number): Promise<Buffer> {
-  const expected = to - from + 1
-  let lastErr: unknown = null
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const signals = [AbortSignal.timeout(180000)]
-      if (state.abort) signals.push(state.abort.signal)
-      const res = await fetch(url, {
-        headers: { Range: `bytes=${from}-${to}` },
-        redirect: 'follow',
-        signal: AbortSignal.any(signals)
-      })
-      if (res.status === 200) throw new Error('il server ignora le richieste ranged')
-      if (res.status !== 206) throw new Error(`HTTP ${res.status}`)
-      const buf = Buffer.from(await res.arrayBuffer())
-      if (buf.length !== expected) {
-        throw new Error(`blocco ${from}-${to}: ricevuti ${buf.length} byte su ${expected}`)
-      }
-      return buf
-    } catch (err) {
-      lastErr = err
-      if (attempt < 3) await new Promise((r) => setTimeout(r, 1000 * attempt))
-    }
-  }
-  throw new Error(`blocco ${from}-${to} non scaricabile: ${(lastErr as Error).message}`)
-}
-
 async function downloadWithResumeInner(
   url: string,
   dest: string,
@@ -253,7 +231,6 @@ async function downloadWithResumeInner(
 ): Promise<void> {
   const part = `${dest}.part`
 
-  // dimensione obbligatoria: senza, il download non è verificabile e viene rifiutato
   let total = await remoteSize(url)
   if (total <= 0) {
     try {
@@ -271,31 +248,51 @@ async function downloadWithResumeInner(
   }
   if (total <= 0) throw new Error('il server non dichiara la dimensione: download non verificabile')
 
-  // ripresa allineata al blocco: un blocco parziale viene scartato, mai completato a caso
   let have = fs.existsSync(part) ? Math.min(fs.statSync(part).size, total) : 0
-  have = Math.floor(have / BLOCK) * BLOCK
-  if (!fs.existsSync(part)) fs.writeFileSync(part, '')
-  fs.truncateSync(part, have)
+  if (have >= total) have = 0 // file parziale più grande dell'atteso: si riparte
+  if (have > 0) fs.truncateSync(part, have)
+  else fs.writeFileSync(part, '')
 
-  const fd = fs.openSync(part, 'r+')
+  const headers: Record<string, string> = {}
+  if (have > 0) headers.Range = `bytes=${have}-`
+  const res = await fetch(url, {
+    headers,
+    redirect: 'follow',
+    signal: state.abort ? AbortSignal.any([state.abort.signal, AbortSignal.timeout(1_800_000)]) : AbortSignal.timeout(1_800_000)
+  })
+  if (!res.ok && res.status !== 206) throw new Error(`download fallito (${res.status}) da ${url}`)
+  if (res.status !== 206) have = 0
+  if (!res.body) throw new Error('risposta senza corpo')
+
+  const fd = fs.openSync(part, have > 0 ? 'r+' : 'w')
+  const hash = have === 0 ? createHash('sha256') : null
+  let received = have
+  let lastTick = 0
   try {
-    for (let from = have; from < total; from += BLOCK) {
-      const to = Math.min(from + BLOCK - 1, total - 1)
-      const buf = await fetchBlock(url, from, to)
-      fs.writeSync(fd, buf, 0, buf.length, from)
-      onPct(Math.min(0.999, (to + 1) / total))
+    const reader = res.body.getReader()
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (!value) continue
+      const buf = Buffer.from(value)
+      fs.writeSync(fd, buf, 0, buf.length, received)
+      hash?.update(buf)
+      received += buf.length
+      const now = Date.now()
+      if (now - lastTick > 80) {
+        lastTick = now
+        onPct(Math.min(0.999, received / total))
+      }
     }
   } finally {
     fs.closeSync(fd)
   }
 
-  const size = fs.statSync(part).size
-  if (size !== total) {
-    fs.rmSync(part, { force: true })
-    throw new Error(`download incompleto: ${size} byte su ${total} attesi`)
+  if (received !== total) {
+    throw new Error(`download incompleto: ${received} byte su ${total} attesi (riprende da qui)`)
   }
-  await finalize(part, dest, total, url)
   onPct(1)
+  await finalize(part, dest, total, url, hash ? hash.digest('hex') : undefined)
 }
 
 export async function installModel(id: string, onProgress?: ProgressCb): Promise<ModelStatus> {
