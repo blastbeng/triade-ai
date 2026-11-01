@@ -49,8 +49,8 @@ export function getSettings(): Settings {
   // sane defaults requested by the user
   if (!loaded.personas || loaded.personas.length !== 3) {
     loaded.personas = defaultPersonas(loaded.ui?.language ?? 'en')
-  } else if (areDefaultPersonas(loaded.personas) && loaded.ui?.language !== 'it') {
-    // installazioni nuove o aggiornate: i system prompt predefiniti seguono la lingua
+  } else if (areDefaultPersonas(loaded.personas)) {
+    // se sono ancora quelle predefinite, i tre system prompt seguono la lingua scelta
     loaded.personas = defaultPersonas(loaded.ui?.language ?? 'en')
   }
   if (!loaded.contextSize || loaded.contextSize < 2048) loaded.contextSize = 65536
