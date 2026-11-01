@@ -270,6 +270,11 @@ export function registerIpc(): void {
 
   ipcMain.handle('memory:stats', () => memory.stats())
   ipcMain.handle('memory:recent', (_e, limit: number) => memory.recent(limit ?? 40))
+  ipcMain.handle('search:web', async (_e, payload: { query: string; max?: number }) => {
+    const { webSearchDetailed } = await import('./search')
+    return webSearchDetailed(payload.query, payload.max ?? 5)
+  })
+
   ipcMain.handle('memory:search', (_e, query: string) => memory.search(query, 12))
   ipcMain.handle('memory:delete', (_e, ids: string[]) => {
     memory.removeEntries(Array.isArray(ids) ? ids : [String(ids)])

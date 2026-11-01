@@ -73,6 +73,11 @@ const api = {
 
   listSessions: (): Promise<{ id: string; topic: string; updatedAt: number; state: string; turns: number }[]> =>
     ipcRenderer.invoke('session:list'),
+  searchWeb: (
+    query: string,
+    max?: number
+  ): Promise<{ hits: { title: string; url: string; snippet: string }[]; engine: string }> =>
+    ipcRenderer.invoke('search:web', { query, max }),
   loadSession: (id: string): Promise<Session | null> => ipcRenderer.invoke('session:load', id),
   currentSession: (): Promise<Session | null> => ipcRenderer.invoke('session:current'),
   deleteSession: (id: string): Promise<{

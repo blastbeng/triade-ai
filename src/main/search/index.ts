@@ -3,6 +3,11 @@ import { fallbackSearch, parseSearxHtml, type SearchHit } from './engines'
 
 export type { SearchHit }
 
+export interface SearchAnswer {
+  hits: SearchHit[]
+  engine: string
+}
+
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36'
 
@@ -104,7 +109,11 @@ async function googleCse(query: string, max: number): Promise<SearchHit[]> {
   }))
 }
 
-export async function webSearch(query: string, max?: number, images = false): Promise<SearchHit[]> {
+export async function webSearchDetailed(
+  query: string,
+  max?: number,
+  images = false
+): Promise<SearchAnswer> {
   const s = getSettings()
   const n = max ?? s.search.maxResults
   const primary = async (): Promise<SearchHit[]> => {
@@ -131,11 +140,20 @@ export async function webSearch(query: string, max?: number, images = false): Pr
 
   // SearXNG pubblici spesso rispondono con captcha: catena di riserva senza chiavi.
   if (!hits.length) {
-    const fallback = await fallbackSearch(query, n)
-    if (fallback.hits.length) return fallback.hits
+    const lang = (s.ui?.language ?? 'it') === 'en' ? 'en' : 'it'
+    const fallback = await fallbackSearch(query, n, lang)
+    if (fallback.hits.length) {
+      console.log(`[search] "${query}" → ${fallback.engine} (${fallback.hits.length})`)
+      return { hits: fallback.hits, engine: fallback.engine }
+    }
     if (primaryError) throw new Error(primaryError)
+    throw new Error('nessun motore di ricerca ha restituito risultati')
   }
-  return hits
+  return { hits, engine: s.search.provider }
+}
+
+export async function webSearch(query: string, max?: number, images = false): Promise<SearchHit[]> {
+  return (await webSearchDetailed(query, max, images)).hits
 }
 
 /** Estrae il testo leggibile di una pagina, senza dipendenze pesanti. */

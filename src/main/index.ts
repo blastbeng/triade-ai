@@ -48,6 +48,14 @@ function createWindow(): void {
       void (async () => {
         const js = (code: string): Promise<unknown> => mainWindow!.webContents.executeJavaScript(code)
         try {
+          if (process.env.TRIADE_SHOT_TEST === 'search') {
+            const out = await js(
+              `window.triade.searchWeb(${JSON.stringify(process.env.TRIADE_SHOT_QUERY ?? 'vulkan amd rx 7600 xt')}, 4)`
+            )
+            const r = out as { engine: string; hits: { title: string; url: string }[] }
+            console.log(`[shot] search engine=${r.engine} hits=${r.hits.length}`)
+            for (const h of r.hits.slice(0, 3)) console.log(`[shot]   - ${h.title} (${h.url})`)
+          }
           if (process.env.TRIADE_SHOT_TAB) {
             await js(
               "(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === 'impostazioni'); if (b) b.click(); return true })()"
