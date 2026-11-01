@@ -76,13 +76,16 @@ export class DebateEngine extends EventEmitter {
     persona: Persona
   ): Promise<{ baseUrl: string; backend: Backend; apiKey?: string; model?: string }> {
     const s = getSettings()
-    if (s.backend === 'llama') {
+    const backend: Backend = s.backendByPersona?.[persona.id] ?? s.backend ?? 'llama'
+    if (backend === 'llama') {
       const { baseUrl } = await llamaPool.ensure(this.modelFor(persona), this.deviceFor(persona))
       return { baseUrl, backend: 'llama' }
     }
-    const cfg = s.remote[s.backend]
-    const model = s.models.byPersona[persona.id] || cfg.model || this.modelFor(persona)
-    return { baseUrl: cfg.baseUrl, backend: s.backend, apiKey: cfg.apiKey || undefined, model }
+    const cfg = s.remote[backend]
+    const model =
+      s.models.byPersonaBackend?.[persona.id]?.[backend] || cfg.model || ''
+    if (!model) throw new Error(`nessun modello configurato per ${persona.name} su ${backend}`)
+    return { baseUrl: cfg.baseUrl, backend, apiKey: cfg.apiKey || undefined, model }
   }
 
   private modelFor(persona: Persona): string {

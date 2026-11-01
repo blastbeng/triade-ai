@@ -311,6 +311,14 @@ export function defaultPersonas(locale: Locale, count = 3): Persona[] {
     }))
 }
 
+/** Backend effettivo di una personalità: scelta esplicita o default globale. */
+export function backendFor(
+  settings: { backend?: string; backendByPersona?: Record<string, string> },
+  personaId: string
+): string {
+  return settings.backendByPersona?.[personaId] ?? settings.backend ?? 'llama'
+}
+
 /** Personalità attive in base alla scelta dell'utente (1..3). */
 export function activePersonas(settings: {
   personas: Persona[]

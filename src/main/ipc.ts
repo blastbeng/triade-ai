@@ -99,9 +99,10 @@ export function registerIpc(): void {
     const s = getSettings()
     const { usable } = await detectGpus()
     const device = bestDevice(usable)
-    const distinct = new Set(
-      activePersonas(s).map((p) => s.models.byPersona[p.id] ?? s.models.active)
-    ).size
+    const local = activePersonas(s).filter(
+      (p) => (s.backendByPersona?.[p.id] ?? s.backend) === 'llama'
+    )
+    const distinct = new Set(local.map((p) => s.models.byPersona[p.id] ?? s.models.active)).size
     const verdict = await inspectRepo(repo, {
       device,
       contextSize: s.contextSize,

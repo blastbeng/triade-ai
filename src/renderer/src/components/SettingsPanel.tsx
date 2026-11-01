@@ -83,6 +83,26 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
 
   const modelName = (id: string): string => catalog.find((m) => m.id === id)?.name ?? id
 
+  const [modelsByBackend, setModelsByBackend] = useState<Record<string, string[]>>({})
+  useEffect(() => {
+    const targets = new Set<string>()
+    for (const p of draft.personas) {
+      const b = draft.backendByPersona?.[p.id] ?? draft.backend ?? 'llama'
+      if (b !== 'llama') targets.add(b)
+    }
+    for (const backend of targets) {
+      if (modelsByBackend[backend]) continue
+      const cfg = draft.remote[backend as 'openai' | 'anthropic' | 'ollama']
+      if (!cfg) continue
+      void window.triade
+        .remoteModels(backend, cfg.baseUrl, cfg.apiKey)
+        .then((list) =>
+          setModelsByBackend((prev) => ({ ...prev, [backend]: list }))
+        )
+        .catch(() => setModelsByBackend((prev) => ({ ...prev, [backend]: [] })))
+    }
+  }, [draft.backend, draft.backendByPersona, draft.personas.length])
+
   const remoteBackend = (draft.backend ?? 'llama') !== 'llama'
   const remoteCfg = remoteBackend
     ? draft.remote[draft.backend as 'openai' | 'anthropic' | 'ollama']
@@ -604,31 +624,81 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                   <input value={p.name} onChange={(e) => setPersona(i, { name: e.target.value })} />
                   <input type="color" value={p.color} onChange={(e) => setPersona(i, { color: e.target.value })} />
                   <select
-                    title="modello di questa chat"
-                    value={draft.models.byPersona[p.id] ?? draft.models.active}
-                    onChange={(e) =>
+                    title={t('settings.personaBackend')}
+                    value={draft.backendByPersona?.[p.id] ?? draft.backend ?? 'llama'}
+                    onChange={(e) => {
+                      const backend = e.target.value as 'llama' | 'openai' | 'anthropic' | 'ollama'
                       setDraft({
                         ...draft,
-                        models: {
-                          ...draft.models,
-                          byPersona: { ...draft.models.byPersona, [p.id]: e.target.value }
-                        }
+                        backendByPersona: { ...(draft.backendByPersona ?? {}), [p.id]: backend }
                       })
-                    }
+                    }}
                   >
-                    {remoteBackend
-                      ? [...new Set([...(draft.models.byPersona[p.id] ? [draft.models.byPersona[p.id]] : []), ...(remoteCfg?.model ? [remoteCfg.model] : []), ...remoteList])].map(
-                          (id) => (
-                            <option key={id} value={id}>
-                              {id}
-                            </option>
-                          )
-                        )
-                      : catalog.map((m) => (
+                    <option value="llama">llama-server</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="ollama">Ollama</option>
+                  </select>
+                  <select
+                    title="modello di questa chat"
+                    value={
+                      (draft.backendByPersona?.[p.id] ?? draft.backend ?? 'llama') === 'llama'
+                        ? (draft.models.byPersona[p.id] ?? draft.models.active)
+                        : (draft.models.byPersonaBackend?.[p.id]?.[
+                            draft.backendByPersona?.[p.id] ?? draft.backend ?? 'llama'
+                          ] ?? '')
+                    }
+                    onChange={(e) => {
+                      const backend = draft.backendByPersona?.[p.id] ?? draft.backend ?? 'llama'
+                      if (backend === 'llama') {
+                        setDraft({
+                          ...draft,
+                          models: {
+                            ...draft.models,
+                            byPersona: { ...draft.models.byPersona, [p.id]: e.target.value }
+                          }
+                        })
+                      } else {
+                        setDraft({
+                          ...draft,
+                          models: {
+                            ...draft.models,
+                            byPersonaBackend: {
+                              ...(draft.models.byPersonaBackend ?? {}),
+                              [p.id]: {
+                                ...(draft.models.byPersonaBackend?.[p.id] ?? {}),
+                                [backend]: e.target.value
+                              }
+                            }
+                          }
+                        })
+                      }
+                    }}
+                  >
+                    {(draft.backendByPersona?.[p.id] ?? draft.backend ?? 'llama') === 'llama'
+                      ? catalog.map((m) => (
                           <option key={m.id} value={m.id}>
                             {m.name}
                           </option>
-                        ))}
+                        ))
+                      : (() => {
+                          const backend = draft.backendByPersona?.[p.id] ?? draft.backend ?? 'llama'
+                          const cfg =
+                            draft.remote[backend as 'openai' | 'anthropic' | 'ollama']
+                          const chosen = draft.models.byPersonaBackend?.[p.id]?.[backend] ?? ''
+                          const options = [
+                            ...new Set([
+                              ...(chosen ? [chosen] : []),
+                              ...(cfg?.model ? [cfg.model] : []),
+                              ...(modelsByBackend[backend] ?? [])
+                            ])
+                          ]
+                          return options.map((id) => (
+                            <option key={id} value={id}>
+                              {id}
+                            </option>
+                          ))
+                        })()}
                   </select>
                 </legend>
                 <textarea rows={7} value={p.prompt} onChange={(e) => setPersona(i, { prompt: e.target.value })} />

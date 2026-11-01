@@ -74,8 +74,10 @@ export interface CustomModelEntry {
 export interface Settings {
   /** quante personalità contemporaneamente (1 = chat singola, 2-3 = dibattito) */
   personaCount: number
-  /** dove gira l'inferenza */
+  /** backend predefinito (usato dalle personalità senza scelta esplicita) */
   backend: Backend
+  /** backend scelto per singola personalità (id → backend) */
+  backendByPersona: Record<string, Backend>
   /** configurazione delle API remote */
   remote: RemoteSettings
   /** Dimensione contesto (token) condivisa dalle 3 chat. */
@@ -102,6 +104,8 @@ export interface Settings {
     installed: string[]
     active: string
     byPersona: Record<string, string>
+    /** modello scelto per personalità e backend: personaId → backend → model */
+    byPersonaBackend: Record<string, Record<string, string>>
     /** modelli scelti dalla ricerca HuggingFace, verificati prima dell'aggiunta */
     custom: CustomModelEntry[]
   }
@@ -287,6 +291,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   personaCount: 3,
   backend: 'llama',
+  backendByPersona: {},
   remote: {
     openai: { baseUrl: 'https://api.openai.com/v1', apiKey: '', model: '' },
     anthropic: { baseUrl: 'https://api.anthropic.com/v1', apiKey: '', model: '' },
@@ -294,7 +299,13 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   personas: DEFAULT_PERSONAS,
   asr: { enabled: true, modelFile: 'ggml-base.bin', language: 'it' },
-  models: { installed: [], active: 'ornith-1.5-9b', byPersona: {}, custom: [] },
+  models: {
+    installed: [],
+    active: 'ornith-1.5-9b',
+    byPersona: {},
+    byPersonaBackend: {},
+    custom: []
+  },
   onboardingDone: false,
   gpus: { byPersona: {} }
 }

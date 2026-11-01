@@ -266,7 +266,10 @@ async function assertGpu(): Promise<boolean> {
   // con un'API remota la GPU non serve: il controllo vale solo per llama-server locale
   try {
     const { getSettings, saveSettings } = await import('./settings')
-    if (getSettings().backend !== 'llama') return true
+    const { activePersonas, backendFor } = await import('../shared/personas')
+    const s = getSettings()
+    const needsLocal = activePersonas(s).some((p) => backendFor(s, p.id) === 'llama')
+    if (!needsLocal) return true
     const { usable } = await detectGpus(true)
     if (usable.length > 0) return true
     // nessuna GPU dedicata: si offre la scelta di un backend remoto invece di uscire subito

@@ -11,6 +11,7 @@ export const LOCALES: { id: Locale; label: string; flag: string }[] = [
 export type Dict = Record<string, string>
 
 const en: Dict = {
+  'settings.personaBackend': "backend of this chat",
   'backend.perChatNote': "Each chat picks its model from this provider in the personalities tab.",
   'backend.title': "Where the model runs",
   'backend.llamaNote': "llama-server is downloaded and run locally on your GPU. Nothing leaves the machine.",
@@ -249,6 +250,7 @@ const en: Dict = {
 }
 
 const it: Dict = {
+  'settings.personaBackend': "backend di questa chat",
   'backend.perChatNote': "Ogni chat sceglie il proprio modello di questo provider nella scheda personalità.",
   'backend.title': "Dove gira il modello",
   'backend.llamaNote': "llama-server viene scaricato ed eseguito in locale sulla tua GPU. Nulla esce dalla macchina.",
@@ -484,6 +486,7 @@ const it: Dict = {
 }
 
 const de: Dict = {
+  'settings.personaBackend': "Backend dieses Chats",
   'backend.perChatNote': "Jeder Chat wählt sein Modell dieses Anbieters im Tab Persönlichkeiten.",
   'backend.title': "Wo läuft das Modell",
   'backend.llamaNote': "llama-server wird heruntergeladen und lokal auf der GPU ausgeführt. Nichts verlässt den Rechner.",
@@ -718,6 +721,7 @@ const de: Dict = {
 }
 
 const fr: Dict = {
+  'settings.personaBackend': "backend de ce chat",
   'backend.perChatNote': "Chaque chat choisit son modèle de ce fournisseur dans l'onglet personnalités.",
   'backend.title': "Où tourne le modèle",
   'backend.llamaNote': "llama-server est téléchargé et exécuté localement sur votre GPU. Rien ne quitte la machine.",
@@ -952,6 +956,7 @@ const fr: Dict = {
 }
 
 const es: Dict = {
+  'settings.personaBackend': "backend de este chat",
   'backend.perChatNote': "Cada chat elige su modelo de este proveedor en la pestaña personalidades.",
   'backend.title': "Dónde se ejecuta el modelo",
   'backend.llamaNote': "llama-server se descarga y se ejecuta localmente en tu GPU. Nada sale del equipo.",
