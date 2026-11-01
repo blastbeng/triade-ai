@@ -1,6 +1,6 @@
 {
   "name": "triade-ai",
-  "version": "0.14.3",
+  "version": "0.14.4",
   "description": "Tre personalita, un solo modello, un dibattito che arriva a una conclusione",
   "main": "./out/main/index.js",
   "author": "blast",
@@ -41,6 +41,6 @@
     "react-dom": "^18.3.1",
     "typescript": "^5.7.2",
     "vite": "^5.4.11",
-    "vitest": "^5.0.5"
+    "vitest": "^2.1.9"
   }
 }
