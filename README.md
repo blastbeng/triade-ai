@@ -1,125 +1,237 @@
 # TriadeAI
 
-**Three personalities, one model, one debate.** A desktop app (Electron + React + TypeScript) where
-three AI agents discuss the same topic with each other until they reach a consensus or you stop
-them. Everything runs locally on a **dedicated AMD GPU via Vulkan** (CUDA also supported when the
-build is present). No cloud, no ROCm/HIP.
+**One model, up to three personalities, a real debate — or a plain assistant chat.**
+
+TriadeAI is a local-first desktop app (Electron + React + TypeScript) where two or three AI agents
+discuss your topic with each other until they reach a validated consensus, or you stop them. With a
+single personality it becomes a normal ChatGPT/OpenWebUI-style chat. Inference runs either on a
+**local `llama-server` over Vulkan/CUDA** (no ROCm/HIP) or through a **remote API** (OpenAI,
+Anthropic, Ollama).
 
 ```
-┌─ TriadeAI ────────────────────────────────────────────────────────────┐
-│  ◆ Architect      ▲ Devil's advocate     ● Researcher                 │
-│  (persona 1)      (persona 2)            (persona 3)                  │
-├───────────────────────────────────────────────────────────────────────┤
-│  write the topic, attach images/video/audio, choose who answers  →    │
-└───────────────────────────────────────────────────────────────────────┘
+┌─ TriadeAI ─────────────────────────────────────────────────────────────┐
+│  ◆ Architect      ▲ Devil's advocate     ● Researcher                  │
+│  own prompt       own prompt             own prompt                    │
+│  own model/GPU    own model/GPU          own model/GPU                 │
+├────────────────────────────────────────────────────────────────────────┤
+│  topic + attachments, choose who answers, send  →                      │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Features
+---
 
-- **Three chats, three personalities, one model.** Each column is its own agent with its own
-  system prompt, model, GPU and context. Same model on all three chats = **one** `llama-server`
-  process; different models = one process per model+GPU pair.
-- **Real debate.** Turn rotation, `@Name` mentions (an agent picks who speaks next and says why),
-  and mid-sentence hand-off (`[[PASSA A: Name]]`) which interrupts the speaker and gives the floor
-  to another agent. Stop condition: validated consensus, max turns, or your **pause**/**stop**.
-- **Pause, stop, resume.** Every turn is persisted: pause interrupts generation immediately, stop
-  closes the debate, resume continues from the exact point — even after restarting the app.
-- **Vision, video, audio, documents.** Ornith 1.5 9B reads images through its `mmproj`; video is
-  sampled into frames with ffmpeg and its audio track transcribed with whisper.cpp; audio files and
-  documents are transcribed/extracted locally.
-- **Web tools.** `web_search`, `fetch_page`, `image_search`, `find_media` — SearXNG (own instance
-  recommended), Brave, Tavily or Google CSE, plus keyless fallbacks.
-- **Shared vector memory.** Facts from past sessions are distilled and stored in a local vector
-  store (`data/memory/`), recalled by similarity in later chats. Deleting a chat deletes the memory
-  it produced; single entries can be removed from the memory panel.
-- **HuggingFace model search with verification.** Before offering a model the app checks that it
-  has vision (`mmproj`) and that a quant fits your GPUs/RAM — including **MoE** models, whose
-  experts can stay in system RAM. Unusable models are excluded with the reason and the recommended
-  context.
-- **Auto-tuning, no OOM.** Context, KV cache type, ubatch, mmproj placement and layer offload are
-  derived from the real VRAM (and the model's GGUF header); llama.cpp's `fit` decides layers. The
-  pool reserves VRAM per device and shrinks contexts — or refuses the start — instead of crashing.
-- **Reasoning & tool calls.** Always active when the template supports it, hidden by default and
-  expandable; tool calls render as collapsible cards.
-- **UI settings.** Text size, font, density, line height, corners, accent colour, timestamps,
-  token counters, markdown on/off — plus **5 languages** (English, Italian, German, French,
-  Spanish); English by default, selectable at first run.
+## 1. What it does
 
-## Requirements
+### Configurable personalities (1–3)
+- **1 personality** → single-column assistant chat: no debate, no rotation, no consensus, a
+  dedicated assistant system prompt (`MODALITÀ ASSISTENTE`): the loop answers once and goes back to
+  idle.
+- **2 personalities** → Architect + Devil's Advocate debating each other.
+- **3 personalities** (default) → Architect + Devil's Advocate + Researcher.
+- Choose the count at first run and later in *Settings → personalities*. Ids are stable across
+  languages, so per-chat model/GPU assignments survive edits. Default prompts follow the UI
+  language and are replaced only while they are still untouched.
+
+### Debating engine
+- Turn rotation with no agent speaking twice in a row.
+- **`@Name` mentions decide the next speaker**, and the mentioning agent must say *why* it calls
+  that agent — the UI shows the chip `→ Researcher` with the sentence that motivated it, and the
+  called column shows `called by Architect`.
+- **Mid-sentence hand-off** with `[[PASSA A: Name]]`: generation is aborted at the marker, the text
+  written so far is kept, the marker removed, and the floor passes immediately (real interruption).
+- **Consensus** only when a judge call validates the proposal (`[[CONSENSO: …]]`); otherwise the
+  debate continues until `maxTurns`, error, or your stop.
+- **Pause / stop / resume**: pause aborts generation instantly and keeps the chat resumable; stop
+  closes it (state `stopped`, facts distilled into memory); resume continues from the exact turn,
+  even after restarting the app. A message sent into an existing conversation always continues it.
+- **Turns are never truncated by length**: the generation budget is whatever is left up to the 75%
+  context threshold; a turn stops only on obsessive repetition (loop detector) or when the budget is
+  exhausted — both flagged in the UI (`stopped: repetition`, `near the context limit`).
+
+### Model & context management
+- **Default model**: [Ornith-1.5-9B-uncensored Q4_K_M + mmproj-Q8_0](https://huggingface.co/mradermacher/Ornith-1.5-9B-uncensored-GGUF)
+  (`qwen35` hybrid architecture, 32 layers of which 8 with full attention, 262144 native context,
+  vision tower).
+- **Context** default **131072** tokens, shared by all chats and editable in settings — but always
+  `min(your setting, model max)` from the GGUF header, in server start, pool planning, prompt
+  compression and HF compatibility estimates.
+- **Prompt compression at 75%** of the *effective* context: transcript stays intact on disk and in
+  the UI, only the model window is summarized (`contextFrom` advances).
+- **Auto-tuning per GPU**: planner derives context, KV type (`f16 → q8_0 → q4_0`), ubatch, mmproj
+  placement and offload from real VRAM and the GGUF header; layers are left to llama.cpp's `fit`
+  (`-ngl auto`), which knows the free VRAM at that moment.
+- **No OOM by construction**: the pool reserves VRAM per device, splits the KV cache between the
+  models that will run together, shrinks contexts, or refuses to start with an explicit message.
+  Orphaned `llama-server` processes are killed at startup via pid files.
+
+### Model onboarding and downloads
+- First run: language → backend → **number of personalities** → models.
+- Default card is the internal **llama-server + Ornith**; nothing else is required. Any additional
+  model can be searched **on HuggingFace** from the onboarding or from *Settings → models*.
+- Every candidate is verified *before* being offered:
+  - must have a **vision `mmproj`** (otherwise excluded: the app uses images/video);
+  - the **best quant that fits** is chosen (and shown per quant: *all in GPU (ctx N)* /
+    *experts on CPU (ctx N)* / *does not fit*);
+  - **MoE** models are supported with partial offload (experts in RAM) and a recommended context;
+  - VRAM budget is **divided by the number of models that will run concurrently** (distinct models
+    among active personalities + the new one), so 1 personality and 3 personalities give different
+    verdicts — by design.
+- Downloads resume (`.part`), verify size and never block the UI; files live in `data/models/`.
+- **Downloads and GPU checks only apply to the local backend**: choosing an API skips them entirely.
+
+### Backends
+| Backend | How | Needs GPU | Downloads |
+|---|---|---|---|
+| `llama` (default) | bundled `llama-server` (Vulkan, CUDA if fetched) | yes, dedicated | model + mmproj + whisper |
+| `openai` | any OpenAI-compatible `/v1/chat/completions` (also Azure-style proxies) | no | none |
+| `anthropic` | `/v1/messages` adapter (system prompt, images as base64 blocks, tools as `input_schema`, streaming deltas) | no | none |
+| `ollama` | OpenAI-compatible `/v1` endpoint of Ollama | no | none |
+
+- Configured in onboarding and in *Settings → backend* with base URL, API key, model picker
+  (*load models* reads `/v1/models`, Ollama's `models[].name` included) and a **test** button that
+  performs a minimal generation and reports the exact error.
+- Each chat picks its own model **of the active provider** (local catalog or remote list).
+- With no dedicated GPU the app no longer exits blindly: it offers a remote API first, and only
+  quits if you decline.
+
+### Vision, video, audio, documents
+- **Images** go to the model through the `mmproj` (`image_url`; the Anthropic adapter converts them
+  to base64 blocks).
+- **Video**: ffmpeg samples frames (sent as images) and the audio track is transcribed locally with
+  **whisper.cpp** (Vulkan build) — Ornith has no audio encoder, so audio always becomes text.
+- **Audio files** are transcribed; **documents** are extracted to text.
+- Files are ingested once, cached in `data/cache/`, and can be attached from the composer or by drag
+  and drop.
+
+### Tools (function calling)
+`web_search`, `fetch_page` (readability extraction), `image_search`, `find_media` (image/video/audio
+discovery + download). Native tool calling when the server supports it, with a deterministic
+marker-based fallback; truncated tool-call JSON is discarded instead of crashing the server; results
+are rendered as collapsible cards.
+
+**Web search chain**: configured provider (SearXNG / Brave / Tavily / Google CSE) → **Bing HTML**
+(with `/ck/a` redirect decoding) → **Wikipedia** → **DuckDuckGo instant answers**. The engine that
+answered is written into the tool result. Public SearXNG instances usually answer with a captcha —
+point the setting at your own instance for serious use. *Settings → search* has a **test** button.
+
+### Memory
+- Every turn plus a distilled set of reusable facts goes into a **local vector store**
+  (`data/memory/`: `meta.json` + `vectors.bin`, hashed n-gram embeddings, cosine similarity).
+- Facts from past sessions are recalled by similarity when a new turn needs them.
+- **Deleting a chat deletes the memory it produced** (turns *and* its distilled synthesis);
+  single entries can be deleted from the memory panel.
+
+### GPU handling
+- Vulkan and CUDA only (no ROCm/HIP). Detection is **fully dynamic**: the driver-reported type
+  (INTEGRATED/DISCRETE), dedicated memory and shared-memory heuristics exclude iGPUs without any
+  hardcoded GPU name.
+- Every chat can use a different GPU when more than one usable dedicated GPU exists (e.g. a 3060 on
+  CUDA and a 7800 XT on Vulkan); with a single GPU the selector is disabled.
+- One `llama-server` per **model+GPU pair**: same model everywhere = one process, different models =
+  one process each.
+
+### Sessions
+- Sidebar with all chats (state, turn count, date), **title generated at session start** by the
+  model (provisional title immediately, refined asynchronously), word-wrapped to two lines.
+- Open any past chat to continue it, delete it (with its memory), nothing is ever lost by starting a
+  new one.
+
+### Interface
+- 5 languages (English default, Italian, German, French, Spanish), switchable at first run and in
+  settings; system prompts and date formats follow.
+- *Settings → UI*: text size, font family, density, line height, corner radius, accent colour,
+  timestamps, token counter, markdown on/off, live preview.
+- Per-chat status pill with spinner and elapsed time for **prefill / thinking / writing / tool**,
+  streaming reasoning block (hidden by default, expandable), tool cards, mention chips, context bar
+  with absolute tokens, auto-scroll that follows the chat unless you scroll up.
+- Version badge in the title bar.
+
+---
+
+## 2. Requirements
 
 | | |
 |---|---|
-| OS | Windows 10/11 x64 (portable exe) or Linux x64 (AppImage) |
-| GPU | **dedicated** AMD (Vulkan) or NVIDIA (Vulkan/CUDA). Integrated GPUs are excluded and the app exits with a warning if none is found |
-| VRAM | 8 GB minimum for the default 9B model at 131k context with `q4_0` KV, 12–16 GB comfortable |
-| Disk | ~12 GB (model 5.6 GB + mmproj 0.7 GB + whisper ~1 GB + binaries) |
+| OS | Windows 10/11 x64 (portable exe) · Linux x64 (AppImage) |
+| Backend | local `llama-server` **or** any OpenAI/Anthropic/Ollama API |
+| GPU (local only) | **dedicated** AMD (Vulkan) or NVIDIA (Vulkan/CUDA); integrated GPUs are excluded |
+| VRAM | 8 GB minimum for the 9B model at 131k with `q4_0` KV; 12–16 GB comfortable |
+| Disk | ~12 GB for the local default (model 5.6 GB + mmproj 0.7 GB + whisper ~1 GB + binaries) |
 
-## Quick start
+## 3. Quick start
 
 ```bash
 npm install
-npm run fetch:bin          # llama.cpp Vulkan + ffmpeg + whisper.cpp into bin/
-npm run dev                # dev mode (download the model from the app)
-npm run build:linux        # dist/TriadeAI-<version>.AppImage
-npm run build:win          # dist/TriadeAI-<version>-portable.exe (uses wine on Linux)
+npm run fetch:bin                 # llama.cpp Vulkan + ffmpeg + whisper.cpp into bin/
+npm run dev                       # dev mode; models are downloaded from the app
+npm run build:linux               # dist/TriadeAI-<version>.AppImage
+npm run build:win                 # dist/TriadeAI-<version>-portable.exe (wine on Linux)
+npm run fetch:bin -- --cuda       # optional: adds the CUDA build (NVIDIA)
 ```
 
-`npm run fetch:bin -- --cuda` also fetches the CUDA build (only needed for NVIDIA).
+## 4. Data layout — always next to the executable
 
-Everything the app creates lives next to the executable, in `data/`:
+Everything the app creates lives in `data/` beside the `.exe` / `.AppImage`, **not** in the working
+directory and never in the temporary extraction folder:
 
 ```
 data/
-├─ models/            # GGUF models + mmproj (the vector store lives here too)
-├─ memory/            # vector store: meta.json, vectors.bin
-├─ sessions/          # one JSON per chat (resumable)
-├─ cache/             # extracted frames, fetched pages, audio
-├─ run/               # llama-server pid files (orphan cleanup)
+├─ models/      GGUF models + mmproj (and the vector store base)
+├─ memory/      vector store: meta.json, vectors.bin
+├─ sessions/    one JSON per chat (resumable)
+├─ cache/       extracted frames, fetched pages, audio
+├─ run/         llama-server pid files (orphan cleanup)
 └─ settings.json
 ```
 
-On first start the app asks for the language, then which models to use (Ornith 1.5 9B is
-preselected) and downloads them with resume inside `data/models/`.
+Resolution order: `PORTABLE_EXECUTABLE_DIR` / `PORTABLE_EXECUTABLE_FILE` (Windows portable) →
+`APPIMAGE` (or `/proc/self/cmdline` for extract-and-run) → writable exe directory → user data
+fallback. The resolved path is logged at startup (`[paths] cartella dati: …`).
 
-## Versioning
+## 5. Versioning
 
-Every change bumps the version (`npm run release:patch|minor|major`, script `scripts/bump.mjs`):
-patch for fixes, minor for new features, major for breaking changes. The version is shown in the
-title bar and used in the artifact names.
+Every change bumps the version: `npm run release:patch|minor|major`
+(`scripts/bump.mjs`). The version appears in the title bar and in the artifact names.
 
-## Development
+## 6. Development
 
 ```bash
 npm run typecheck
-npm run build              # main + preload + renderer
-npm run stage:linux       # copy bin/ into the bundle (real .so files, no symlinks)
+npm run build            # main + preload + renderer
+npm run stage:linux      # copy bin/ into the bundle (real .so files, no symlinks)
+npm run stage:win        # same for the Windows payload
 ```
 
-Environment switches used by the tests: `TRIADE_SMOKE=1|2|…` (headless self-checks),
-`TRIADE_SHOT=1` (screenshot), `TRIADE_SKIP_GPU_CHECK=1` (UI work on a machine without a dedicated
-GPU — never for real use).
+Test switches: `TRIADE_SMOKE=1|2|…` (headless self-checks), `TRIADE_SHOT=1` (screenshot),
+`TRIADE_SHOT_TEST=search`, `TRIADE_DEBUG_SEARCH=1` (search diagnostics),
+`TRIADE_SKIP_GPU_CHECK=1` (UI work on a machine without a dedicated GPU — never for real use).
 
-Builds for Windows and Linux are produced on a Linux host (wine for the NSIS/portable packaging);
-the build machine is configured in `.build.env` (see `.build.env.example`, git-ignored).
+Windows and Linux artifacts are produced on a Linux host (wine for the Windows packaging); the build
+machine is described by `.build.env` (git-ignored, see `.build.env.example`). No IPs, hostnames or
+credentials are committed.
 
-## Model
+## 7. Model
 
-- Default: [mradermacher/Ornith-1.5-9B-uncensored-GGUF](https://huggingface.co/mradermacher/Ornith-1.5-9B-uncensored-GGUF)
-  `Q4_K_M` + `mmproj-Q8_0`.
-- Architecture `qwen35` (hybrid attention), 32 layers (8 with full attention), 262144 native
-  context, vision through `qwen3vl_merger`.
-- Quant choice is automatic at runtime: `Q8_0 → Q4_K_M → Q3_K_M → Q2_K` if VRAM is tight.
+- Default: `Ornith-1.5-9B-uncensored` Q4_K_M + `mmproj-Q8_0` (mradermacher GGUF).
+- Architecture `qwen35`, 32 layers (8 full-attention), 262144 native context, vision through
+  `qwen3vl_merger`.
+- Runtime quant choice: `Q8_0 → Q4_K_M → Q3_K_M → Q2_K` when VRAM is tight.
 
-## Notes and limits
+## 8. Known limits
 
-- Windows SmartScreen warnings disappear only with a code-signing certificate; the build pipeline
-  is ready for one (`CSC_LINK` / `CSC_KEY_PASSWORD`).
-- Public SearXNG instances usually answer with a captcha: set your own instance URL in settings for
-  reliable web search.
-- Linux packaging is validated; Windows artifacts are produced and staged with wine on the build
-  host, so a final smoke test on real Windows hardware is recommended.
+- **Code signing**: SmartScreen warnings disappear only with a certificate. The pipeline is ready
+  (`CSC_LINK` / `CSC_KEY_PASSWORD`), nothing is bypassed in code.
+- **Public SearXNG** instances usually answer with a captcha: use your own instance for reliable
+  web search.
+- **OpenAI/Anthropic real calls** require your keys; the *test* button reports the exact error.
+  The Anthropic adapter is implemented and type-checked but not yet exercised against a live key.
+- **Linux packaging** is validated (including the packaged smoke test); Windows artifacts are
+  produced and staged with wine on the build host, so a final run on real Windows hardware is
+  recommended.
+- App icon still the Electron default.
 
-## License
+## 9. License
 
-MIT for the code. The model has its own license — see the model card of
-[junafinity/Ornith-1.5-9B-uncensored](https://huggingface.co/junafinity/Ornith-1.5-9B-uncensored).
+MIT for the code. The model has its own license — see the
+[junafinity/Ornith-1.5-9B-uncensored](https://huggingface.co/junafinity/Ornith-1.5-9B-uncensored)
+model card.
