@@ -73,6 +73,18 @@ const api = {
 
   listSessions: (): Promise<{ id: string; topic: string; updatedAt: number; state: string; turns: number }[]> =>
     ipcRenderer.invoke('session:list'),
+  remoteModels: (
+    backend: string,
+    baseUrl?: string,
+    apiKey?: string
+  ): Promise<string[]> => ipcRenderer.invoke('remote:models', { backend, baseUrl, apiKey }),
+  remoteTest: (payload: {
+    backend: string
+    baseUrl: string
+    apiKey: string
+    model: string
+  }): Promise<{ ok: boolean; detail: string; models: number }> =>
+    ipcRenderer.invoke('remote:test', payload),
   searchWeb: (
     query: string,
     max?: number

@@ -2,9 +2,14 @@ import { useEffect, useState } from 'react'
 import { LOCALES, translate, type Locale } from '../../../shared/i18n'
 import type { CatalogEntry } from '../env'
 import ModelSearch from './ModelSearch'
+import BackendPanel from './BackendPanel'
+import type { Backend, RemoteSettings } from '../../../shared/types'
 
 interface Props {
   catalog: CatalogEntry[]
+  backend: Backend
+  remote: RemoteSettings
+  onBackend: (backend: Backend, remote: RemoteSettings) => Promise<void> | void
   language: Locale
   onLanguage: (locale: Locale) => Promise<void> | void
   onDone: (installed: string[], active: string, personaCount: number) => Promise<void>
@@ -13,12 +18,17 @@ interface Props {
 
 export default function Onboarding({
   catalog,
+  backend,
+  remote,
+  onBackend,
   language,
   onLanguage,
   onDone,
   onProgress
 }: Props): JSX.Element {
-  const [step, setStep] = useState<'language' | 'models'>('language')
+  const [step, setStep] = useState<'language' | 'backend' | 'models'>('language')
+  const [localBackend, setLocalBackend] = useState<Backend>(backend)
+  const [localRemote, setLocalRemote] = useState<RemoteSettings>(remote)
   const [locale, setLocale] = useState<Locale>(language)
   const [selected, setSelected] = useState<string[]>([])
   const [personas, setPersonas] = useState(3)
@@ -93,6 +103,42 @@ export default function Onboarding({
               className="primary"
               onClick={async () => {
                 await onLanguage(locale)
+                setStep('backend')
+              }}
+            >
+              {t('onboarding.continue')}
+            </button>
+          </footer>
+        </div>
+      </div>
+    )
+  }
+
+  if (step === 'backend') {
+    const remoteBackend = localBackend !== 'llama'
+    return (
+      <div className="modal">
+        <div className="modalbox onboarding">
+          <h2>{t('onboarding.backendTitle')}</h2>
+          <p className="lead">{t('onboarding.backendLead')}</p>
+          <BackendPanel
+            backend={localBackend}
+            remote={localRemote}
+            onChange={(next, remoteCfg) => {
+              setLocalBackend(next)
+              setLocalRemote(remoteCfg)
+            }}
+          />
+          <footer className="modalfooter">
+            <button
+              className="primary"
+              onClick={async () => {
+                await onBackend(localBackend, localRemote)
+                if (remoteBackend) {
+                  // nessun download: si passa direttamente al modello attivo
+                  await onDone([], localRemote[localBackend as Exclude<Backend, 'llama'>].model, personas)
+                  return
+                }
                 setStep('models')
               }}
             >

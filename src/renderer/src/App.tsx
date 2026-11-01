@@ -540,6 +540,12 @@ export default function App(): JSX.Element {
         {onboarding && settings && (
           <Onboarding
             catalog={catalog}
+            backend={settings.backend ?? 'llama'}
+            remote={settings.remote}
+            onBackend={async (backend, remote) => {
+              const next = await window.triade.saveSettings({ backend, remote })
+              setSettings(next)
+            }}
             language={locale}
             onLanguage={async (l) => {
               const next = await window.triade.saveSettings({

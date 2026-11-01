@@ -8,6 +8,22 @@ export interface Persona {
   prompt: string
 }
 
+/** Motore di inferenza: llama-server locale oppure un'API remota. */
+export type Backend = 'llama' | 'openai' | 'anthropic' | 'ollama'
+
+export interface RemoteBackendConfig {
+  baseUrl: string
+  apiKey: string
+  /** modello predefinito per questo backend (usato se la chat non ne sceglie uno) */
+  model: string
+}
+
+export interface RemoteSettings {
+  openai: RemoteBackendConfig
+  anthropic: RemoteBackendConfig
+  ollama: RemoteBackendConfig
+}
+
 export type SearchProvider = 'searxng' | 'brave' | 'tavily' | 'googlecse'
 
 export interface SearchSettings {
@@ -58,6 +74,10 @@ export interface CustomModelEntry {
 export interface Settings {
   /** quante personalità contemporaneamente (1 = chat singola, 2-3 = dibattito) */
   personaCount: number
+  /** dove gira l'inferenza */
+  backend: Backend
+  /** configurazione delle API remote */
+  remote: RemoteSettings
   /** Dimensione contesto (token) condivisa dalle 3 chat. */
   contextSize: number
   /** Frazione del contesto oltre la quale scatta il prompt compression (0.75 = 75%). */
@@ -266,6 +286,12 @@ export const DEFAULT_SETTINGS: Settings = {
     maxResults: 5
   },
   personaCount: 3,
+  backend: 'llama',
+  remote: {
+    openai: { baseUrl: 'https://api.openai.com/v1', apiKey: '', model: '' },
+    anthropic: { baseUrl: 'https://api.anthropic.com/v1', apiKey: '', model: '' },
+    ollama: { baseUrl: 'http://127.0.0.1:11434/v1', apiKey: '', model: '' }
+  },
   personas: DEFAULT_PERSONAS,
   asr: { enabled: true, modelFile: 'ggml-base.bin', language: 'it' },
   models: { installed: [], active: 'ornith-1.5-9b', byPersona: {}, custom: [] },

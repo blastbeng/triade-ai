@@ -98,6 +98,13 @@ interface Api {
   stopServer(): Promise<ServerStatus[]>
   listSessions(): Promise<{ id: string; topic: string; updatedAt: number; state: string; turns: number }[]>
   loadSession(id: string): Promise<Session | null>
+  remoteModels(backend: string, baseUrl?: string, apiKey?: string): Promise<string[]>
+  remoteTest(payload: {
+    backend: string
+    baseUrl: string
+    apiKey: string
+    model: string
+  }): Promise<{ ok: boolean; detail: string; models: number }>
   searchWeb(
     query: string,
     max?: number

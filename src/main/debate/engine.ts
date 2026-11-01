@@ -6,7 +6,7 @@ import { getSettings } from '../settings'
 import { activePersonas } from '../../shared/personas'
 import { mediaUrl } from '../paths'
 import { defaultModelId } from '../models/registry'
-import type { Attachment, DebateEvent, Mention, Persona, Session, Turn } from '../../shared/types'
+import type { Attachment, Backend, DebateEvent, Mention, Persona, Session, Turn } from '../../shared/types'
 import { buildMessages, summarize, tokenCountOf } from './context'
 import { loadSession, newSession, provisionalTitle, saveSession } from './store'
 import { distillSession, rememberTurn, rememberUserNote } from '../memory/integrate'
@@ -71,6 +71,20 @@ export class DebateEngine extends EventEmitter {
   }
 
   /** Modello assegnato alla singola chat (default: modello attivo globale). */
+  /** Dove far girare l'inferenza: llama-server locale oppure API remota. */
+  private async endpointFor(
+    persona: Persona
+  ): Promise<{ baseUrl: string; backend: Backend; apiKey?: string; model?: string }> {
+    const s = getSettings()
+    if (s.backend === 'llama') {
+      const { baseUrl } = await llamaPool.ensure(this.modelFor(persona), this.deviceFor(persona))
+      return { baseUrl, backend: 'llama' }
+    }
+    const cfg = s.remote[s.backend]
+    const model = s.models.byPersona[persona.id] || cfg.model || this.modelFor(persona)
+    return { baseUrl: cfg.baseUrl, backend: s.backend, apiKey: cfg.apiKey || undefined, model }
+  }
+
   private modelFor(persona: Persona): string {
     const s = getSettings()
     return s.models.byPersona[persona.id] ?? s.models.active ?? defaultModelId()
@@ -189,9 +203,13 @@ export class DebateEngine extends EventEmitter {
     }
     const lang = languageNames[getSettings().ui?.language ?? 'en'] ?? 'English'
     try {
-      const { baseUrl } = await llamaPool.ensure(this.modelFor(persona), this.deviceFor(persona))
+      const ep = await this.endpointFor(persona)
+      const baseUrl = ep.baseUrl
       const firstTurn = session.turns.find((t) => t.agentId !== 'utente')?.text ?? ''
-      const res = await chat(baseUrl, {
+      const res = await chat(ep.baseUrl, {
+        backend: ep.backend,
+        apiKey: ep.apiKey,
+        model: ep.model,
         messages: [
           {
             role: 'system',
@@ -230,7 +248,8 @@ export class DebateEngine extends EventEmitter {
     void (async () => {
       try {
         const persona = activePersonas(getSettings())[0]
-        const { baseUrl } = await llamaPool.ensure(this.modelFor(persona), this.deviceFor(persona))
+        const ep = await this.endpointFor(persona)
+        const baseUrl = ep.baseUrl
         const added = await distillSession(baseUrl, session)
         if (added > 0) this.emitEvent({ type: 'log', message: `memoria: ${added} elementi appresi` })
       } catch (err) {
@@ -352,7 +371,8 @@ export class DebateEngine extends EventEmitter {
           break
         }
         const persona = this.pickSpeaker(personas)
-        const { baseUrl } = await llamaPool.ensure(this.modelFor(persona), this.deviceFor(persona))
+        const ep = await this.endpointFor(persona)
+        const baseUrl = ep.baseUrl
         this.emitEvent({
           type: 'log',
           message: `${persona.name} usa ${this.modelFor(persona)} su ${this.deviceFor(persona) ?? 'GPU automatica'}`
@@ -441,6 +461,9 @@ export class DebateEngine extends EventEmitter {
           let result
           try {
             result = await chat(baseUrl, {
+              backend: ep.backend,
+              apiKey: ep.apiKey,
+              model: ep.model,
               messages,
               temperature: settings.temperature,
               maxTokens: budget,
@@ -646,7 +669,7 @@ export class DebateEngine extends EventEmitter {
 
         if (marker) {
           const proposed = (marker[1] ?? clean).trim()
-          const validated = await this.validateConsensus(baseUrl, persona, proposed, controller.signal)
+          const validated = await this.validateConsensus(ep, persona, proposed, controller.signal)
           if (validated.ok) {
             this.session.consensus = {
               answer: validated.answer || proposed,
@@ -677,7 +700,7 @@ export class DebateEngine extends EventEmitter {
 
   /** Il consenso dichiarato da un agente viene verificato da un turno dedicato. */
   private async validateConsensus(
-    baseUrl: string,
+    ep: { baseUrl: string; backend: Backend; apiKey?: string; model?: string },
     proposer: Persona,
     answer: string,
     signal: AbortSignal
@@ -690,7 +713,10 @@ export class DebateEngine extends EventEmitter {
       .map((t) => `[${t.name}] ${t.text}`)
       .join('\n\n')
       .slice(-9000)
-    const res = await chat(baseUrl, {
+    const res = await chat(ep.baseUrl, {
+      backend: ep.backend,
+      apiKey: ep.apiKey,
+      model: ep.model,
       messages: [
         {
           role: 'system',

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Persona, SearchProvider, Settings } from '../../../shared/types'
 import type { CatalogEntry } from '../env'
 import ModelSearch from './ModelSearch'
+import BackendPanel from './BackendPanel'
 import { LOCALES, type Locale } from '../../../shared/i18n'
 import { useT } from '../i18n'
 
@@ -20,7 +21,7 @@ const PROVIDERS: { id: SearchProvider; label: string }[] = [
   { id: 'googlecse', label: 'Google CSE' }
 ]
 
-type Tab = 'generale' | 'ui' | 'ricerca' | 'gpu' | 'personas' | 'modelli'
+type Tab = 'generale' | 'backend' | 'ui' | 'ricerca' | 'gpu' | 'personas' | 'modelli'
 
 interface GpuInfo {
   usable: { key: string; label: string; backend: string; name: string; vramMiB: number; freeMiB: number }[]
@@ -82,12 +83,33 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
 
   const modelName = (id: string): string => catalog.find((m) => m.id === id)?.name ?? id
 
+  const remoteBackend = (draft.backend ?? 'llama') !== 'llama'
+  const remoteCfg = remoteBackend
+    ? draft.remote[draft.backend as 'openai' | 'anthropic' | 'ollama']
+    : null
+  const [remoteList, setRemoteList] = useState<string[]>([])
+  useEffect(() => {
+    if (!remoteCfg) return setRemoteList([])
+    let alive = true
+    void window.triade
+      .remoteModels(draft.backend, remoteCfg.baseUrl, remoteCfg.apiKey)
+      .then((list) => {
+        if (alive) setRemoteList(list)
+      })
+      .catch(() => {
+        if (alive) setRemoteList([])
+      })
+    return () => {
+      alive = false
+    }
+  }, [draft.backend, remoteCfg?.baseUrl, remoteCfg?.apiKey])
+
   return (
     <div className="modal" onClick={onClose}>
       <div className="modalbox settings" onClick={(e) => e.stopPropagation()}>
         <h2>{t('settings.title')}</h2>
         <nav className="tabs">
-          {(['generale', 'ui', 'ricerca', 'gpu', 'personas', 'modelli'] as Tab[]).map((tab) => (
+          {(['generale', 'backend', 'ui', 'ricerca', 'gpu', 'personas', 'modelli'] as Tab[]).map((tab) => (
             <button
               key={tab}
               className={activeTab === tab ? 'tab active' : 'tab'}
@@ -101,6 +123,19 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
             </button>
           ))}
         </nav>
+
+        {activeTab === 'backend' && (
+          <div className="form">
+            <BackendPanel
+              backend={draft.backend ?? 'llama'}
+              remote={draft.remote}
+              onChange={(backend, remote) => setDraft({ ...draft, backend, remote })}
+            />
+            {(draft.backend ?? 'llama') !== 'llama' && (
+              <p className="note">{t('backend.perChatNote')}</p>
+            )}
+          </div>
+        )}
 
         {activeTab === 'generale' && (
           <div className="form">
@@ -581,11 +616,19 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                       })
                     }
                   >
-                    {catalog.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
+                    {remoteBackend
+                      ? [...new Set([...(draft.models.byPersona[p.id] ? [draft.models.byPersona[p.id]] : []), ...(remoteCfg?.model ? [remoteCfg.model] : []), ...remoteList])].map(
+                          (id) => (
+                            <option key={id} value={id}>
+                              {id}
+                            </option>
+                          )
+                        )
+                      : catalog.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name}
+                          </option>
+                        ))}
                   </select>
                 </legend>
                 <textarea rows={7} value={p.prompt} onChange={(e) => setPersona(i, { prompt: e.target.value })} />

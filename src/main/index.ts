@@ -263,6 +263,30 @@ function createWindow(): void {
  */
 async function assertGpu(): Promise<boolean> {
   if (process.env.TRIADE_SKIP_GPU_CHECK === '1') return true
+  // con un'API remota la GPU non serve: il controllo vale solo per llama-server locale
+  try {
+    const { getSettings, saveSettings } = await import('./settings')
+    if (getSettings().backend !== 'llama') return true
+    const { usable } = await detectGpus(true)
+    if (usable.length > 0) return true
+    // nessuna GPU dedicata: si offre la scelta di un backend remoto invece di uscire subito
+    const choice = dialog.showMessageBoxSync({
+      type: 'warning',
+      title: 'TriadeAI — nessuna GPU dedicata',
+      message:
+        'Nessuna GPU dedicata AMD (Vulkan) o NVIDIA (Vulkan/CUDA) rilevata.\n\n' +
+        'TriadeAI può comunque funzionare con un\u2019API remota (OpenAI, Anthropic o Ollama).\n\n' +
+        'Vuoi usare un\u2019API remota?',
+      buttons: ['Usa un\u2019API remota', 'Chiudi'],
+      defaultId: 0,
+      cancelId: 1
+    })
+    if (choice !== 0) return false
+    saveSettings({ backend: 'openai' })
+    return true
+  } catch {
+    return false
+  }
   const { usable, excluded, error } = await detectGpus(true)
   if (usable.length > 0) return true
   const detail = excluded.length

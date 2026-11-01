@@ -1,6 +1,7 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { getSettings, saveSettings } from './settings'
 import { activePersonas } from '../shared/personas'
+import type { Backend } from '../shared/types'
 import { catalogStatus, installModel, removeModel, statusFor } from './llama/downloader'
 import { llamaPool } from './llama/server'
 import { engine } from './debate/engine'
@@ -271,6 +272,46 @@ export function registerIpc(): void {
 
   ipcMain.handle('memory:stats', () => memory.stats())
   ipcMain.handle('memory:recent', (_e, limit: number) => memory.recent(limit ?? 40))
+  // elenco modelli disponibili su un backend remoto (OpenAI/Anthropic/Ollama)
+  ipcMain.handle(
+    'remote:models',
+    async (_e, payload: { backend: Backend; baseUrl?: string; apiKey?: string }) => {
+      const s = getSettings()
+      const cfg = payload.backend === 'llama' ? null : s.remote[payload.backend]
+      const baseUrl = (payload.baseUrl ?? cfg?.baseUrl ?? '').replace(/\/$/, '')
+      const apiKey = payload.apiKey ?? cfg?.apiKey ?? ''
+      if (!baseUrl) throw new Error('base URL mancante')
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (payload.backend === 'anthropic') {
+        headers['x-api-key'] = apiKey
+        headers['anthropic-version'] = '2023-06-01'
+      } else if (apiKey) {
+        headers.Authorization = `Bearer ${apiKey}`
+      }
+      const url = /\/v1$/.test(baseUrl) ? `${baseUrl}/models` : `${baseUrl}/v1/models`
+      const res = await fetch(url, { headers, signal: AbortSignal.timeout(20000) })
+      const text = await res.text()
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
+      const data = JSON.parse(text) as {
+        data?: { id: string }[]
+        models?: { name: string }[]
+      }
+      const ids = (data.data ?? []).map((m) => m.id)
+      const names = (data.models ?? []).map((m) => m.name)
+      const all = [...ids, ...names].filter(Boolean)
+      return [...new Set(all)].sort()
+    }
+  )
+
+  // verifica credenziali/raggiungibilità senza generare testo costoso
+  ipcMain.handle(
+    'remote:test',
+    async (_e, payload: { backend: Backend; baseUrl: string; apiKey: string; model: string }) => {
+      const meta = await import('./remote')
+      return meta.testBackend(payload)
+    }
+  )
+
   ipcMain.handle('search:web', async (_e, payload: { query: string; max?: number }) => {
     const { webSearchDetailed } = await import('./search')
     return webSearchDetailed(payload.query, payload.max ?? 5)
