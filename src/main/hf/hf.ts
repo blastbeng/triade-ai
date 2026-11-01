@@ -187,7 +187,7 @@ function baseRepos(repo: string): string[] {
 async function mmprojFromBaseRepos(repo: string): Promise<{ path: string; size: number } | null> {
   for (const candidate of baseRepos(repo)) {
     const files = await repoFiles(candidate)
-    const found = files.filter((f) => /mmproj/i.test(f.path) && /\.gguf$/i.test(f.path))
+    const found = files.filter((f) => /(mmproj|projector)/i.test(f.path) && /\.gguf$/i.test(f.path))
     if (found.length) {
       // preferisce Q8_0, poi f16, poi il primo disponibile
       const best =
@@ -199,7 +199,7 @@ async function mmprojFromBaseRepos(repo: string): Promise<{ path: string; size: 
 }
 
 function pickMmproj(files: HfFile[]): HfFile | null {
-  const candidates = files.filter((f) => /mmproj/i.test(f.path) && /\.gguf$/i.test(f.path))
+  const candidates = files.filter((f) => /(mmproj|projector)/i.test(f.path) && /\.gguf$/i.test(f.path))
   if (!candidates.length) return null
   const q8 = candidates.find((f) => /q8_0/i.test(f.path))
   const f16 = candidates.find((f) => /f16|fp16|bf16/i.test(f.path))
@@ -230,7 +230,7 @@ export async function inspectRepo(
   const name = (modelRow?.modelId ?? repo).split('/').pop() ?? repo
   const mmproj = pickMmproj(files) ?? (await mmprojFromBaseRepos(repo))
   const ggufs = files.filter(
-    (f) => /\.gguf$/i.test(f.path) && !/mmproj/i.test(f.path) && !/-\d{5}-of-\d{5}/i.test(f.path)
+    (f) => /\.gguf$/i.test(f.path) && !/(mmproj|projector)/i.test(f.path) && !/-\d{5}-of-\d{5}/i.test(f.path)
   )
 
   const tags = modelRow?.tags ?? []
