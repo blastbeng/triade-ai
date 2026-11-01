@@ -5,7 +5,7 @@ import { llamaPool } from '../llama/server'
 import { getSettings } from '../settings'
 import { mediaUrl } from '../paths'
 import { defaultModelId } from '../models/registry'
-import type { Attachment, DebateEvent, Persona, Session, Turn } from '../../shared/types'
+import type { Attachment, DebateEvent, Mention, Persona, Session, Turn } from '../../shared/types'
 import { buildMessages, summarize, tokenCountOf } from './context'
 import { loadSession, newSession, saveSession } from './store'
 import { distillSession, rememberTurn, rememberUserNote } from '../memory/integrate'
@@ -13,6 +13,28 @@ import { TOOL_SPECS, runTool } from './tools'
 
 const CONSENSUS = /\[\[\s*CONSENSO\s*(?::([\s\S]*?))?\s*\]\]/i
 const MAX_TOOL_ROUNDS = 2
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** Le menzioni @Nome diventano "questa chat chiama quest'altra, per questo motivo". */
+function extractMentions(text: string, personas: Persona[], selfId: string): Mention[] {
+  const mentions: Mention[] = []
+  for (const persona of personas) {
+    if (persona.id === selfId) continue
+    const pattern = new RegExp(`@\\s*${escapeRegExp(persona.name).replace(/\\ /g, '\\s+')}`, 'i')
+    const match = pattern.exec(text)
+    if (!match) continue
+    const before = text.lastIndexOf('.', match.index)
+    const after = text.indexOf('.', match.index + match[0].length)
+    const reason = text
+      .slice(before + 1, after === -1 ? Math.min(text.length, match.index + 220) : after + 1)
+      .trim()
+    mentions.push({ targetId: persona.id, targetName: persona.name, reason: reason.slice(0, 260) })
+  }
+  return mentions
+}
 
 function parseArgs(raw: string): Record<string, unknown> | null {
   try {
@@ -239,6 +261,15 @@ export class DebateEngine extends EventEmitter {
         const controller = this.abort
         this.emitEvent({ type: 'log', message: `${persona.name} sta scrivendo (turno ${turnIndex + 1})` })
 
+        // stato visibile nella colonna: prefill -> ragionamento -> scrittura -> tool
+        let phase: 'prefill' | 'thinking' | 'writing' | 'tool' = 'prefill'
+        const setPhase = (next: typeof phase, detail?: string): void => {
+          if (phase === next && !detail) return
+          phase = next
+          this.emitEvent({ type: 'phase', agentId: persona.id, phase: next, detail })
+        }
+        setPhase('prefill', 'preparazione del prompt')
+
         let text = ''
         let reasoning = ''
         const tools: Turn['tools'] = []
@@ -254,6 +285,7 @@ export class DebateEngine extends EventEmitter {
         if (turnCap < 256) cut = 'budget'
         for (let attempt = 0; attempt < 3; attempt++) {
           const budget = turnCap
+          if (attempt > 0) setPhase('prefill', 'nuovo tentativo')
           let result
           try {
             result = await chat(baseUrl, {
@@ -334,6 +366,7 @@ export class DebateEngine extends EventEmitter {
               } as LlmMessage
             ]
             for (const { call, args } of validCalls) {
+              setPhase('tool', call.function.name)
               let outcome: { text: string; images?: string[] } = { text: 'errore' }
               let ok = true
               try {
@@ -392,6 +425,8 @@ export class DebateEngine extends EventEmitter {
           break
         }
 
+        this.emitEvent({ type: 'phase', agentId: persona.id, phase: 'idle' })
+
         const clean = text.replace(CONSENSUS, '').trim()
         const marker = CONSENSUS.exec(text)
         const turn: Turn = {
@@ -405,7 +440,8 @@ export class DebateEngine extends EventEmitter {
           tokensOut: Math.ceil(clean.length / 3.6),
           tools,
           interrupted,
-          cut
+          cut,
+          mentions: extractMentions(clean, personas, persona.id)
         }
         this.session.turns.push(turn)
         this.session.turnIndex = this.session.turns.length

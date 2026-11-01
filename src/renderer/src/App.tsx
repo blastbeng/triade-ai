@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Attachment, DebateEvent, ModelStatus, ServerStatus, Session, Settings } from '../../shared/types'
-import ChatColumn from './components/ChatColumn'
+import ChatColumn, { type Phase } from './components/ChatColumn'
 import Composer from './components/Composer'
 import SettingsPanel from './components/SettingsPanel'
 import Onboarding from './components/Onboarding'
@@ -28,6 +28,7 @@ export default function App(): JSX.Element {
   const [catalog, setCatalog] = useState<CatalogEntry[]>([])
   const [stream, setStream] = useState<{ agentId: string; text: string } | null>(null)
   const [streamReasoning, setStreamReasoning] = useState<{ agentId: string; text: string } | null>(null)
+  const [phases, setPhases] = useState<Record<string, Phase>>({})
   const [servers, setServers] = useState<ServerStatus[]>([])
   const [logs, setLogs] = useState<string[]>([])
   const [notice, setNotice] = useState<string | null>(null)
@@ -78,6 +79,12 @@ export default function App(): JSX.Element {
           )
           break
         }
+        case 'phase': {
+          const agentId = String(event.agentId)
+          const phase = String(event.phase) as Phase
+          setPhases((prev) => ({ ...prev, [agentId]: phase }))
+          break
+        }
         case 'turn':
           setStream(null)
           setStreamReasoning(null)
@@ -116,6 +123,11 @@ export default function App(): JSX.Element {
       }
     })
   }, [loadAll, pushLog])
+
+  useEffect(() => {
+    const scale = settings?.textScale ?? 1
+    document.body.style.zoom = String(scale)
+  }, [settings?.textScale])
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -252,8 +264,11 @@ export default function App(): JSX.Element {
                 </span>
               ))}
             <span className="badge">ctx {settings?.contextSize ?? '—'}</span>
-            <span className="badge" title="token del prompt nell'ultimo turno">
+            <span className="badge ctxbadge" title="token del prompt nell'ultimo turno">
               prompt {Math.round(ctxUsed * 100)}%
+              <span className="ctxbar">
+                <span style={{ width: `${Math.round(ctxUsed * 100)}%` }} />
+              </span>
             </span>
           </div>
 
@@ -286,6 +301,12 @@ export default function App(): JSX.Element {
               turns={(session?.turns ?? []).filter((t) => t.agentId === persona.id)}
               streaming={stream?.agentId === persona.id ? stream.text : null}
               streamReasoning={streamReasoning?.agentId === persona.id ? streamReasoning.text : null}
+              phase={phases[persona.id] ?? null}
+              calledBy={
+                session?.turns[session.turns.length - 1]?.mentions?.find((m) => m.targetId === persona.id)
+                  ? session?.turns[session.turns.length - 1]?.name ?? null
+                  : null
+              }
               active={session?.state === 'running' && stream?.agentId === persona.id}
             />
           ))}

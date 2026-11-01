@@ -33,6 +33,8 @@ export interface Settings {
   maxTokensPerTurn: number
   maxTurns: number
   temperature: number
+  /** scala del testo dell'interfaccia (1 = 14px) */
+  textScale: number
   toolsEnabled: boolean
   search: SearchSettings
   personas: Persona[]
@@ -62,10 +64,20 @@ export interface ToolRun {
   ok: boolean
 }
 
+export interface Mention {
+  /** id della personalità chiamata in causa */
+  targetId: string
+  targetName: string
+  /** frase con cui la chiama: il "perché" */
+  reason: string
+}
+
 export interface Turn {
   id: string
   agentId: string
   name: string
+  /** altre chat chiamate in causa in questo intervento, con il motivo */
+  mentions?: Mention[]
   text: string
   /** ragionamento del modello, nascosto nella UI salvo espansione */
   reasoning?: string
@@ -155,6 +167,7 @@ export interface DebateEvent {
     | 'session'
     | 'model'
     | 'reasoning'
+    | 'phase'
   [key: string]: unknown
 }
 
@@ -192,9 +205,10 @@ export const DEFAULT_SETTINGS: Settings = {
   autoTune: true,
   flashAttention: true,
   kvCacheType: 'q8_0',
-  maxTokensPerTurn: 4096,
+  maxTokensPerTurn: 16384,
   maxTurns: 40,
   temperature: 0.85,
+  textScale: 1,
   toolsEnabled: true,
   search: {
     provider: 'searxng',

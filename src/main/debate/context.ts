@@ -3,9 +3,18 @@ import { recallBlock } from '../memory/integrate'
 import { mediaUrl } from '../paths'
 import type { Persona, Session, Settings, Turn } from '../../shared/types'
 
-const PROTOCOL = (name: string, others: string[], maxTokens: number): string => `
+const PROTOCOL = (
+  name: string,
+  others: string[],
+  roster: string,
+  maxTokens: number
+): string => `
 PROTOCOLLO DEL DIBATTITO
-- Sei ${name}. Partecipi a una discussione a tre con ${others.join(' e ')}.
+- Sei ${name}. Fai parte di un gruppo di tre agenti che discute insieme: conosci e vedi gli interventi degli altri.
+- IL GRUPPO:
+${roster}
+- Quando un altro agente è decisivo per il tuo punto, chiamalo per nome con @Nome e spiega in una frase PERCHÉ lo chiami (es. "@Ricercatore verifica questo dato: la mia obiezione dipende da quel numero"). Chi viene chiamato risponderà nel turno successivo.
+- Non chiamare tutti: al massimo una o due menzioni per intervento, solo se servono davvero.
 - Ragiona e rispondi in italiano.
 - Parla solo per te: niente intestazioni, niente elenchi di repliche altrui. Massimo ~${maxTokens} token.
 - Ogni intervento deve contenere un contributo sostanziale (almeno 3 frasi): mai una sola riga di cortesia.
@@ -24,11 +33,14 @@ export function systemPrompt(
   personas: Persona[]
 ): string {
   const others = personas.filter((p) => p.id !== persona.id).map((p) => `${p.name}`)
+  const roster = personas
+    .map((p) => `  - ${p.name}${p.id === persona.id ? ' (sei tu)' : ''}: ${p.prompt.split('.')[0].slice(0, 110)}.`)
+    .join('\n')
   const lastTurns = session.turns.slice(-2).map((t) => t.text).join(' ')
   const recall = recallBlock(`${session.topic} ${lastTurns}`, session.id, 6, 1400)
   return [
     persona.prompt,
-    PROTOCOL(persona.name, others, settings.maxTokensPerTurn),
+    PROTOCOL(persona.name, others, roster, settings.maxTokensPerTurn),
     `ARGOMENTO DEL DIBATTITO:\n${session.topic}`,
     session.memory ? `MEMORIA CONDIVISA (sintesi dei turni precedenti):\n${session.memory}` : '',
     recall,
