@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { chat, type LlmMessage } from '../llama/client'
 import { llamaPool } from '../llama/server'
 import { getSettings } from '../settings'
+import { activePersonas } from '../../shared/personas'
 import { mediaUrl } from '../paths'
 import { defaultModelId } from '../models/registry'
 import type { Attachment, DebateEvent, Mention, Persona, Session, Turn } from '../../shared/types'
@@ -112,7 +113,7 @@ export class DebateEngine extends EventEmitter {
   /** Imposta chi deve parlare al prossimo turno (select in chat). */
   private setNextSpeaker(personaId?: string): void {
     if (!this.session || !personaId) return
-    const personas = getSettings().personas
+    const personas = activePersonas(getSettings())
     const idx = personas.findIndex((p) => p.id === personaId)
     if (idx < 0) return
     const agentTurns = this.session.turns.filter((t) => t.agentId !== 'utente').length
@@ -130,7 +131,7 @@ export class DebateEngine extends EventEmitter {
     if (this.session && this.session.turns.length > 0) {
       if (this.session.state === 'running') await this.pause()
       const session = this.session
-      const personas = getSettings().personas
+      const personas = activePersonas(getSettings())
       const responder =
         startWith ??
         session.nextSpeakerId ??
@@ -228,7 +229,7 @@ export class DebateEngine extends EventEmitter {
   private distillInBackground(session: Session): void {
     void (async () => {
       try {
-        const persona = getSettings().personas[0]
+        const persona = activePersonas(getSettings())[0]
         const { baseUrl } = await llamaPool.ensure(this.modelFor(persona), this.deviceFor(persona))
         const added = await distillSession(baseUrl, session)
         if (added > 0) this.emitEvent({ type: 'log', message: `memoria: ${added} elementi appresi` })
@@ -254,7 +255,7 @@ export class DebateEngine extends EventEmitter {
       .join('\n\n')
     if (context) session.topic = `${topic}\n\nMateriale fornito dall'utente:\n${context}`
     this.session = session
-    const personasForStart = getSettings().personas
+    const personasForStart = activePersonas(getSettings())
     if (startWith) {
       const idx = personasForStart.findIndex((p) => p.id === startWith)
       if (idx >= 0) session.rotationOffset = idx
@@ -340,7 +341,7 @@ export class DebateEngine extends EventEmitter {
     try {
       while (this.session && this.session.state === 'running') {
         const settings = getSettings()
-        const personas = settings.personas
+        const personas = activePersonas(settings)
         const agentTurns = this.session.turns.filter((t) => t.agentId !== 'utente').length
         const turnIndex = agentTurns
         if (turnIndex >= settings.maxTurns) {
@@ -627,6 +628,16 @@ export class DebateEngine extends EventEmitter {
         }
         this.emitEvent({ type: 'session', session: this.session })
 
+        if (personas.length <= 1) {
+          // chat singola: nessun dibattito, un turno e si torna in attesa
+          this.session.nextSpeakerId = undefined
+          saveSession(this.session)
+          this.emitEvent({ type: 'session', session: this.session })
+          this.setState('paused')
+          this.distillInBackground(this.session)
+          break
+        }
+
         if (interrupted) {
           this.setState('paused')
           this.distillInBackground(this.session)
@@ -672,7 +683,7 @@ export class DebateEngine extends EventEmitter {
     signal: AbortSignal
   ): Promise<{ ok: boolean; answer?: string; by: string; reason: string }> {
     const settings = getSettings()
-    const personas = settings.personas
+    const personas = activePersonas(settings)
     const judge = personas.find((p) => p.id !== proposer.id) ?? proposer
     const transcript = (this.session?.turns ?? [])
       .slice(-12)

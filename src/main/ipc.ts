@@ -1,5 +1,6 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { getSettings, saveSettings } from './settings'
+import { activePersonas } from '../shared/personas'
 import { catalogStatus, installModel, removeModel, statusFor } from './llama/downloader'
 import { llamaPool } from './llama/server'
 import { engine } from './debate/engine'
@@ -98,7 +99,7 @@ export function registerIpc(): void {
     const { usable } = await detectGpus()
     const device = bestDevice(usable)
     const distinct = new Set(
-      s.personas.map((p) => s.models.byPersona[p.id] ?? s.models.active)
+      activePersonas(s).map((p) => s.models.byPersona[p.id] ?? s.models.active)
     ).size
     const verdict = await inspectRepo(repo, {
       device,

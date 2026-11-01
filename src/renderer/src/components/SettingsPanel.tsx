@@ -550,7 +550,19 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
 
         {activeTab === 'personas' && (
           <div className="form personas">
-            {draft.personas.map((p, i) => (
+            <label>
+              {t('settings.personasCount')}
+              <select
+                value={draft.personaCount ?? 3}
+                onChange={(e) => setDraft({ ...draft, personaCount: Number(e.target.value) })}
+              >
+                <option value={1}>{t('settings.personasOne')}</option>
+                <option value={2}>{t('settings.personasTwo')}</option>
+                <option value={3}>{t('settings.personasThree')}</option>
+              </select>
+            </label>
+            <p className="note">{t('settings.personasCountNote')}</p>
+            {draft.personas.slice(0, draft.personaCount ?? 3).map((p, i) => (
               <fieldset key={p.id}>
                 <legend>
                   <input className="emoji" value={p.emoji} onChange={(e) => setPersona(i, { emoji: e.target.value })} />

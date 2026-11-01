@@ -3,6 +3,15 @@ import { recallBlock } from '../memory/integrate'
 import { mediaUrl } from '../paths'
 import type { Persona, Session, Settings, Turn } from '../../shared/types'
 
+const SOLO_PROTOCOL = (name: string, maxTokens: number): string => `
+MODALITÀ ASSISTENTE
+- Sei ${name} e stai conversando direttamente con l'utente: non c'è nessun dibattito e nessun altro agente.
+- Rispondi all'ultimo messaggio dell'utente in modo diretto e completo, nella sua lingua.
+- Usa i tool (web_search, fetch_page, image_search, find_media) quando servono fatti, fonti o contenuti multimediali, e cita gli URL letti. Non inventare nulla: se non puoi verificare, dillo.
+- Struttura la risposta (paragrafi brevi, elenchi, codice) e chiudi quando hai risposto: niente monologhi, niente conclusioni ripetute.
+${maxTokens > 0 ? `- Massimo ~${maxTokens} token.` : '- Sviluppa quanto serve, senza riempitivi.'}
+- Non usare @menzioni, [[PASSA A: ...]] né [[CONSENSO]]: non esistono altri interlocutori.`
+
 const PROTOCOL = (
   name: string,
   others: string[],
@@ -10,7 +19,7 @@ const PROTOCOL = (
   maxTokens: number
 ): string => `
 PROTOCOLLO DEL DIBATTITO
-- Sei ${name}. Fai parte di un gruppo di tre agenti che discute insieme: conosci e vedi gli interventi degli altri.
+- Sei ${name}. Fai parte di un gruppo di ${others.length + 1} agenti che discute insieme: conosci e vedi gli interventi degli altri.
 - IL GRUPPO:
 ${roster}
 - Quando un altro agente è decisivo per il tuo punto, chiamalo per nome con @Nome e spiega in una frase PERCHÉ lo chiami (es. "@Ricercatore verifica questo dato: la mia obiezione dipende da quel numero"). Chi viene chiamato prende la parola al turno successivo: decide tu il prossimo interlocutore.
@@ -40,10 +49,13 @@ export function systemPrompt(
     .join('\n')
   const lastTurns = session.turns.slice(-2).map((t) => t.text).join(' ')
   const recall = recallBlock(`${session.topic} ${lastTurns}`, session.id, 6, 1400)
+  const solo = personas.length <= 1
   return [
     persona.prompt,
-    PROTOCOL(persona.name, others, roster, settings.maxTokensPerTurn),
-    `ARGOMENTO DEL DIBATTITO:\n${session.topic}`,
+    solo
+      ? SOLO_PROTOCOL(persona.name, settings.maxTokensPerTurn)
+      : PROTOCOL(persona.name, others, roster, settings.maxTokensPerTurn),
+    solo ? `CONVERSAZIONE:\n${session.topic}` : `ARGOMENTO DEL DIBATTITO:\n${session.topic}`,
     session.memory ? `MEMORIA CONDIVISA (sintesi dei turni precedenti):\n${session.memory}` : '',
     recall,
     session.turns.length

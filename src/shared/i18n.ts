@@ -11,6 +11,17 @@ export const LOCALES: { id: Locale; label: string; flag: string }[] = [
 export type Dict = Record<string, string>
 
 const en: Dict = {
+  'settings.personasCount': 'Personalities in use',
+  'settings.personasOne': '1 — single assistant (no debate)',
+  'settings.personasTwo': '2 — two agents debating',
+  'settings.personasThree': '3 — three agents debating',
+  'settings.personasCountNote': 'With one personality it works like a normal ChatGPT/OpenWebUI chat; with two or three the agents debate with each other.',
+  'onboarding.personasTitle': 'How many personalities?',
+  'onboarding.personasLead': 'One for a normal chat, two or three for a debate between agents.',
+  'onboarding.personasOne': '1 · assistant',
+  'onboarding.personasTwo': '2 · debate',
+  'onboarding.personasThree': '3 · debate (default)',
+  'app.singleMode': 'single chat, no debate',
   'settings.testSearch': 'Test the search engine',
   'app.tagline': 'three personalities · {model} · one debate',
   'app.newChat': '+ new chat',
@@ -219,6 +230,17 @@ const en: Dict = {
 }
 
 const it: Dict = {
+  'settings.personasCount': 'Personalità in uso',
+  'settings.personasOne': '1 — assistente singolo (nessun dibattito)',
+  'settings.personasTwo': '2 — due agenti che discutono',
+  'settings.personasThree': '3 — tre agenti che discutono',
+  'settings.personasCountNote': 'Con una personalità funziona come una normale chat ChatGPT/OpenWebUI; con due o tre gli agenti discutono fra loro.',
+  'onboarding.personasTitle': 'Quante personalità?',
+  'onboarding.personasLead': 'Una per una chat normale, due o tre per un dibattito tra agenti.',
+  'onboarding.personasOne': '1 · assistente',
+  'onboarding.personasTwo': '2 · dibattito',
+  'onboarding.personasThree': '3 · dibattito (predefinito)',
+  'app.singleMode': 'chat singola, nessun dibattito',
   'settings.testSearch': 'Prova il motore di ricerca',
   'app.tagline': 'tre personalità · {model} · un dibattito',
   'app.newChat': '+ nuova chat',
@@ -424,6 +446,17 @@ const it: Dict = {
 }
 
 const de: Dict = {
+  'settings.personasCount': 'Persönlichkeiten',
+  'settings.personasOne': '1 — einzelner Assistent (keine Debatte)',
+  'settings.personasTwo': '2 — zwei Agenten debattieren',
+  'settings.personasThree': '3 — drei Agenten debattieren',
+  'settings.personasCountNote': 'Mit einer Persönlichkeit verhält es sich wie ein normaler ChatGPT/OpenWebUI-Chat; mit zwei oder drei debattieren die Agenten.',
+  'onboarding.personasTitle': 'Wie viele Persönlichkeiten?',
+  'onboarding.personasLead': 'Eine für einen normalen Chat, zwei oder drei für eine Debatte.',
+  'onboarding.personasOne': '1 · Assistent',
+  'onboarding.personasTwo': '2 · Debatte',
+  'onboarding.personasThree': '3 · Debatte (Standard)',
+  'app.singleMode': 'einzelner Chat, keine Debatte',
   'settings.testSearch': 'Suchmaschine testen',
   'app.tagline': 'drei Persönlichkeiten · {model} · eine Debatte',
   'app.newChat': '+ neuer Chat',
@@ -628,6 +661,17 @@ const de: Dict = {
 }
 
 const fr: Dict = {
+  'settings.personasCount': 'Personnalités utilisées',
+  'settings.personasOne': '1 — assistant unique (pas de débat)',
+  'settings.personasTwo': '2 — deux agents débattent',
+  'settings.personasThree': '3 — trois agents débattent',
+  'settings.personasCountNote': 'Avec une personnalité, c\'est un chat normal (ChatGPT/OpenWebUI) ; avec deux ou trois, les agents débattent.',
+  'onboarding.personasTitle': 'Combien de personnalités ?',
+  'onboarding.personasLead': 'Une pour un chat normal, deux ou trois pour un débat.',
+  'onboarding.personasOne': '1 · assistant',
+  'onboarding.personasTwo': '2 · débat',
+  'onboarding.personasThree': '3 · débat (par défaut)',
+  'app.singleMode': 'chat unique, sans débat',
   'settings.testSearch': 'Tester le moteur de recherche',
   'app.tagline': 'trois personnalités · {model} · un débat',
   'app.newChat': '+ nouveau chat',
@@ -832,6 +876,17 @@ const fr: Dict = {
 }
 
 const es: Dict = {
+  'settings.personasCount': 'Personalidades en uso',
+  'settings.personasOne': '1 — asistente único (sin debate)',
+  'settings.personasTwo': '2 — dos agentes debaten',
+  'settings.personasThree': '3 — tres agentes debaten',
+  'settings.personasCountNote': 'Con una personalidad funciona como un chat normal (ChatGPT/OpenWebUI); con dos o tres los agentes debaten.',
+  'onboarding.personasTitle': '¿Cuántas personalidades?',
+  'onboarding.personasLead': 'Una para un chat normal, dos o tres para un debate.',
+  'onboarding.personasOne': '1 · asistente',
+  'onboarding.personasTwo': '2 · debate',
+  'onboarding.personasThree': '3 · debate (por defecto)',
+  'app.singleMode': 'chat único, sin debate',
   'settings.testSearch': 'Probar el motor de búsqueda',
   'app.tagline': 'tres personalidades · {model} · un debate',
   'app.newChat': '+ nuevo chat',

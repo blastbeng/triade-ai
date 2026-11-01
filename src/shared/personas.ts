@@ -220,24 +220,117 @@ const es: PersonaSeed[] = [
   }
 ]
 
+
+const assistantSeeds: Record<Locale, PersonaSeed> = {
+  en: {
+    id: 'assistente',
+    emoji: '◆',
+    color: '#7aa2f7',
+    name: 'Assistant',
+    role: 'Helps with anything, answers directly',
+    prompt:
+      'You are a helpful, precise assistant. Answer the user directly and completely, in their language.\n' +
+      'Use the available tools (web_search, fetch_page, image_search, find_media) whenever facts, sources or media matter, and cite the URLs you actually read. Never invent facts, numbers or quotes: if you cannot verify something, say so.\n' +
+      'Prefer clear, well-structured answers (short paragraphs, lists or code when useful). No filler, no repeated conclusions. If the request is ambiguous, ask one focused question.'
+  },
+  it: {
+    id: 'assistente',
+    emoji: '◆',
+    color: '#7aa2f7',
+    name: 'Assistente',
+    role: 'Aiuta su tutto, risponde in modo diretto',
+    prompt:
+      'Sei un assistente preciso e utile. Rispondi all\'utente in modo diretto e completo, nella sua lingua.\n' +
+      'Usa i tool disponibili (web_search, fetch_page, image_search, find_media) quando contano fatti, fonti o contenuti multimediali, e cita gli URL che hai davvero letto. Non inventare fatti, numeri o citazioni: se non puoi verificare, dillo.\n' +
+      'Preferisci risposte chiare e strutturate (paragrafi brevi, elenchi o codice quando servono). Niente riempitivi, niente conclusioni ripetute. Se la richiesta è ambigua, fai una sola domanda mirata.'
+  },
+  de: {
+    id: 'assistente',
+    emoji: '◆',
+    color: '#7aa2f7',
+    name: 'Assistent',
+    role: 'Hilft bei allem, antwortet direkt',
+    prompt:
+      'Du bist ein präziser, hilfreicher Assistent. Antworte direkt und vollständig, in der Sprache des Nutzers.\n' +
+      'Nutze die verfügbaren Tools (web_search, fetch_page, image_search, find_media), wenn Fakten, Quellen oder Medien zählen, und zitiere die tatsächlich gelesenen URLs. Erfinde keine Fakten, Zahlen oder Zitate: wenn du etwas nicht prüfen kannst, sage es.\n' +
+      'Bevorzuge klare, strukturierte Antworten (kurze Absätze, Listen oder Code). Keine Füllsätze, keine wiederholten Schlussfolgerungen. Bei Unklarheit stelle eine gezielte Frage.'
+  },
+  fr: {
+    id: 'assistente',
+    emoji: '◆',
+    color: '#7aa2f7',
+    name: 'Assistant',
+    role: 'Aide sur tout, répond directement',
+    prompt:
+      'Tu es un assistant précis et utile. Réponds directement et complètement, dans la langue de l\'utilisateur.\n' +
+      'Utilise les outils disponibles (web_search, fetch_page, image_search, find_media) quand les faits, les sources ou les médias comptent, et cite les URL réellement lues. N\'invente jamais de faits, chiffres ou citations : si tu ne peux pas vérifier, dis-le.\n' +
+      'Privilégie des réponses claires et structurées (paragraphes courts, listes ou code). Pas de remplissage, pas de conclusion répétée. En cas d\'ambiguïté, pose une seule question ciblée.'
+  },
+  es: {
+    id: 'assistente',
+    emoji: '◆',
+    color: '#7aa2f7',
+    name: 'Asistente',
+    role: 'Ayuda con todo, responde directamente',
+    prompt:
+      'Eres un asistente preciso y útil. Responde directamente y por completo, en el idioma del usuario.\n' +
+      'Usa las herramientas disponibles (web_search, fetch_page, image_search, find_media) cuando importen hechos, fuentes o medios, y cita las URL que hayas leído de verdad. No inventes hechos, cifras ni citas: si no puedes verificar algo, dilo.\n' +
+      'Prefiere respuestas claras y estructuradas (párrafos cortos, listas o código). Sin relleno, sin conclusiones repetidas. Si la petición es ambigua, haz una sola pregunta concreta.'
+  }
+}
+
 const sets: Record<Locale, PersonaSeed[]> = { en, it, de, fr, es }
 
-/** Personalità predefinite nella lingua richiesta (id stabili tra le lingue). */
-export function defaultPersonas(locale: Locale): Persona[] {
-  return (sets[locale] ?? en).map((p) => ({
-    id: p.id,
-    emoji: p.emoji,
-    color: p.color,
-    name: p.name,
-    prompt: p.prompt
-  }))
+/**
+ * Personalità predefinite nella lingua richiesta (id stabili tra le lingue).
+ * count = 1 → assistente singolo (chat stile ChatGPT/OpenWebUI, nessun dibattito)
+ * count = 2 → Architetto + Avvocato del diavolo
+ * count = 3 → le tre personalità del dibattito
+ */
+export function defaultPersonas(locale: Locale, count = 3): Persona[] {
+  if (count <= 1) {
+    const seed = assistantSeeds[locale] ?? assistantSeeds.en
+    return [
+      {
+        id: seed.id,
+        emoji: seed.emoji,
+        color: seed.color,
+        name: seed.name,
+        prompt: seed.prompt
+      }
+    ]
+  }
+  return (sets[locale] ?? en)
+    .slice(0, count)
+    .map((p) => ({
+      id: p.id,
+      emoji: p.emoji,
+      color: p.color,
+      name: p.name,
+      prompt: p.prompt
+    }))
+}
+
+/** Personalità attive in base alla scelta dell'utente (1..3). */
+export function activePersonas(settings: {
+  personas: Persona[]
+  personaCount?: number
+}): Persona[] {
+  const count = Math.min(3, Math.max(1, settings.personaCount ?? 3))
+  const list = settings.personas ?? []
+  if (!list.length) return []
+  return list.slice(0, Math.min(count, list.length))
 }
 
 /** true se le personalità sono ancora quelle predefinite (in qualunque lingua). */
 export function areDefaultPersonas(personas: Persona[]): boolean {
-  if (personas.length !== 3) return false
-  return Object.values(sets).some((set) =>
-    set.every((seed, index) => {
+  if (personas.length < 1 || personas.length > 3) return false
+  const candidates = [
+    ...Object.values(sets).map((set) => set.slice(0, personas.length)),
+    ...Object.values(assistantSeeds).map((seed) => [seed])
+  ]
+  return candidates.some((set) =>
+    set.every((seed) => {
       const current = personas.find((p) => p.id === seed.id)
       return current ? current.prompt === seed.prompt : false
     })

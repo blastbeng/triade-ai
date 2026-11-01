@@ -80,6 +80,7 @@ export default function Composer({
         >
           +
         </button>
+        {personas.length > 1 && (
         <label className="responder" title={t('composer.attach')}>
           <span>{t('composer.responder')}</span>
           <select value={responder} onChange={(e) => setResponder(e.target.value)} disabled={running}>
@@ -91,6 +92,7 @@ export default function Composer({
             ))}
           </select>
         </label>
+        )}
         <textarea
           ref={areaRef}
           value={text}

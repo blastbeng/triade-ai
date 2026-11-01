@@ -173,7 +173,10 @@ export default function App(): JSX.Element {
     return () => window.clearInterval(id)
   }, [])
 
-  const personas = settings?.personas ?? []
+  const personas = (settings?.personas ?? []).slice(
+    0,
+    Math.min(3, Math.max(1, settings?.personaCount ?? 3))
+  )
 
   /** Turni visibili in una colonna: quelli dell'agente più i messaggi dell'utente rivolti a lui. */
   const turnsFor = (personaId: string): Turn[] => {
@@ -425,7 +428,7 @@ export default function App(): JSX.Element {
 
         {notice && <div className="notice">{notice}</div>}
 
-        <main className="columns">
+        <main className={`columns cols-${personas.length}`}>
           {personas.map((persona) => (
             <ChatColumn
               key={persona.id}
@@ -533,9 +536,10 @@ export default function App(): JSX.Element {
               setSettings(next)
               setCatalog(await window.triade.modelsCatalog())
             }}
-            onDone={async (installed, active) => {
+            onDone={async (installed, active, personaCount) => {
               const next = await window.triade.saveSettings({
                 onboardingDone: true,
+                personaCount,
                 models: { ...settings.models, installed, active }
               })
               setSettings(next)

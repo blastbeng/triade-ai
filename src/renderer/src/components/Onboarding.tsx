@@ -7,7 +7,7 @@ interface Props {
   catalog: CatalogEntry[]
   language: Locale
   onLanguage: (locale: Locale) => Promise<void> | void
-  onDone: (installed: string[], active: string) => Promise<void>
+  onDone: (installed: string[], active: string, personaCount: number) => Promise<void>
   onProgress: () => Promise<void>
 }
 
@@ -21,6 +21,7 @@ export default function Onboarding({
   const [step, setStep] = useState<'language' | 'models'>('language')
   const [locale, setLocale] = useState<Locale>(language)
   const [selected, setSelected] = useState<string[]>([])
+  const [personas, setPersonas] = useState(3)
   const [phase, setPhase] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
@@ -35,7 +36,11 @@ export default function Onboarding({
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
-        void onDone(catalog.filter((m) => m.installed).map((m) => m.id), catalog[0]?.id ?? '')
+        void onDone(
+          catalog.filter((m) => m.installed).map((m) => m.id),
+          catalog[0]?.id ?? '',
+          personas
+        )
       }
     }
     window.addEventListener('keydown', onKey)
@@ -57,7 +62,7 @@ export default function Onboarding({
         await window.triade.modelsInstall(id)
         await onProgress()
       }
-      await onDone(selected, selected[0])
+      await onDone(selected, selected[0], personas)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -107,6 +112,20 @@ export default function Onboarding({
           {t('onboarding.lead')} <code>dati/modelli/</code> {t('onboarding.lead2')}
         </p>
 
+        <h3 className="searchtitle">{t('onboarding.personasTitle')}</h3>
+        <p className="lead small">{t('onboarding.personasLead')}</p>
+        <div className="personacount">
+          {[1, 2, 3].map((n) => (
+            <button
+              key={n}
+              className={`langbutton ${personas === n ? 'selected' : ''}`}
+              onClick={() => setPersonas(n)}
+            >
+              {t(n === 1 ? 'onboarding.personasOne' : n === 2 ? 'onboarding.personasTwo' : 'onboarding.personasThree')}
+            </button>
+          ))}
+        </div>
+
         <ul className="catalog">
           {catalog.map((m) => (
             <li key={m.id} className={selected.includes(m.id) ? 'picked' : ''}>
@@ -152,7 +171,8 @@ export default function Onboarding({
             onClick={() =>
               void onDone(
                 catalog.filter((m) => m.installed).map((m) => m.id),
-                catalog[0]?.id ?? ''
+                catalog[0]?.id ?? '',
+                personas
               )
             }
           >

@@ -27,8 +27,12 @@ function merge(base: Settings, patch: Partial<Settings>): Settings {
     },
     onboardingDone: patch.onboardingDone ?? base.onboardingDone,
     gpus: { ...base.gpus, ...(patch.gpus ?? {}) },
+    personaCount:
+      typeof patch.personaCount === 'number'
+        ? Math.min(3, Math.max(1, patch.personaCount))
+        : base.personaCount,
     personas:
-      Array.isArray(patch.personas) && patch.personas.length === 3
+      Array.isArray(patch.personas) && patch.personas.length >= 1 && patch.personas.length <= 3
         ? patch.personas
         : base.personas
   }
@@ -70,6 +74,18 @@ export function saveSettings(patch: Partial<Settings>): Settings {
       previous.personas?.length === 3
         ? previous.personas
         : defaultPersonas(clean.ui?.language ?? 'en')
+  }
+
+  // cambio del numero di personalità: se sono ancora quelle predefinite si rigenerano
+  // con il set adatto (1 = assistente singolo, 2-3 = dibattito)
+  const count = Math.min(3, Math.max(1, clean.personaCount ?? 3))
+  clean.personaCount = count
+  const countChanged = count !== (previous.personaCount ?? 3)
+  if (countChanged && areDefaultPersonas(clean.personas)) {
+    clean.personas = defaultPersonas(clean.ui?.language ?? 'en', count)
+  } else if (clean.personas.length < count) {
+    const extra = defaultPersonas(clean.ui?.language ?? 'en', count)
+    clean.personas = [...clean.personas, ...extra.slice(clean.personas.length)]
   }
 
   // se l'utente cambia lingua e le personalità sono ancora quelle predefinite,

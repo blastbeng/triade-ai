@@ -56,6 +56,8 @@ export interface CustomModelEntry {
 }
 
 export interface Settings {
+  /** quante personalità contemporaneamente (1 = chat singola, 2-3 = dibattito) */
+  personaCount: number
   /** Dimensione contesto (token) condivisa dalle 3 chat. */
   contextSize: number
   /** Frazione del contesto oltre la quale scatta il prompt compression (0.75 = 75%). */
@@ -263,6 +265,7 @@ export const DEFAULT_SETTINGS: Settings = {
     googleCx: '',
     maxResults: 5
   },
+  personaCount: 3,
   personas: DEFAULT_PERSONAS,
   asr: { enabled: true, modelFile: 'ggml-base.bin', language: 'it' },
   models: { installed: [], active: 'ornith-1.5-9b', byPersona: {}, custom: [] },

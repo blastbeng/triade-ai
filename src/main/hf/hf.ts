@@ -212,10 +212,14 @@ export async function inspectRepo(
     const paramsB = nameParams || Math.max(0.5, file.size / 1e9 / 0.6)
     const overheadMiB = 450 + (file.size / 1024 ** 2) * 0.08
     const perToken = hints ? kvPerTokenFromHints(hints) : kvPerTokenMiB(paramsB)
-    const kvMiB = (perToken * ctxForEstimate) / Math.max(1, compat.concurrentModels ?? 1)
+    const kvMiB = perToken * ctxForEstimate
     const weightsMiB = file.size / 1024 ** 2 + (mmproj?.size ?? 0) / 1024 ** 2
     const totalMiB = Math.round(weightsMiB + kvMiB + overheadMiB)
-    const available = compat.device ? compat.device.vramMiB - RESERVE_MIB : 0
+    // con più modelli attivi la VRAM va divisa: ogni modello deve entrarci da solo
+    const share = Math.max(1, compat.concurrentModels ?? 1)
+    const available = compat.device
+      ? Math.round((compat.device.vramMiB - RESERVE_MIB) / share)
+      : 0
 
     // MoE: gli esperti possono restare in RAM, in GPU vanno attenzione + shared (~55%)
     const budgetFull = available - weightsMiB - overheadMiB
@@ -252,7 +256,10 @@ export async function inspectRepo(
         Math.max(2048, Math.floor((best.fits ? best.ctxFull : best.ctxPartial) / 1024) * 1024)
       )
   const smallestVariant = variants.length ? variants.reduce((a, b) => (a.bytes < b.bytes ? a : b)) : null
-  const available = compat.device ? Math.round(compat.device.vramMiB - RESERVE_MIB) : 0
+  const share = Math.max(1, compat.concurrentModels ?? 1)
+  const available = compat.device
+    ? Math.round((compat.device.vramMiB - RESERVE_MIB) / share)
+    : 0
   const ramNeededMiB = best ? Math.round(best.bytes / 1024 ** 2 + 800) : 0
 
   let reason = ''
