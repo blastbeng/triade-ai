@@ -289,7 +289,15 @@ export function registerIpc(): void {
       } else if (apiKey) {
         headers.Authorization = `Bearer ${apiKey}`
       }
-      const url = /\/v1$/.test(baseUrl) ? `${baseUrl}/models` : `${baseUrl}/v1/models`
+      // Ollama: API nativa /api/tags; gli altri: /v1/models
+      const url =
+        payload.backend === 'ollama'
+          ? /\/api$/.test(baseUrl)
+            ? `${baseUrl}/tags`
+            : `${baseUrl}/api/tags`
+          : /\/v1$/.test(baseUrl)
+            ? `${baseUrl}/models`
+            : `${baseUrl}/v1/models`
       const res = await fetch(url, { headers, signal: AbortSignal.timeout(20000) })
       const text = await res.text()
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
@@ -298,7 +306,7 @@ export function registerIpc(): void {
         models?: { name: string }[]
       }
       const ids = (data.data ?? []).map((m) => m.id)
-      const names = (data.models ?? []).map((m) => m.name)
+      const names = (data.models ?? []).map((m) => m.name ?? '')
       const all = [...ids, ...names].filter(Boolean)
       return [...new Set(all)].sort()
     }

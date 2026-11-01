@@ -28,7 +28,13 @@ export async function testBackend(payload: {
     } else if (payload.apiKey) {
       headers.Authorization = `Bearer ${payload.apiKey}`
     }
-    const res = await fetch(endpoint(base, '/models'), {
+    const modelsUrl =
+      payload.backend === 'ollama'
+        ? /\/api$/.test(base)
+          ? `${base}/tags`
+          : `${base}/api/tags`
+        : endpoint(base, '/models')
+    const res = await fetch(modelsUrl, {
       headers,
       signal: AbortSignal.timeout(15000)
     })

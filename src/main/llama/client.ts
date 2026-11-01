@@ -73,7 +73,8 @@ export function endpoint(baseUrl: string, path: string): string {
 
 /** Streaming di /v1/chat/completions (SSE) con accumulo dei tool call. */
 export async function chat(baseUrl: string, req: ChatRequest): Promise<ChatResult> {
-  if (req.backend === 'anthropic') return anthropicChat(req)
+  if (req.backend === 'anthropic') return anthropicChat(req, baseUrl)
+  if (req.backend === 'ollama') return ollamaChat(baseUrl, req)
 
   const body: Record<string, unknown> = {
     model: req.model ?? 'locale',
@@ -387,4 +388,89 @@ export async function anthropicChat(req: ChatRequest, baseUrlOverride?: string):
   if (buffer) handle(buffer)
 
   return { content, reasoning, toolCalls, interrupted: Boolean(req.signal?.aborted) && !content, stopReason }
+}
+
+/* ------------------------------------------------------------------ *
+ * Adattatore Ollama (API nativa: POST /api/chat, NDJSON)
+ * ------------------------------------------------------------------ */
+
+export async function ollamaChat(baseUrl: string, req: ChatRequest): Promise<ChatResult> {
+  const base = baseUrl.replace(/\/$/, '')
+  const url = /\/api$/.test(base) ? `${base}/chat` : `${base}/api/chat`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(req.apiKey ? { Authorization: `Bearer ${req.apiKey}` } : {})
+    },
+    body: JSON.stringify({
+      model: req.model,
+      messages: req.messages.map((m) => ({ role: m.role, content: m.content })),
+      stream: true,
+      options: {
+        temperature: req.temperature ?? 0.8,
+        num_predict: req.maxTokens && req.maxTokens > 0 ? req.maxTokens : 4096
+      }
+    }),
+    signal: req.signal
+  })
+  if (!res.ok || !res.body) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`ollama ${res.status}: ${text.slice(0, 300)}`)
+  }
+
+  let content = ''
+  let reasoning = ''
+  const toolCalls: RawToolCall[] = []
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  const handle = (line: string): void => {
+    const trimmed = line.trim()
+    if (!trimmed) return
+    let parsed: any
+    try {
+      parsed = JSON.parse(trimmed)
+    } catch {
+      return
+    }
+    if (parsed.error) throw new Error(`ollama: ${parsed.error}`)
+    const message = parsed.message ?? {}
+    if (typeof message.content === 'string' && message.content) {
+      content += message.content
+      req.onDelta?.(message.content)
+    }
+    if (typeof message.thinking === 'string' && message.thinking) {
+      reasoning += message.thinking
+      req.onReasoningDelta?.(message.thinking)
+    }
+    if (Array.isArray(message.tool_calls)) {
+      for (const call of message.tool_calls) {
+        toolCalls.push({
+          id: call.id ?? `ollama-${toolCalls.length}`,
+          type: 'function',
+          function: {
+            name: call.function?.name ?? '',
+            arguments:
+              typeof call.function?.arguments === 'string'
+                ? call.function.arguments
+                : JSON.stringify(call.function?.arguments ?? {})
+          }
+        })
+      }
+    }
+  }
+
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+    for (const line of lines) handle(line)
+  }
+  if (buffer) handle(buffer)
+
+  return { content, reasoning, toolCalls, interrupted: Boolean(req.signal?.aborted) && !content, stopReason: undefined }
 }
