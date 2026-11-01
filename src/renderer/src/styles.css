@@ -26,7 +26,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: 'Segoe UI', system-ui, -apple-system, 'Inter', sans-serif;
-  font-size: 14px;
+  font-size: 17.5px;
   overflow: hidden;
 }
 
@@ -53,20 +53,20 @@ body {
 }
 
 .logo {
-  font-size: 18px;
+  font-size: 22.5px;
   letter-spacing: 2px;
   color: var(--accent);
 }
 
 .brand h1 {
-  font-size: 15px;
+  font-size: 19px;
   margin: 0;
   letter-spacing: 0.5px;
 }
 
 .brand p {
   margin: 0;
-  font-size: 11px;
+  font-size: 14px;
   color: var(--muted);
 }
 
@@ -78,7 +78,7 @@ body {
 }
 
 .badge {
-  font-size: 11px;
+  font-size: 14px;
   padding: 3px 8px;
   border-radius: 999px;
   border: 1px solid var(--line);
@@ -104,7 +104,7 @@ body {
 
 button {
   font-family: inherit;
-  font-size: 12px;
+  font-size: 15px;
   border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--panel2);
@@ -146,7 +146,7 @@ button.ghost {
   border-radius: 8px;
   background: #1a2334;
   border: 1px solid #2b3a53;
-  font-size: 12px;
+  font-size: 15px;
   color: #cfe0f7;
 }
 
@@ -179,7 +179,7 @@ button.ghost {
 }
 
 .column h2 {
-  font-size: 13px;
+  font-size: 16px;
   margin: 0;
   font-weight: 600;
   flex: 1;
@@ -190,7 +190,7 @@ button.ghost {
 }
 
 .column .count {
-  font-size: 11px;
+  font-size: 14px;
   color: var(--muted);
 }
 
@@ -236,7 +236,7 @@ button.ghost {
 
 .empty {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 15px;
   text-align: center;
   margin-top: 30px;
 }
@@ -258,7 +258,7 @@ button.ghost {
 }
 
 .meta {
-  font-size: 10px;
+  font-size: 12.5px;
   color: var(--muted);
   margin-bottom: 5px;
 }
@@ -266,7 +266,7 @@ button.ghost {
 .text {
   white-space: pre-wrap;
   line-height: 1.5;
-  font-size: 13px;
+  font-size: 16px;
   word-break: break-word;
 }
 
@@ -288,7 +288,7 @@ button.ghost {
 
 .tools {
   margin-top: 8px;
-  font-size: 11px;
+  font-size: 14px;
   color: var(--muted);
 }
 
@@ -313,7 +313,7 @@ button.ghost {
 
 .consensus h3 {
   margin: 0 0 6px;
-  font-size: 12px;
+  font-size: 15px;
   color: var(--accent);
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -355,7 +355,7 @@ button.ghost {
   color: var(--text);
   padding: 10px 12px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1.45;
 }
 
@@ -367,7 +367,7 @@ button.ghost {
 .attach {
   height: 40px;
   width: 40px;
-  font-size: 18px;
+  font-size: 22.5px;
   line-height: 0;
 }
 
@@ -377,7 +377,7 @@ button.ghost {
 }
 
 .hint {
-  font-size: 10.5px;
+  font-size: 13px;
   color: var(--muted);
   margin-top: 6px;
 }
@@ -393,7 +393,7 @@ button.ghost {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 14px;
   padding: 3px 6px 3px 8px;
   border-radius: 999px;
   background: #16202e;
@@ -405,7 +405,7 @@ button.ghost {
   background: transparent;
   padding: 0 4px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 17.5px;
   line-height: 1;
 }
 
@@ -431,13 +431,13 @@ button.ghost {
   align-items: center;
   padding: 8px 10px;
   border-bottom: 1px solid var(--line);
-  font-size: 12px;
+  font-size: 15px;
 }
 
 .logpanel pre {
   margin: 0;
   padding: 10px;
-  font-size: 11px;
+  font-size: 14px;
   line-height: 1.45;
   overflow: auto;
   max-height: 22vh;
@@ -475,7 +475,7 @@ button.ghost {
 
 .modalbox h2 {
   margin: 0 0 12px;
-  font-size: 15px;
+  font-size: 19px;
 }
 
 .tabs {
@@ -507,7 +507,7 @@ button.ghost {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  font-size: 12px;
+  font-size: 15px;
   color: var(--muted);
 }
 
@@ -520,7 +520,7 @@ button.ghost {
   color: var(--text);
   padding: 8px 10px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 16px;
 }
 
 .form input:focus,
@@ -552,7 +552,7 @@ button.ghost {
 }
 
 .note {
-  font-size: 11.5px;
+  font-size: 14.5px;
   color: var(--muted);
   margin: 0;
 }
@@ -605,11 +605,11 @@ button.ghost {
   grid-template-columns: 130px 1fr auto;
   gap: 8px;
   align-items: center;
-  font-size: 12px;
+  font-size: 15px;
 }
 
 .kv code {
-  font-size: 11px;
+  font-size: 14px;
   color: #9fb3cc;
   word-break: break-all;
 }
@@ -641,7 +641,7 @@ button.ghost {
 }
 
 .history span {
-  font-size: 11px;
+  font-size: 14px;
   color: var(--muted);
 }
 
@@ -699,7 +699,7 @@ button.ghost {
 }
 
 .sessionrow .title {
-  font-size: 12px;
+  font-size: 15px;
   color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -707,7 +707,7 @@ button.ghost {
 }
 
 .sessionrow .sub {
-  font-size: 10px;
+  font-size: 12.5px;
   color: var(--muted);
 }
 
@@ -726,7 +726,7 @@ button.ghost {
 /* ---------- onboarding / catalogo ---------- */
 .onboarding .lead,
 .modalbox .lead {
-  font-size: 12.5px;
+  font-size: 15.5px;
   color: var(--muted);
   line-height: 1.55;
   margin-top: 0;
@@ -762,18 +762,18 @@ button.ghost {
 
 .catalog p {
   margin: 4px 0;
-  font-size: 12px;
+  font-size: 15px;
   color: #c3d1e3;
   line-height: 1.5;
 }
 
 .catalog .meta {
-  font-size: 10.5px;
+  font-size: 13px;
   color: var(--muted);
 }
 
 .tag {
-  font-size: 9.5px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.6px;
   padding: 1px 6px;
@@ -790,7 +790,7 @@ button.ghost {
 
 .error {
   color: var(--danger);
-  font-size: 12px;
+  font-size: 15px;
 }
 
 /* ---------- memoria ---------- */
@@ -802,7 +802,7 @@ button.ghost {
 }
 
 .memstats span {
-  font-size: 11px;
+  font-size: 14px;
   color: var(--muted);
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -828,7 +828,7 @@ button.ghost {
 }
 
 .memlist .kind {
-  font-size: 9.5px;
+  font-size: 12px;
   text-transform: uppercase;
   color: var(--accent);
   flex: 0 0 62px;
@@ -837,13 +837,13 @@ button.ghost {
 
 .memlist p {
   margin: 0 0 3px;
-  font-size: 12px;
+  font-size: 15px;
   line-height: 1.45;
   color: #cfdaea;
 }
 
 .memlist small {
-  font-size: 10px;
+  font-size: 12.5px;
   color: var(--muted);
 }
 
@@ -868,13 +868,13 @@ button.ghost {
 
 .modelcard p {
   margin: 6px 0;
-  font-size: 12px;
+  font-size: 15px;
   color: #c3d1e3;
   line-height: 1.5;
 }
 
 .modelcard .meta {
-  font-size: 10.5px;
+  font-size: 13px;
   color: var(--muted);
 }
 
@@ -889,14 +889,14 @@ button.ghost {
 .gputable {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 15px;
 }
 
 .gputable th {
   text-align: left;
   color: var(--muted);
   font-weight: 500;
-  font-size: 11px;
+  font-size: 14px;
   border-bottom: 1px solid var(--line);
   padding: 6px 8px;
 }
@@ -918,7 +918,7 @@ button.ghost {
 }
 
 .gpuassign label {
-  font-size: 11.5px;
+  font-size: 14.5px;
 }
 
 .gpuassign select:disabled {
@@ -935,7 +935,7 @@ button.ghost {
 
 .reasoning summary {
   cursor: pointer;
-  font-size: 10.5px;
+  font-size: 13px;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.6px;
@@ -956,7 +956,7 @@ button.ghost {
 
 .reasoning pre {
   margin: 6px 0 0;
-  font-size: 11.5px;
+  font-size: 14.5px;
   line-height: 1.5;
   color: #96a7bd;
   white-space: pre-wrap;
@@ -996,7 +996,7 @@ button.ghost {
   gap: 8px;
   align-items: baseline;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 14px;
   list-style: none;
 }
 
@@ -1017,7 +1017,7 @@ button.ghost {
 
 .toolcard pre {
   margin: 6px 0 0;
-  font-size: 11px;
+  font-size: 14px;
   color: #9fb0c6;
   white-space: pre-wrap;
   max-height: 220px;
@@ -1033,7 +1033,7 @@ button.ghost {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 10.5px;
+  font-size: 13px;
   color: var(--accent);
   background: #102027;
   border: 1px solid #1d5b60;
@@ -1055,7 +1055,7 @@ button.ghost {
 }
 
 .calledby {
-  font-size: 10px;
+  font-size: 12.5px;
   color: #c4b5fd;
   border: 1px dashed #4c3f7a;
   border-radius: 999px;
@@ -1084,7 +1084,7 @@ button.ghost {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 15px;
   color: var(--muted);
   padding: 4px 0;
 }
@@ -1100,7 +1100,7 @@ button.ghost {
 }
 
 .mention {
-  font-size: 11px;
+  font-size: 14px;
   color: #d8c7ff;
   background: #1a1630;
   border: 1px solid #3b3163;
@@ -1147,7 +1147,7 @@ button.ghost {
 
 /* ---------- markdown ---------- */
 .md {
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1.55;
   word-break: break-word;
 }
@@ -1165,7 +1165,7 @@ button.ghost {
 .md h3,
 .md h4 {
   margin: 10px 0 6px;
-  font-size: 13.5px;
+  font-size: 17px;
   color: #e9f1fb;
 }
 
@@ -1203,7 +1203,7 @@ button.ghost {
   border: none;
   padding: 0;
   color: #cbd5e1;
-  font-size: 11.5px;
+  font-size: 14.5px;
   line-height: 1.5;
 }
 
@@ -1233,7 +1233,7 @@ button.ghost {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10.5px;
+  font-size: 13px;
   color: var(--muted);
   background: var(--panel2);
   border: 1px solid var(--line);
@@ -1252,7 +1252,7 @@ button.ghost {
   border: none;
   color: var(--text);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 15px;
   max-width: 190px;
   outline: none;
   cursor: pointer;
@@ -1269,7 +1269,7 @@ button.ghost {
 }
 
 .nextup {
-  font-size: 10px;
+  font-size: 12.5px;
   color: #86efac;
   border: 1px solid #1c4a3a;
   background: #0f241c;
@@ -1317,7 +1317,7 @@ button.ghost {
   border: none;
   background: transparent;
   color: #5c6b80;
-  font-size: 15px;
+  font-size: 19px;
   line-height: 1;
   border-radius: 6px;
   opacity: 0;
@@ -1343,7 +1343,7 @@ button.ghost {
   border: none;
   background: transparent;
   color: #5c6b80;
-  font-size: 15px;
+  font-size: 19px;
   line-height: 1;
   padding: 0 4px;
   border-radius: 6px;
