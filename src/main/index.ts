@@ -42,6 +42,33 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
+  // Hook per catturare uno screenshot dell'interfaccia in headless: TRIADE_SHOT=1
+  if (process.env.TRIADE_SHOT) {
+    mainWindow.webContents.once('did-finish-load', () => {
+      void (async () => {
+        const js = (code: string): Promise<unknown> => mainWindow!.webContents.executeJavaScript(code)
+        try {
+          await js(
+            "window.triade.startDebate('Screenshot: come progettiamo un agente locale che usa la GPU AMD per la ricerca?', [])"
+          )
+          await new Promise((r) => setTimeout(r, Number(process.env.TRIADE_SHOT_DELAY ?? 30000)))
+          const image = await mainWindow!.webContents.capturePage()
+          const fs = await import('node:fs')
+          const path = await import('node:path')
+          const { dataDir } = await import('./paths')
+          const file = path.join(dataDir(), 'screenshot.png')
+          fs.writeFileSync(file, image.toPNG())
+          console.log(`[shot] salvato ${file} (${fs.statSync(file).size} byte)`)
+        } catch (err) {
+          console.error('[shot] fallito:', (err as Error).message)
+        }
+        await engine.pause()
+        await llamaPool.stopAll()
+        app.exit(0)
+      })()
+    })
+  }
+
   // Hook di verifica end-to-end (CI/headless): TRIADE_SMOKE=1 npx electron .
   if (process.env.TRIADE_SMOKE) {
     mainWindow.webContents.once('did-finish-load', () => {
