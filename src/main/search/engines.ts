@@ -74,6 +74,24 @@ export function parseSearxHtml(html: string, max: number): SearchHit[] {
   return hits
 }
 
+/** Bing incapsula i link in /ck/a?...&u=a1<base64>: recupera la destinazione reale. */
+export function decodeBingLink(href: string): string {
+  const clean = href.replace(/&amp;/g, '&')
+  try {
+    const url = new URL(clean)
+    const enc = url.searchParams.get('u')
+    if (enc && enc.startsWith('a1')) {
+      const b64 = enc.slice(2).replace(/-/g, '+').replace(/_/g, '/')
+      const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4)
+      const decoded = Buffer.from(padded, 'base64').toString('utf8')
+      if (/^https?:\/\//.test(decoded)) return decoded
+    }
+  } catch {
+    // link non incapsulato
+  }
+  return clean
+}
+
 /** Bing (HTML pubblico, nessuna chiave). */
 export async function bing(query: string, max: number): Promise<SearchHit[]> {
   const html = await get(
@@ -83,13 +101,17 @@ export async function bing(query: string, max: number): Promise<SearchHit[]> {
   const hits: SearchHit[] = []
   const blocks = html.split(/<li class="b_algo"/).slice(1)
   for (const block of blocks) {
-    const link = /<h2[^>]*>\s*<a[^>]+href="(https?:\/\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/i.exec(block)
+    const link = /<h2[^>]*>[\s\S]*?<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i.exec(block)
     if (!link) continue
-    if (/\/\/(r\.bing\.com|www\.bing\.com|go\.microsoft\.com)/i.test(link[1])) continue
+    const url = decodeBingLink(link[1])
+    if (/^https?:\/\/(r\.bing\.com|www\.bing\.com|go\.microsoft\.com|support\.microsoft\.com\/help)/i.test(url)) {
+      continue
+    }
+    if (!/^https?:\/\//.test(url)) continue
     const snippet = /<p[^>]*>([\s\S]*?)<\/p>/i.exec(block)
     hits.push({
       title: clean(link[2]).slice(0, 160),
-      url: link[1],
+      url,
       snippet: snippet ? clean(snippet[1]).slice(0, 400) : ''
     })
     if (hits.length >= max) break
