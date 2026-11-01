@@ -183,6 +183,10 @@ button.ghost {
   margin: 0;
   font-weight: 600;
   flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .column .dot {
@@ -1301,6 +1305,7 @@ button.ghost {
 .sessionrow .rowbtn {
   flex: 1;
   min-width: 0;
+  padding-right: 24px;
   text-align: left;
   display: flex;
   flex-direction: column;
@@ -1326,6 +1331,7 @@ button.ghost {
 
 .sessionrow .del {
   flex: 0 0 22px;
+  margin-left: -24px;
   border: none;
   background: transparent;
   color: #5c6b80;
