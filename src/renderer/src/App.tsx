@@ -160,7 +160,9 @@ export default function App(): JSX.Element {
   useEffect(() => {
     const id = window.setInterval(() => {
       void window.triade.serverStatus().then(setServers)
-    }, 5000)
+      // la sidebar riflette sempre ciò che è su disco, indipendentemente dagli eventi
+      void window.triade.listSessions().then(setSessions)
+    }, 4000)
     return () => window.clearInterval(id)
   }, [])
 
