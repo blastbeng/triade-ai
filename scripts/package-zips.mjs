@@ -66,7 +66,7 @@ for (const target of targets) {
     continue
   }
   const artifact = target.artifact[0]
-  const version = /TriadeAI-([\d.]+)/.exec(artifact)?.[1] ?? 'unknown'
+  const version = /TriadeAI-(\d+(?:\.\d+)*)/.exec(artifact)?.[1] ?? 'unknown'
   const zipName = `TriadeAI-${version}-${target.suffix}.zip`
   const zipPath = path.join(dist, zipName)
   fs.rmSync(zipPath, { force: true })
