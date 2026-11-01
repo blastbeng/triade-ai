@@ -19,6 +19,22 @@ if (!fs.existsSync(dist)) {
   process.exit(0)
 }
 
+// nomi canonici garantiti: il file DENTRO l'archivio deve portare la versione,
+// anche se electron-builder ha prodotto un nome diverso (es. TriadeAI.exe)
+const pkgVersion = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8')).version
+const canonExe = `TriadeAI-${pkgVersion}-portable.exe`
+const canonImg = `TriadeAI-${pkgVersion}.AppImage`
+for (const f of fs.readdirSync(dist)) {
+  if (f === canonExe || f === canonImg) continue
+  if (/\.exe$/i.test(f) && /^TriadeAI/i.test(f) && !/unpacked/i.test(f)) {
+    fs.renameSync(path.join(dist, f), path.join(dist, canonExe))
+    console.log(`[release] rinominato ${f} → ${canonExe}`)
+  } else if (/\.AppImage$/i.test(f) && /^TriadeAI/i.test(f)) {
+    fs.renameSync(path.join(dist, f), path.join(dist, canonImg))
+    console.log(`[release] rinominato ${f} → ${canonImg}`)
+  }
+}
+
 const files = fs.readdirSync(dist)
 const pick = (re) => files.filter((f) => re.test(f))[0] ?? ''
 
