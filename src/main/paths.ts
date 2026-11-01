@@ -1,8 +1,8 @@
 import { app } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
-import { createHash } from 'node:crypto'
 import { log } from './log'
+import { describeSync, planBinarySync, scanBinaries } from './bin-sync'
 
 /**
  * Cartella "portabile": dove vive l'exe, non la cartella temporanea in cui
@@ -131,44 +131,6 @@ function copyTree(from: string, to: string): void {
   walk(from, to)
 }
 
-/**
- * Tutto ciò che serve deve stare in `dati/bin`: i binari inclusi nel pacchetto
- * vengono copiati lì al primo avvio (con le loro sottocartelle, es. `whisper/`),
- * così il runtime non dipende mai dalla cartella temporanea di scompattazione.
- */
-/**
- * Impronta dell'intero albero dei binari inclusi nel pacchetto (percorso, dimensione
- * e mtime di ogni file). Basta guardare l'eseguibile per perdere i cambi di sole
- * DLL — che sono proprio quelli che rompono l'avvio su Windows (0xC0000139).
- */
-function treeStamp(dir: string): string {
-  const rows: string[] = []
-  const walk = (base: string, rel: string): void => {
-    let entries: fs.Dirent[] = []
-    try {
-      entries = fs.readdirSync(path.join(base, rel), { withFileTypes: true })
-    } catch {
-      return
-    }
-    for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-      const next = rel ? path.join(rel, e.name) : e.name
-      if (e.isDirectory()) {
-        walk(base, next)
-        continue
-      }
-      if (e.name === '.stamp' || e.name.startsWith('.')) continue
-      try {
-        const st = fs.statSync(path.join(base, next))
-        rows.push(`${next}:${st.size}:${Math.round(st.mtimeMs)}`)
-      } catch {
-        /* file sparito */
-      }
-    }
-  }
-  walk(dir, '')
-  return rows.length ? createHash('sha1').update(rows.join('|')).digest('hex') : ''
-}
-
 /** Toglie da `target` ciò che non è più nel pacchetto (es. residui di release precedenti). */
 function pruneExtras(source: string, target: string): number {
   let removed = 0
@@ -208,27 +170,24 @@ function pruneExtras(source: string, target: string): number {
   return removed
 }
 
-export function ensureBinaries(): string {
+/**
+ * Tutto ciò che serve deve stare in `dati/bin`: i binari inclusi nel pacchetto
+ * vengono copiati lì al primo avvio (con le loro sottocartelle, es. `whisper/`),
+ * così il runtime non dipende mai dalla cartella temporanea di scompattazione.
+ */
+export function ensureBinaries(force = false): string {
   const target = path.join(dataDir(), 'bin')
   const exe = process.platform === 'win32' ? 'llama-server.exe' : 'llama-server'
   const source = packagedBinDir()
-  const stampFile = path.join(target, '.stamp')
-
-  // identità dei binari inclusi nel pacchetto: se cambia, si ricopia.
-  // `dati/` sopravvive agli aggiornamenti, quindi senza questo controllo una
-  // release con un llama.cpp nuovo continuerebbe a usare i binari vecchi.
-  const stamp = treeStamp(source)
-
-  const present = fs.existsSync(path.join(target, exe))
-  let current = ''
-  try {
-    current = fs.readFileSync(stampFile, 'utf8').trim()
-  } catch {
-    current = ''
-  }
-
-  if (present && (!stamp || current === stamp)) return target
   if (!fs.existsSync(source)) return target
+
+  // `dati/` sopravvive agli aggiornamenti: si confronta l'intero albero con il
+  // pacchetto (percorsi + dimensioni), non solo llama-server. Così una release
+  // con DLL nuove — o i residui di una build di whisper.cpp nella radice, che
+  // su Windows fanno fallire l'avvio con 0xC0000139 — vengono riallineati.
+  const present = fs.existsSync(path.join(target, exe))
+  const plan = planBinarySync(scanBinaries(source), present ? scanBinaries(target) : new Map())
+  if (present && !plan.needed && !force) return target
 
   try {
     fs.mkdirSync(target, { recursive: true })
@@ -236,10 +195,10 @@ export function ensureBinaries(): string {
     // si pota solo se la sorgente è completa: mai svuotare dati/bin per una
     // cartella di pacchetto parziale
     const removed = fs.existsSync(path.join(source, exe)) ? pruneExtras(source, target) : 0
-    if (stamp) fs.writeFileSync(stampFile, stamp, 'utf8')
     log.info(
-      `[paths] binari ${present ? 'aggiornati' : 'copiati'} in ${target}` +
-        (removed ? ` (rimossi ${removed} file obsoleti)` : '')
+      `[paths] binari ${present ? 'riallineati' : 'copiati'} in ${target} ` +
+        `(${describeSync(plan) || 'prima copia'}` +
+        `${removed ? ` · rimossi ${removed} obsoleti` : ''})`
     )
   } catch (err) {
     log.error(`[paths] copia binari fallita: ${(err as Error).message}`)

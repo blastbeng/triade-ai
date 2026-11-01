@@ -7,7 +7,7 @@ import fs from 'node:fs'
 import { app } from 'electron'
 import { execFile } from 'node:child_process'
 import { rotateLog } from '../housekeep'
-import { cacheDir, dataDir, findBinary, modelsDir, runDir } from '../paths'
+import { cacheDir, dataDir, ensureBinaries, findBinary, modelsDir, runDir } from '../paths'
 import { getSettings } from '../settings'
 import { catalogModel, defaultModelId } from '../models/registry'
 import { bestDevice, detectGpus, llamaBinaryFor, type Backend, type GpuDevice } from '../gpu/devices'
@@ -16,6 +16,7 @@ import { planPool } from './pool-budget'
 import { readGgufHints } from './gguf'
 import type { ServerStatus } from '../../shared/types'
 import { validateGgufFile } from '../models/verify'
+import { foreignBinaries } from '../bin-sync'
 
 export interface ServerInfo {
   modelId: string
@@ -51,6 +52,10 @@ class LlamaInstance extends EventEmitter {
   private logLines: string[] = []
   private starting = false
   private deviceLabel = 'sconosciuto'
+  /** codice di uscita dell'ultimo tentativo (0xC0000139 = DLL sbagliata) */
+  private lastExitCode: number | null = null
+  /** true dopo il riallineamento di dati/bin: si riprova una sola volta */
+  private repaired = false
 
   /**
    * Argomento per `--device`: llama.cpp accetta l'identificatore del backend
@@ -288,6 +293,7 @@ class LlamaInstance extends EventEmitter {
           '--threads', String(plan.threads)
         ]
         this.logLines = []
+        this.lastExitCode = null
         this.push(
           `avvio (v${app.getVersion()}, tentativo ${attempt}, porta ${port}) -c ${plan.ctx} ` +
             (plan.autoFit ? '-ngl auto (fit di llama.cpp) ' : `-ngl ${plan.ngl} `) +
@@ -303,22 +309,38 @@ class LlamaInstance extends EventEmitter {
         child.stdout.on('data', onData)
         child.stderr.on('data', onData)
         child.on('exit', (code, signal) => {
+          this.lastExitCode = code
           this.push(`[server terminato, codice ${code}, segnale ${signal ?? 'nessuno'}]`)
           // 0xC0000139 = STATUS_ENTRYPOINT_NOT_FOUND: quasi sempre una DLL del backend
           // mancante o di versione diversa accanto all'exe. Elenchiamo cosa c'è davvero.
           if (code === 3221225785 || code === -1073741515) {
             try {
               const dir = path.dirname(exe)
-              const libs = fs
-                .readdirSync(dir)
-                .filter((f) => /\.(dll|exe)$/i.test(f))
-                .sort()
+              const names = fs.readdirSync(dir)
+              const foreign = foreignBinaries(names)
               this.push(
-                `[dll] entrypoint non trovato: in ${dir} ci sono ${libs.length} file (${libs.join(', ') || 'nessuno'})`
+                `[dll] entrypoint non trovato (0xC0000139) in ${dir}: ${names.length} file, ` +
+                  `${names.filter((f) => /\.dll$/i.test(f)).length} dll`
               )
-              this.push(
-                '[dll] servono accanto a llama-server.exe: llama.dll, ggml.dll, ggml-base.dll, ggml-cpu.dll, ggml-vulkan.dll'
-              )
+              if (foreign.length) {
+                // è il caso che rompe l'avvio: una build di whisper.cpp (o CUDA)
+                // ha sovrascritto ggml.dll/mtmd.dll di llama.cpp
+                this.push(`[dll] file di un'altra build nella radice: ${foreign.join(', ')}`)
+                this.push(
+                  '[dll] riavvia: dati/bin viene riallineato ai binari del pacchetto ' +
+                    '(se resta, elimina la cartella dati/bin e riavvia)'
+                )
+              } else {
+                // la build llama.cpp usa ggml-cpu-<arch>.dll, non un ggml-cpu.dll unico
+                const needed = ['llama.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-vulkan.dll', 'mtmd.dll']
+                const missing = needed.filter((n) => !names.includes(n))
+                if (!names.some((n) => /^ggml-cpu(-.*)?\.dll$/i.test(n))) missing.push('ggml-cpu-<arch>.dll')
+                this.push(
+                  missing.length
+                    ? `[dll] mancano: ${missing.join(', ')}`
+                    : '[dll] i file attesi ci sono tutti: la build di llama.cpp inclusa non è compatibile (aggiorna l app)'
+                )
+              }
             } catch {
               /* ignore */
             }
@@ -341,12 +363,29 @@ class LlamaInstance extends EventEmitter {
           }
         }
         const bindIssue = this.logLines.some((l) => BIND_FAILURE.test(l))
+        const dllBroken = this.lastExitCode === 3221225785 || this.lastExitCode === -1073741515
         lastError = new Error(
           bindIssue
             ? `porta ${port} occupata da un altro processo`
-            : `llama-server non ha risposto (app v${app.getVersion()}, binari in ${exe}): controlla il log`
+            : dllBroken
+              ? `le DLL accanto a llama-server non sono compatibili (0xC0000139) anche dopo il ` +
+                `riallineamento: elimina ${path.join(dataDir(), 'bin')} e riavvia l'app`
+              : `llama-server non ha risposto (app v${app.getVersion()}, binari in ${exe}): controlla il log`
         )
         await this.stop()
+        const dllMismatch = this.lastExitCode === 3221225785 || this.lastExitCode === -1073741515
+        // DLL mancante o di un'altra build: invece di arrendersi si riallinea
+        // `dati/bin` al pacchetto e si riprova una volta sola
+        if (dllMismatch && !this.repaired) {
+          this.repaired = true
+          this.push('[dll] riallineo dati/bin ai binari del pacchetto e riprovo')
+          try {
+            ensureBinaries(true)
+          } catch (err) {
+            this.push(`[dll] riallineamento fallito: ${(err as Error).message}`)
+          }
+          continue
+        }
         if (!bindIssue) break
         await new Promise((r) => setTimeout(r, 500))
       }

@@ -235,6 +235,14 @@ credentials are committed.
 - Architecture `qwen35`, 32 layers (8 full-attention), 262144 native context, vision through
   `qwen3vl_merger`.
 
+### Troubleshooting: `llama-server` doesn't start (0xC0000139)
+
+If the log says *entrypoint not found* (`0xC0000139`) or *llama-server non ha risposto*, a DLL of a
+different build (whisper.cpp, CUDA) ended up next to `llama-server.exe`. The app now compares the whole
+tree in `dati/bin` with the bundled one at every start, realigns it and removes foreign files, then
+retries the launch once. If it still fails, close the app, delete `dati/bin` and start again: the
+folder is recreated from the package.
+
 ## 8. Known limits
 
 - **Public SearXNG** instances usually answer with a captcha: use your own instance for reliable
