@@ -341,6 +341,19 @@ function createWindow(): void {
  */
 /** Controllo aggiornamenti all'avvio: dialogo bloccante, timeout breve, mai fatale. */
 // una promise rifiutata non deve produrre un warning rumoroso né far cadere l'app
+// Su Linux (X11/compositor) Chromium non riesce a leggere il vsync e spamma
+// "GetVSyncParametersIfAvailable() failed": è un avviso innocuo, lo si disattiva.
+// Con TRIADE_SOFTWARE_RENDER=1 si passa del tutto alla composizione software,
+// utile su driver problematici (nessun impatto sui modelli: girano in llama-server).
+if (process.platform === 'linux') {
+  if (process.env.TRIADE_SOFTWARE_RENDER === '1') {
+    app.disableHardwareAcceleration()
+  } else {
+    app.commandLine.appendSwitch('disable-gpu-vsync')
+    app.commandLine.appendSwitch('disable-frame-rate-limit')
+  }
+}
+
 process.on('unhandledRejection', (reason) => {
   console.error('[main] promise non gestita:', reason instanceof Error ? reason.message : reason)
 })
