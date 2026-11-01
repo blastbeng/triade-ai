@@ -19,27 +19,32 @@ if (!fs.existsSync(dist)) {
   process.exit(0)
 }
 
-// nomi canonici garantiti: il file DENTRO l'archivio deve portare la versione,
-// anche se electron-builder ha prodotto un nome diverso (es. TriadeAI.exe)
-const pkgVersion = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8')).version
-const canonExe = `TriadeAI-${pkgVersion}-portable.exe`
-const canonImg = `TriadeAI-${pkgVersion}.AppImage`
+// Nomi fissi DENTRO gli archivi: la versione sta nel nome dell'archivio, non
+// nel file eseguibile. Convenzione: TriadeAI.exe (Windows), TriadeAI.AppImage (Linux).
+// AppImage richiede l'estensione .AppImage per essere eseguibile: mantenuta.
+const FIXED_EXE = 'TriadeAI.exe'
+const FIXED_IMG = 'TriadeAI.AppImage'
 for (const f of fs.readdirSync(dist)) {
-  if (f === canonExe || f === canonImg) continue
+  if (f === FIXED_EXE || f === FIXED_IMG) continue
   if (/\.exe$/i.test(f) && /^TriadeAI/i.test(f) && !/unpacked/i.test(f)) {
-    fs.renameSync(path.join(dist, f), path.join(dist, canonExe))
-    console.log(`[release] rinominato ${f} → ${canonExe}`)
+    fs.renameSync(path.join(dist, f), path.join(dist, FIXED_EXE))
+    console.log(`[release] ${f} → ${FIXED_EXE}`)
   } else if (/\.AppImage$/i.test(f) && /^TriadeAI/i.test(f)) {
-    fs.renameSync(path.join(dist, f), path.join(dist, canonImg))
-    console.log(`[release] rinominato ${f} → ${canonImg}`)
+    fs.renameSync(path.join(dist, f), path.join(dist, FIXED_IMG))
+    console.log(`[release] ${f} → ${FIXED_IMG}`)
   }
+}
+try {
+  fs.chmodSync(path.join(dist, FIXED_IMG), 0o755)
+} catch {
+  /* su Windows non serve */
 }
 
 const files = fs.readdirSync(dist)
 const pick = (re) => files.filter((f) => re.test(f))[0] ?? ''
 
-const exe = pick(/TriadeAI-[\d.]+-portable\.exe$/i)
-const appimage = pick(/TriadeAI-[\d.]+\.AppImage$/i)
+const exe = pick(/^TriadeAI\.exe$/i)
+const appimage = pick(/^TriadeAI\.AppImage$/i)
 const version =
   /TriadeAI-(\d+(?:\.\d+)*)/.exec(exe || appimage)?.[1] ??
   JSON.parse(fs.readFileSync('package.json', 'utf8')).version
