@@ -119,6 +119,12 @@ function createWindow(): void {
               `[smoke] verdetto ${found[0].repo}: ok=${v.ok} vision=${v.vision} quant=${v.quant} ` +
                 `${v.totalMiB}/${v.availableMiB} MiB — ${v.reason}`
             )
+            const moe = (await js(
+              `window.triade.hfInspect('Qwen/Qwen3-VL-30B-A3B-Instruct-GGUF')`
+            )) as { ok: boolean; moe: boolean; mode: string; quant: string; contextSuggestion: number }
+            console.log(
+              `[smoke] MoE: ok=${moe.ok} moe=${moe.moe} modo=${moe.mode} quant=${moe.quant} ctx=${moe.contextSuggestion}`
+            )
           }
           const memory = (await js('window.triade.memoryStats()')) as { entries: number }
           console.log(`[smoke] memoria: ${memory.entries} elementi`)
