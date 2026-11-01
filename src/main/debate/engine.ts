@@ -227,7 +227,6 @@ export class DebateEngine extends EventEmitter {
     })
     session.turnIndex = session.turns.length
     saveSession(session)
-    saveSession(session)
     this.emitEvent({ type: 'session', session })
     this.setState('running')
     void this.loop()
