@@ -153,6 +153,11 @@ export default function App(): JSX.Element {
   }, [settings?.ui])
 
   useEffect(() => {
+    if (!session?.id) return
+    void window.triade.listSessions().then(setSessions)
+  }, [session?.id])
+
+  useEffect(() => {
     const id = window.setInterval(() => {
       void window.triade.serverStatus().then(setServers)
     }, 5000)
