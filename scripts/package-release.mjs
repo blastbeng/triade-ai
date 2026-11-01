@@ -43,8 +43,8 @@ try {
 const files = fs.readdirSync(dist)
 const pick = (re) => files.filter((f) => re.test(f))[0] ?? ''
 
-const exe = pick(/^TriadeAI\.exe$/i)
-const appimage = pick(/^TriadeAI\.AppImage$/i)
+const exe = files.find((f) => f.toLowerCase() === 'triadeai.exe') ?? ''
+const appimage = files.find((f) => f.toLowerCase() === 'triadeai.appimage') ?? ''
 const version =
   /TriadeAI-(\d+(?:\.\d+)*)/.exec(exe || appimage)?.[1] ??
   JSON.parse(fs.readFileSync('package.json', 'utf8')).version
