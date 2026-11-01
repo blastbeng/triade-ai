@@ -213,9 +213,19 @@ export class DebateEngine extends EventEmitter {
         turns: session.turns,
         rotationOffset: session.rotationOffset
       }).id
-    session.turns = session.turns.map((t) =>
-      t.agentId === 'utente' && !t.toPersonaId ? { ...t, toPersonaId: firstSpeaker } : t
-    )
+    // il primo messaggio dell'utente è a tutti gli effetti un turno della chat scelta
+    session.turns.push({
+      id: randomUUID(),
+      agentId: 'utente',
+      name: 'Utente',
+      toPersonaId: firstSpeaker,
+      text: topic,
+      ts: Date.now(),
+      tokensIn: 0,
+      tokensOut: 0,
+      tools: []
+    })
+    session.turnIndex = session.turns.length
     saveSession(session)
     saveSession(session)
     this.emitEvent({ type: 'session', session })
@@ -359,6 +369,7 @@ export class DebateEngine extends EventEmitter {
         let interrupted = false
 
         let toolRounds = 0
+        let attempt = 0
         let cut: 'loop' | 'budget' | 'handoff' | undefined
         // budget per turno: il contesto disponibile fino al 75% (soglia di compressione)
         // nessun tetto per turno: il limite reale è lo spazio di contesto disponibile
@@ -366,16 +377,18 @@ export class DebateEngine extends EventEmitter {
         const configured = settings.maxTokensPerTurn > 0 ? settings.maxTokensPerTurn : room
         const turnCap = Math.max(128, Math.min(configured, room))
         if (room < 256) cut = 'budget'
-        for (let attempt = 0; attempt < 3; attempt++) {
+        while (attempt < 3) {
           const budget = turnCap
           if (attempt > 0) setPhase('prefill', 'nuovo tentativo')
+          // i tool si usano solo al primo tentativo: i retry devono produrre la risposta
+          const allowTools = settings.toolsEnabled && attempt === 0 && toolRounds < MAX_TOOL_ROUNDS
           let result
           try {
             result = await chat(baseUrl, {
               messages,
               temperature: settings.temperature,
               maxTokens: budget,
-              tools: settings.toolsEnabled ? TOOL_SPECS : undefined,
+              tools: allowTools ? TOOL_SPECS : undefined,
               // dal secondo tentativo niente reasoning: serve solo la risposta finale
               noThinking: attempt > 0,
               signal: controller.signal,
@@ -434,7 +447,7 @@ export class DebateEngine extends EventEmitter {
             continue
           }
 
-          if (validCalls.length && toolRounds < MAX_TOOL_ROUNDS) {
+          if (allowTools && validCalls.length) {
             toolRounds++
             messages = [
               ...messages,
@@ -490,8 +503,8 @@ export class DebateEngine extends EventEmitter {
           }
 
           if (!result.content.trim()) {
-            // il modello ha consumato il budget nel ragionamento: chiedo solo la risposta
-            if (attempt < 2) {
+            attempt++
+            if (attempt < 3) {
               messages.push({
                 role: 'user',
                 content:
@@ -499,7 +512,6 @@ export class DebateEngine extends EventEmitter {
               })
               continue
             }
-            // nessuna risposta dopo i retry: meglio dichiararlo che mostrare il ragionamento
             text += '[il modello ha esaurito i token nel ragionamento senza produrre una risposta]'
             break
           }
