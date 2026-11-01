@@ -1,6 +1,6 @@
 {
   "name": "triade-ai",
-  "version": "0.6.6",
+  "version": "0.6.7",
   "description": "Tre personalita, un solo modello, un dibattito che arriva a una conclusione",
   "main": "./out/main/index.js",
   "author": "blast",
@@ -14,8 +14,8 @@
     "fetch:bin": "node scripts/fetch-binaries.mjs",
     "stage:win": "node scripts/stage-bin.mjs win",
     "stage:linux": "node scripts/stage-bin.mjs linux",
-    "dist:linux": "npm run build && npm run stage:linux && electron-builder --linux && npm run package:zips",
-    "dist:win": "npm run build && npm run stage:win && electron-builder --win && npm run package:zips",
+    "dist:linux": "npm run build && npm run stage:linux && electron-builder --linux && npm run package:release",
+    "dist:win": "npm run build && npm run stage:win && electron-builder --win && npm run package:release",
     "dist:linux:remote": "bash scripts/build-remote.sh linux",
     "dist:win:remote": "bash scripts/build-remote.sh win",
     "release:patch": "node scripts/bump.mjs patch",
@@ -23,9 +23,9 @@
     "release:major": "node scripts/bump.mjs major",
     "sign:win": "node scripts/sign-win.mjs",
     "checksums": "node scripts/checksums.mjs",
-    "package:zips": "node scripts/package-zips.mjs",
-    "release:artifacts": "npm run dist:linux && npm run dist:win && npm run sign:win && npm run checksums && npm run package:zips",
-    "make:icon": "bash scripts/make-icon.sh"
+    "release:artifacts": "npm run dist:linux && npm run dist:win && npm run sign:win && npm run package:release && npm run checksums",
+    "make:icon": "bash scripts/make-icon.sh",
+    "package:release": "node scripts/package-release.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
