@@ -39,8 +39,8 @@ function createWindow(): void {
   // nessun onboarding sotto il dialogo: la finestra appare solo a fine aggiornamento
   mainWindow.on('ready-to-show', () => {
     void (async () => {
-      await maybeUpdate()
-      mainWindow?.show()
+      const exiting = await maybeUpdate()
+      if (!exiting) liveWindow()?.show()
     })()
   })
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -340,14 +340,23 @@ function createWindow(): void {
  * immediata, invece di far girare un modello da 9B sulla CPU.
  */
 /** Controllo aggiornamenti all'avvio: dialogo bloccante, timeout breve, mai fatale. */
-async function maybeUpdate(): Promise<void> {
+// una promise rifiutata non deve produrre un warning rumoroso né far cadere l'app
+process.on('unhandledRejection', (reason) => {
+  console.error('[main] promise non gestita:', reason instanceof Error ? reason.message : reason)
+})
+
+const liveWindow = (): BrowserWindow | null =>
+  mainWindow && !mainWindow.isDestroyed() ? mainWindow : null
+
+/** true = aggiornamento applicato e app in chiusura (non mostrare nulla) */
+async function maybeUpdate(): Promise<boolean> {
   try {
     const { checkForUpdate, downloadUpdate, applyUpdate, updateTexts, skipVersion } =
       await import('./updater')
     const info = await checkForUpdate()
-    if (!info) return
+    if (!info) return false
     const t = updateTexts()
-    const choice = dialog.showMessageBoxSync(mainWindow!, {
+    const choice = dialog.showMessageBoxSync(liveWindow() ?? undefined!, {
       type: 'question',
       buttons: [t.now, t.later, t.skip],
       defaultId: 0,
@@ -359,27 +368,31 @@ async function maybeUpdate(): Promise<void> {
     })
     if (choice === 2) {
       skipVersion(info.version)
-      return
+      return false
     }
-    if (choice !== 0) return
+    if (choice !== 0) return false
 
-    mainWindow?.hide()
-    mainWindow?.setTitle(`TriadeAI — download aggiornamento…`)
+    liveWindow()?.hide()
+    liveWindow()?.setTitle(`TriadeAI — download aggiornamento…`)
     const nuovo = await downloadUpdate(info, (p) => {
-      mainWindow?.setProgressBar(Math.min(1, p))
-      mainWindow?.setTitle(`TriadeAI — aggiornamento ${Math.round(p * 100)}%`)
+      liveWindow()?.setProgressBar(Math.min(1, p))
+      liveWindow()?.setTitle(`TriadeAI — aggiornamento ${Math.round(p * 100)}%`)
     })
-    mainWindow?.setProgressBar(-1)
-    applyUpdate(nuovo)
+    liveWindow()?.setProgressBar(-1)
+    applyUpdate(nuovo, info.version)
+    // da qui l'app sta per chiudersi: nessun accesso alla finestra
+    return true
   } catch (err) {
-    mainWindow?.setProgressBar(-1)
-    dialog.showMessageBoxSync(mainWindow!, {
+    liveWindow()?.setProgressBar(-1)
+    if (!liveWindow()) return false
+    dialog.showMessageBoxSync(liveWindow()!, {
       type: 'error',
       title: 'Aggiornamento non riuscito',
       message: (err as Error).message,
       detail: 'Puoi scaricare l\'ultima versione dalla pagina Releases del progetto.',
       buttons: ['OK']
     })
+    return false
   }
 }
 
