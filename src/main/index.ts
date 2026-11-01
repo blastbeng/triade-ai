@@ -167,6 +167,12 @@ function createWindow(): void {
         }
         await engine.pause()
         await llamaPool.stopAll()
+  try {
+    const { stopEmbedServer } = await import('./memory/embed-client')
+    stopEmbedServer()
+  } catch {
+    /* ignore */
+  }
         app.exit(0)
       })()
     })
