@@ -1,5 +1,7 @@
 import { execFile, execFileSync } from 'node:child_process'
 import os from 'node:os'
+import fs from 'node:fs'
+import path from 'node:path'
 import { findBinary } from '../paths'
 import { parseDevices, parseVulkaninfoSummary, type Backend, type GpuDevice } from './parse'
 
@@ -15,7 +17,29 @@ export interface DetectedGpus {
 export function llamaBinaryFor(backend: Backend): string | null {
   // CUDA non è supportato: qualunque GPU passa da Vulkan
   if (backend === 'cuda') return null
-  return findBinary('llama-server')
+  const found = findBinary('llama-server')
+  if (found) return found
+  // layout alternativi (pacchetto Windows: resources/bin/win, bin/vulkan, …):
+  // senza binario la GPU risulterebbe "non trovata" pur essendoci
+  const exe = process.platform === 'win32' ? 'llama-server.exe' : 'llama-server'
+  const roots = [
+    process.resourcesPath ?? '',
+    path.join(process.resourcesPath ?? '', 'bin'),
+    path.join(process.cwd(), 'bin'),
+    path.join(path.dirname(process.execPath), 'bin')
+  ].filter(Boolean)
+  const subs = ['', 'win', 'vulkan', 'linux']
+  for (const root of roots) {
+    for (const sub of subs) {
+      const candidate = path.join(root, sub, exe)
+      try {
+        if (fs.existsSync(candidate)) return candidate
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  return null
 }
 
 function run(exe: string, args: string[], timeout = 20000): string {
@@ -123,11 +147,19 @@ export async function detectGpus(force = false): Promise<DetectedGpus> {
   }
 
   const classified = classify(found)
+  let diag = ''
+  if (!classified.length) {
+    const exe = llamaBinaryFor('vulkan')
+    diag = exe
+      ? `binario: ${exe} — risposta di --list-devices: ${(await runAsync(exe, ['--list-devices'])).slice(0, 300) || '(vuota)'}`
+      : 'binario llama-server non trovato accanto all\'app: i file in bin/ non sono stati inclusi nel pacchetto'
+    console.error(`[gpu] nessuna GPU: ${diag}`)
+  }
   const value: DetectedGpus = {
-    usable: classified.filter((d) => !d.integrated && d.backend === 'vulkan'),
+    usable: classified.filter((d) => !d.integrated && d.backend !== 'cuda'),
     excluded: classified.filter((d) => d.integrated),
     backends,
-    error: classified.length ? undefined : 'nessuna GPU rilevata: mancano i binari o il driver Vulkan/CUDA'
+    error: classified.length ? undefined : `nessuna GPU Vulkan rilevata (${diag})`
   }
   cache = { at: Date.now(), value }
   return value
