@@ -193,16 +193,24 @@ export function applyUpdate(newExe: string, version = ''): void {
     const target = process.execPath
     markPending(version, `${target}.old`)
     const helper = path.join(path.dirname(newExe), 'aggiorna.cmd')
+    // Su Windows rinominare un eseguibile IN USO è permesso, copiarlo no:
+    // per questo si usa move (rename atomico) con retry, non copy.
     const script = [
       '@echo off',
+      'setlocal',
       'ping 127.0.0.1 -n 4 >nul',
-      `copy /Y "${target}" "${target}.old" >nul`,
-      `copy /Y "${newExe}" "${target}" >nul`,
+      `move /Y "${target}" "${target}.old" >nul 2>&1`,
+      'for /L %%i in (1,1,15) do (',
+      `  move /Y "${newExe}" "${target}" >nul 2>&1`,
+      `  if exist "${target}" goto started`,
+      '  ping 127.0.0.1 -n 2 >nul',
+      ')',
+      ':started',
+      `if not exist "${target}" move /Y "${target}.old" "${target}" >nul 2>&1`,
       `start "" "${target}"`,
       'del /Q "%~f0"'
     ].join('\r\n')
     fs.writeFileSync(helper, `${script}\r\n`)
-    // il percorso può contenere spazi: va passato quotato a cmd.exe
     spawn('cmd.exe', ['/c', `"${helper}"`], { detached: true, stdio: 'ignore' }).unref()
     app.exit(0)
     return
