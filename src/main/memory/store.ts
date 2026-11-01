@@ -42,6 +42,7 @@ class VectorMemory {
   private loaded = false
   private embedderTag = 'hash-768'
   private reindexTimer: NodeJS.Timeout | null = null
+  private needsReindex = false
 
   private scheduleReindex(): void {
     if (this.reindexTimer) return
@@ -111,8 +112,20 @@ class VectorMemory {
       const meta = JSON.parse(fs.readFileSync(this.metaFile(), 'utf8')) as Meta
       const buf = fs.readFileSync(this.vecFile())
       const n = meta.entries.length
-      if (buf.byteLength < n * DIM * 4) return
-      const flat = new Float32Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + n * DIM * 4))
+      if (!n) return
+      // dimensione dei vettori salvati: se non coincide con quella attuale
+      // (cambio di motore di embedding) si ricarica solo il testo e si ri-indicizza
+      const dim = Math.floor(buf.byteLength / n / 4)
+      if (!Number.isFinite(dim) || dim < 8) return
+      if (dim !== DIM && dim !== activeDim) {
+        this.entries = meta.entries
+        this.hashes = new Set(meta.hashes)
+        this.vectors = meta.entries.map(() => new Float32Array(0))
+        this.needsReindex = true
+        return
+      }
+      if (buf.byteLength < n * dim * 4) return
+      const flat = new Float32Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + n * dim * 4))
       this.entries = meta.entries
       this.hashes = new Set(meta.hashes)
       this.vectors = []
