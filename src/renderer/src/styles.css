@@ -1765,3 +1765,19 @@ body[data-density='compact'] .reasoning pre {
   color: var(--accent);
   font-weight: 700;
 }
+
+/* barra di avanzamento dei download */
+.dlbar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  margin: 6px 0 2px;
+}
+
+.dlfill {
+  height: 100%;
+  background: var(--accent);
+  transition: width .25s ease;
+}

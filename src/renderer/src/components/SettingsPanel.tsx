@@ -800,7 +800,8 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                     {t('settings.status')}:{' '}
                     {m.status.modelReady ? t('settings.modelOk') : t('settings.modelMissing')} ·{' '}
                     {m.status.mmprojReady ? t('settings.mmprojOk') : t('settings.mmprojMissing')}
-                    {m.status.downloading && ` · ${m.status.phase} ${Math.round(m.status.progress * 100)}%`}
+                    {m.status?.downloading &&
+                      ` · ${m.status.phase} ${Math.round((m.status.progress ?? 0) * 100)}%`}
                   </p>
                 )}
                 <div className="modelactions">
@@ -839,6 +840,14 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                 </div>
                 {m.assignedTo.length > 0 && (
                   <p className="note">{t('settings.inUseBy', { names: m.assignedTo.join(', ') })}</p>
+                )}
+                {m.status?.downloading && (
+                  <div className="dlbar">
+                    <div
+                      className="dlfill"
+                      style={{ width: `${Math.round((m.status.progress ?? 0) * 100)}%` }}
+                    />
+                  </div>
                 )}
                 {reportOf(m.id) && !reportOf(m.id)!.ok && (
                   <p className="note warn">

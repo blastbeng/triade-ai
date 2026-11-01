@@ -78,6 +78,15 @@ export async function catalogStatus(): Promise<ModelStatus[]> {
   return out
 }
 
+/** Dimensione attesa del mmproj, per pesare l'avanzamento. */
+function mmprojSizeOf(m: CatalogModel): number {
+  const mmproj = m.files.mmproj
+  if (!mmproj) return 0
+  const file = path.join(modelsDir(), mmproj.name)
+  if (fs.existsSync(file)) return fs.statSync(file).size
+  return Math.round((m.bytes ?? 0) * 0.12) || 1
+}
+
 async function downloadWithResume(
   url: string,
   dest: string,
@@ -149,15 +158,35 @@ export async function installModel(id: string, onProgress?: ProgressCb): Promise
 
   try {
     const current = await statusFor(id)
+    // avanzamento pesato sui BYTE di tutti i file necessari (modello + mmproj)
+    const modelSize = current.expectedBytes && m.files.mmproj
+      ? Math.max(1, current.expectedBytes - mmprojSizeOf(m))
+      : Math.max(1, current.expectedBytes || m.bytes)
+    const mmprojSize = m.files.mmproj ? Math.max(1, mmprojSizeOf(m)) : 0
+    const totalBytes = modelSize + mmprojSize
+    let modelDone = current.modelReady ? modelSize : 0
+    let mmprojDone = current.mmprojReady ? mmprojSize : 0
+
+    const report = (phase: string): void => {
+      const done = modelDone + mmprojDone
+      emit(phase, Math.min(0.999, done / totalBytes))
+    }
+
     if (!current.modelReady) {
-      emit('modello', 0)
-      await downloadWithResume(m.files.model.url, current.modelPath, (p) => emit('modello', p * 0.9))
+      report('modello')
+      await downloadWithResume(m.files.model.url, current.modelPath, (p) => {
+        modelDone = p * modelSize
+        report('modello')
+      })
+      modelDone = modelSize
     }
     if (m.files.mmproj && !current.mmprojReady) {
-      emit('mmproj (vision)', 0.9)
-      await downloadWithResume(m.files.mmproj.url, current.mmprojPath, (p) =>
-        emit('mmproj (vision)', 0.9 + p * 0.1)
-      )
+      report('mmproj (vision)')
+      await downloadWithResume(m.files.mmproj.url, current.mmprojPath, (p) => {
+        mmprojDone = p * mmprojSize
+        report('mmproj (vision)')
+      })
+      mmprojDone = mmprojSize
     }
     state.phase = 'completato'
     state.progress = 1

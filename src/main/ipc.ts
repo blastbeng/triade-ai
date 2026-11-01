@@ -53,7 +53,14 @@ export function registerIpc(): void {
 
   ipcMain.handle('models:install', async (_e, id: string) => {
     try {
-      const st = await installModel(id, (status) => broadcast({ type: 'model', status }))
+      const st = await installModel(id, (status) => {
+        if (process.env.TRIADE_DEBUG_DOWNLOAD) {
+          console.log(
+            `[dl] ${status.id} ${status.phase} ${Math.round((status.progress ?? 0) * 100)}%`
+          )
+        }
+        broadcast({ type: 'model', status })
+      })
       const s = getSettings()
       if (!s.models.installed.includes(id)) {
         saveSettings({ models: { ...s.models, installed: [...s.models.installed, id], active: s.models.active || id } })

@@ -36,6 +36,24 @@ export default function Onboarding({
   const [phase, setPhase] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
+  const [pct, setPct] = useState(0)
+  const [phaseLabel, setPhaseLabel] = useState('')
+
+  useEffect(() => {
+    const off = window.triade.onEvent((event) => {
+      if (event.type !== 'model') return
+      const status = event.status as {
+        id?: string
+        progress?: number
+        phase?: string
+        downloading?: boolean
+      }
+      if (!status) return
+      setPct(Math.round((status.progress ?? 0) * 100))
+      setPhaseLabel(status.phase ?? '')
+    })
+    return off
+  }, [])
 
   const t = (key: string, params?: Record<string, string | number>): string =>
     translate(locale, key, params)
@@ -82,6 +100,7 @@ export default function Onboarding({
         const entry = catalog.find((m) => m.id === id)
         if (entry?.installed) continue
         setPhase(id)
+        setPct(0)
         await window.triade.modelsInstall(id)
         await onProgress()
       }
@@ -256,7 +275,17 @@ export default function Onboarding({
           onError={setError}
         />
 
-        {working && <p className="note">{t('onboarding.downloading', { model: phase, pct: 0 })}</p>}
+        {working && (
+          <>
+            <p className="note">
+              {t('onboarding.downloading', { model: phase, pct })}
+              {phaseLabel ? ` · ${phaseLabel}` : ''}
+            </p>
+            <div className="dlbar">
+              <div className="dlfill" style={{ width: `${pct}%` }} />
+            </div>
+          </>
+        )}
         {error && <p className="error">{error}</p>}
 
         <footer className="modalfooter">
