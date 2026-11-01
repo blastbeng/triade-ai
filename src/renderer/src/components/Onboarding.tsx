@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CatalogEntry } from '../env'
 
 interface Props {
@@ -15,6 +15,14 @@ export default function Onboarding({ catalog, onDone, onProgress }: Props): JSX.
   const [pct, setPct] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') void onDone(catalog.filter((m) => m.installed).map((m) => m.id), catalog[0]?.id ?? '')
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [catalog, onDone])
 
   const toggle = (id: string): void =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
