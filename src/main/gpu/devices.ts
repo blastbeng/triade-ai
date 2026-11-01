@@ -92,6 +92,15 @@ function classify(devices: GpuDevice[]): GpuDevice[] {
   })
 }
 
+/** GPU migliore a parità di scelta esplicita: Vulkan preferito, poi più VRAM libera. */
+export function bestDevice(list: GpuDevice[]): GpuDevice | null {
+  if (!list.length) return null
+  return [...list].sort((a, b) => {
+    const score = (d: GpuDevice): number => (d.backend === 'vulkan' ? 1e9 : 0) + d.freeMiB
+    return score(b) - score(a)
+  })[0]
+}
+
 let cache: { at: number; value: DetectedGpus } | null = null
 
 export async function detectGpus(force = false): Promise<DetectedGpus> {

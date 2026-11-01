@@ -7,7 +7,7 @@ import fs from 'node:fs'
 import { cacheDir, dataDir, findBinary, modelsDir, runDir } from '../paths'
 import { getSettings } from '../settings'
 import { catalogModel, defaultModelId } from '../models/registry'
-import { detectGpus, llamaBinaryFor, type Backend, type GpuDevice } from '../gpu/devices'
+import { bestDevice, detectGpus, llamaBinaryFor, type Backend, type GpuDevice } from '../gpu/devices'
 import { planLaunch } from './tuning'
 import type { ServerStatus } from '../../shared/types'
 
@@ -292,8 +292,8 @@ class LlamaPool extends EventEmitter {
       const found = usable.find((d) => d.key === deviceKey)
       if (found) return found
     }
-    if (usable.length === 1) return usable[0]
-    return null
+    // nessuna scelta: la GPU migliore disponibile, non "auto" alla cieca
+    return bestDevice(usable)
   }
 
   private async instance(modelId: string, deviceKey?: string): Promise<LlamaInstance> {

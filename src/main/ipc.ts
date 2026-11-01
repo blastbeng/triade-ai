@@ -6,7 +6,7 @@ import { engine } from './debate/engine'
 import { deleteSession, listSessions, loadSession } from './debate/store'
 import { ingest } from './media/attachments'
 import { memory } from './memory/store'
-import { detectGpus, hasCudaBuild } from './gpu/devices'
+import { bestDevice, detectGpus, hasCudaBuild } from './gpu/devices'
 import { CATALOG, catalogModel, defaultModelId } from './models/registry'
 import type { Attachment, DebateEvent, Settings } from '../shared/types'
 
@@ -103,7 +103,8 @@ export function registerIpc(): void {
       byPersona: s.personas.map((p) => ({
         id: p.id,
         name: p.name,
-        deviceKey: s.gpus.byPersona[p.id] ?? (detected.usable.length === 1 ? detected.usable[0].key : 'auto')
+        deviceKey:
+          s.gpus.byPersona[p.id] ?? bestDevice(detected.usable)?.key ?? 'auto'
       }))
     }
   })
