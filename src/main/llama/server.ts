@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
+import { rotateLog } from '../housekeep'
 import { cacheDir, dataDir, findBinary, modelsDir, runDir } from '../paths'
 import { getSettings } from '../settings'
 import { catalogModel, defaultModelId } from '../models/registry'
@@ -111,6 +112,7 @@ class LlamaInstance extends EventEmitter {
     const clean = line.replace(/\r/g, '')
     if (!clean.trim()) return
     try {
+      rotateLog(this.logFile())
       fs.appendFileSync(this.logFile(), `${new Date().toISOString()} [${this.modelId}] ${clean}\n`)
     } catch {
       /* ignore */

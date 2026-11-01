@@ -484,6 +484,11 @@ app.whenReady().then(async () => {
     /* il controllo non deve impedire l'avvio */
   }
 
+  void import('./housekeep').then(({ evictCache }) => {
+    const freed = evictCache()
+    if (freed > 0) console.log(`[cache] liberati ${(freed / 1024 ** 2).toFixed(1)} MiB`)
+  })
+
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
