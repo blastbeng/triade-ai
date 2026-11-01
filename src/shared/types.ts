@@ -120,8 +120,10 @@ export interface Turn {
   tokensOut: number
   tools: ToolRun[]
   interrupted?: boolean
-  /** perché la generazione si è fermata: ripetizione o limite di contesto */
-  cut?: 'loop' | 'budget'
+  /** perché la generazione si è fermata: ripetizione, limite di contesto o cessione di parola */
+  cut?: 'loop' | 'budget' | 'handoff'
+  /** personalità a cui questo turno ha ceduto la parola */
+  handoffTo?: string
 }
 
 export type SessionState = 'running' | 'paused' | 'stopped' | 'concluded' | 'error'
@@ -146,6 +148,8 @@ export interface Session {
   contextFrom?: number
   /** Sfasamento della rotazione: chi parla al prossimo turno (scelta dell'utente). */
   rotationOffset?: number
+  /** prossimo interlocutore richiesto da una menzione o da una cessione di parola */
+  nextSpeakerId?: string
   consensus?: Consensus
   lastError?: string
   /** Immagini da mostrare al prossimo turno (ricerca immagini / frame video). */

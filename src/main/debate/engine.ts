@@ -12,6 +12,8 @@ import { distillSession, rememberTurn, rememberUserNote } from '../memory/integr
 import { TOOL_SPECS, runTool } from './tools'
 
 const CONSENSUS = /\[\[\s*CONSENSO\s*(?::([\s\S]*?))?\s*\]\]/i
+/** cessione della parola: [[PASSA A: Nome]] */
+const HANDOFF = /\[\[\s*PASSA\s+A:\s*([^\]\n]{1,40})\]\]/i
 const MAX_TOOL_ROUNDS = 2
 
 function escapeRegExp(text: string): string {
@@ -94,6 +96,33 @@ export class DebateEngine extends EventEmitter {
    * Come in ChatGPT: se c'è una chat caricata si continua quella (messaggio utente
    * in coda), altrimenti se ne apre una nuova.
    */
+  /**
+   * Chi parla adesso: prima l'interlocutore richiesto (menzione o cessione di parola),
+   * altrimenti la rotazione, evitando di dare la parola a chi ha appena parlato.
+   */
+  private pickSpeaker(personas: Persona[]): Persona {
+    const agentTurns = (this.session?.turns ?? []).filter((t) => t.agentId !== 'utente').length
+    const recent = (this.session?.turns ?? [])
+      .filter((t) => t.agentId !== 'utente')
+      .slice(-1)
+      .map((t) => t.agentId)
+
+    const requested = this.session?.nextSpeakerId
+    if (requested) {
+      const found = personas.find((p) => p.id === requested)
+      this.session!.nextSpeakerId = undefined
+      if (found && !recent.includes(found.id)) return found
+      if (found) return found
+    }
+
+    const offset = this.session?.rotationOffset ?? 0
+    for (let step = 0; step < personas.length; step++) {
+      const candidate = personas[(agentTurns + offset + step) % personas.length]
+      if (!recent.includes(candidate.id)) return candidate
+    }
+    return personas[(agentTurns + offset) % personas.length]
+  }
+
   /** Imposta chi deve parlare al prossimo turno (select in chat). */
   private setNextSpeaker(personaId?: string): void {
     if (!this.session || !personaId) return
@@ -248,8 +277,7 @@ export class DebateEngine extends EventEmitter {
           this.distillInBackground(finished)
           break
         }
-        const offset = this.session.rotationOffset ?? 0
-        const persona = personas[(turnIndex + offset) % personas.length]
+        const persona = this.pickSpeaker(personas)
         const { baseUrl } = await llamaPool.ensure(this.modelFor(persona), this.deviceFor(persona))
         this.emitEvent({
           type: 'log',
@@ -315,13 +343,14 @@ export class DebateEngine extends EventEmitter {
 
         let text = ''
         let reasoning = ''
+        let handoffTo: string | undefined
         const tools: Turn['tools'] = []
         let images: string[] = this.session.pendingImages ?? []
         this.session.pendingImages = []
         let interrupted = false
 
         let toolRounds = 0
-        let cut: 'loop' | 'budget' | undefined
+        let cut: 'loop' | 'budget' | 'handoff' | undefined
         // budget per turno: il contesto disponibile fino al 75% (soglia di compressione)
         // nessun tetto per turno: il limite reale è lo spazio di contesto disponibile
         const room = Math.max(128, effectiveCtx - tokens - 384)
@@ -338,6 +367,8 @@ export class DebateEngine extends EventEmitter {
               temperature: settings.temperature,
               maxTokens: budget,
               tools: settings.toolsEnabled ? TOOL_SPECS : undefined,
+              // l'agente può cedere la parola a metà frase: la generazione si ferma lì
+              stops: ['[[PASSA A:'],
               // dal secondo tentativo niente reasoning: serve solo la risposta finale
               noThinking: attempt > 0,
               signal: controller.signal,
@@ -472,7 +503,27 @@ export class DebateEngine extends EventEmitter {
 
         this.emitEvent({ type: 'phase', agentId: persona.id, phase: 'idle' })
 
-        const clean = text.replace(CONSENSUS, '').trim()
+        const handoff = HANDOFF.exec(text)
+        if (handoff) {
+          const wanted = handoff[1].trim().toLowerCase()
+          const target =
+            personas.find((p) => p.id !== persona.id && p.name.toLowerCase().startsWith(wanted.slice(0, 6))) ??
+            personas.find((p) => p.id !== persona.id && wanted.includes(p.name.toLowerCase().slice(0, 5)))
+          if (target) {
+            handoffTo = target.id
+            this.session.nextSpeakerId = target.id
+            cut = 'handoff'
+            this.emitEvent({
+              type: 'log',
+              message: `${persona.name} passa la parola a ${target.name}`
+            })
+          }
+        }
+
+        const clean = text
+          .replace(CONSENSUS, '')
+          .replace(HANDOFF, '')
+          .trim()
         const marker = CONSENSUS.exec(text)
         const turn: Turn = {
           id: randomUUID(),
@@ -486,10 +537,16 @@ export class DebateEngine extends EventEmitter {
           tools,
           interrupted,
           cut,
+          handoffTo,
           mentions: extractMentions(clean, personas, persona.id)
         }
         this.session.turns.push(turn)
         this.session.turnIndex = this.session.turns.length
+        if (!handoffTo && turn.mentions?.length) {
+          // chi è stato chiamato per nome parla al turno successivo
+          const target = turn.mentions.find((m) => m.targetId !== persona.id)
+          if (target) this.session.nextSpeakerId = target.targetId
+        }
         saveSession(this.session)
         rememberTurn(this.session, turn)
         this.emitEvent({ type: 'turn', turn })

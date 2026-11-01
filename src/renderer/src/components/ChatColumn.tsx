@@ -14,6 +14,8 @@ const PHASE_LABEL: Record<Phase, string> = {
 
 interface Props {
   persona: Persona
+  /** tutte le personalità: serve per tradurre l'id in nome nelle menzioni/cessioni */
+  personas: Persona[]
   turns: Turn[]
   streaming: string | null
   streamReasoning: string | null
@@ -26,6 +28,7 @@ interface Props {
 
 export default function ChatColumn({
   persona,
+  personas,
   turns,
   streaming,
   streamReasoning,
@@ -116,6 +119,13 @@ export default function ChatColumn({
               )}
               {turn.cut === 'loop' && <span className="tok"> · fermato: ripetizione</span>}
               {turn.cut === 'budget' && <span className="tok"> · vicino al limite di contesto</span>}
+              {turn.cut === 'handoff' && (
+                <span className="tok">
+                  {' '}
+                  · ha passato la parola a{' '}
+                  {personas.find((p) => p.id === turn.handoffTo)?.name ?? 'un altro agente'}
+                </span>
+              )}
             </div>
 
             {ui?.markdown === false ? <pre className="plain">{turn.text}</pre> : <Markdown text={turn.text} />}

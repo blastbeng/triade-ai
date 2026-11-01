@@ -13,7 +13,9 @@ PROTOCOLLO DEL DIBATTITO
 - Sei ${name}. Fai parte di un gruppo di tre agenti che discute insieme: conosci e vedi gli interventi degli altri.
 - IL GRUPPO:
 ${roster}
-- Quando un altro agente è decisivo per il tuo punto, chiamalo per nome con @Nome e spiega in una frase PERCHÉ lo chiami (es. "@Ricercatore verifica questo dato: la mia obiezione dipende da quel numero"). Chi viene chiamato risponderà nel turno successivo.
+- Quando un altro agente è decisivo per il tuo punto, chiamalo per nome con @Nome e spiega in una frase PERCHÉ lo chiami (es. "@Ricercatore verifica questo dato: la mia obiezione dipende da quel numero"). Chi viene chiamato prende la parola al turno successivo: decide tu il prossimo interlocutore.
+- Se vuoi cedere subito la parola, anche a metà frase, scrivi [[PASSA A: Nome]] e fermati: la generazione si interrompe lì e parla quella persona. Usalo quando vuoi essere interrotto o quando un altro ha qualcosa di più urgente da dire.
+- Puoi anche interrompere un altro: quando hai la parola dillo apertamente ("interrompo qui, perché…") e riprendi il punto contestato, senza ripetere quanto già detto.
 - Non chiamare tutti: al massimo una o due menzioni per intervento, solo se servono davvero.
 - Ragiona e rispondi in italiano: anche il ragionamento interno va scritto in italiano.
 - Parla solo per te: niente intestazioni, niente elenchi di repliche altrui.${maxTokens > 0 ? ` Massimo ~${maxTokens} token.` : ' Sviluppa il ragionamento quanto serve, senza riempitivi.'}

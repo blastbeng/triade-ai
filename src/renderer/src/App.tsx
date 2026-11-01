@@ -390,6 +390,7 @@ export default function App(): JSX.Element {
             <ChatColumn
               key={persona.id}
               persona={persona}
+              personas={personas}
               turns={(session?.turns ?? []).filter((t) => t.agentId === persona.id)}
               streaming={stream?.agentId === persona.id ? stream.text : null}
               ui={settings?.ui}
