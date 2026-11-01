@@ -192,7 +192,7 @@ export function registerIpc(): void {
     const s = getSettings()
     return {
       ...detected,
-      cudaBuild: hasCudaBuild(),
+      vulkanOnly: hasCudaBuild(),
       // con una sola GPU utilizzabile la scelta per chat è disattivata
       selectable: detected.usable.length > 1,
       byPersona: s.personas.map((p) => ({

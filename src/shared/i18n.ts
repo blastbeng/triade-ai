@@ -11,6 +11,10 @@ export const LOCALES: { id: Locale; label: string; flag: string }[] = [
 export type Dict = Record<string, string>
 
 const en: Dict = {
+  'update.errorTitle': "Update failed",
+  'update.errorDetail': "You can download the latest version from the project Releases page.",
+  'update.rollbackTitle': "Update rolled back",
+  'update.rollbackMessage': "Version {version} could not start: the previous version has been restored.",
   'update.title': "Update available",
   'update.message': "TriadeAI {version} is available (you have an older version). Update now? The app will restart.",
   'update.now': "Update now",
@@ -265,6 +269,10 @@ const en: Dict = {
 }
 
 const it: Dict = {
+  'update.errorTitle': "Aggiornamento non riuscito",
+  'update.errorDetail': "Puoi scaricare l’ultima versione dalla pagina Releases del progetto.",
+  'update.rollbackTitle': "Aggiornamento annullato",
+  'update.rollbackMessage': "La versione {version} non è riuscita ad avviarsi: è stata ripristinata la versione precedente.",
   'update.title': "Aggiornamento disponibile",
   'update.message': "È disponibile TriadeAI {version} (la tua versione è più vecchia). Aggiornare ora? L'app si riavvierà.",
   'update.now': "Aggiorna ora",
@@ -516,6 +524,10 @@ const it: Dict = {
 }
 
 const de: Dict = {
+  'update.errorTitle': "Update fehlgeschlagen",
+  'update.errorDetail': "Die neueste Version finden Sie auf der Releases-Seite des Projekts.",
+  'update.rollbackTitle': "Update zurückgerollt",
+  'update.rollbackMessage': "Version {version} konnte nicht starten: die vorherige Version wurde wiederhergestellt.",
   'update.title': "Update verfügbar",
   'update.message': "TriadeAI {version} ist verfügbar. Jetzt aktualisieren? Die App startet neu.",
   'update.now': "Jetzt aktualisieren",
@@ -766,6 +778,10 @@ const de: Dict = {
 }
 
 const fr: Dict = {
+  'update.errorTitle': "Échec de la mise à jour",
+  'update.errorDetail': "Vous pouvez télécharger la dernière version depuis la page Releases du projet.",
+  'update.rollbackTitle': "Mise à jour annulée",
+  'update.rollbackMessage': "La version {version} n’a pas pu démarrer : la version précédente a été restaurée.",
   'update.title': "Mise à jour disponible",
   'update.message': "TriadeAI {version} est disponible. Mettre à jour maintenant ? L'application redémarrera.",
   'update.now': "Mettre à jour",
@@ -1016,6 +1032,10 @@ const fr: Dict = {
 }
 
 const es: Dict = {
+  'update.errorTitle': "Actualización fallida",
+  'update.errorDetail': "Puedes descargar la última versión desde la página Releases del proyecto.",
+  'update.rollbackTitle': "Actualización revertida",
+  'update.rollbackMessage': "La versión {version} no pudo iniciarse: se ha restaurado la versión anterior.",
   'update.title': "Actualización disponible",
   'update.message': "TriadeAI {version} está disponible. ¿Actualizar ahora? La app se reiniciará.",
   'update.now': "Actualizar ahora",

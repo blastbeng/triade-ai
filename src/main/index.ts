@@ -4,6 +4,8 @@ import { registerIpc } from './ipc'
 import { llamaPool } from './llama/server'
 import { detectGpus } from './gpu/devices'
 import { engine } from './debate/engine'
+import { translate } from '../shared/i18n'
+import { getSettings } from './settings'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -358,6 +360,9 @@ process.on('unhandledRejection', (reason) => {
   console.error('[main] promise non gestita:', reason instanceof Error ? reason.message : reason)
 })
 
+const t = (key: string, params?: Record<string, string | number>): string =>
+  translate(getSettings().ui?.language ?? 'en', key, params)
+
 const liveWindow = (): BrowserWindow | null =>
   mainWindow && !mainWindow.isDestroyed() ? mainWindow : null
 
@@ -400,9 +405,9 @@ async function maybeUpdate(): Promise<boolean> {
     if (!liveWindow()) return false
     dialog.showMessageBoxSync(liveWindow()!, {
       type: 'error',
-      title: 'Aggiornamento non riuscito',
+      title: t('update.errorTitle'),
       message: (err as Error).message,
-      detail: 'Puoi scaricare l\'ultima versione dalla pagina Releases del progetto.',
+      detail: t('update.errorDetail'),
       buttons: ['OK']
     })
     return false
@@ -471,8 +476,8 @@ app.whenReady().then(async () => {
     const rolledBack = recoverFailedUpdate()
     if (rolledBack) {
       dialog.showErrorBox(
-        'Aggiornamento annullato',
-        `La versione ${rolledBack} non è riuscita ad avviarsi: è stata ripristinata la versione precedente.`
+        t('update.rollbackTitle'),
+        t('update.rollbackMessage', { version: rolledBack })
       )
     }
   } catch {

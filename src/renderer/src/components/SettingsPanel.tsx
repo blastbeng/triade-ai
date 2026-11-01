@@ -28,7 +28,7 @@ interface GpuInfo {
   excluded: { key: string; label: string; backend: string; name: string; vramMiB: number; freeMiB: number }[]
   backends: string[]
   selectable: boolean
-  cudaBuild: boolean
+  vulkanOnly: boolean
   byPersona: { id: string; name: string; deviceKey: string }[]
   error?: string
 }
