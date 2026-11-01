@@ -48,9 +48,21 @@ function createWindow(): void {
       void (async () => {
         const js = (code: string): Promise<unknown> => mainWindow!.webContents.executeJavaScript(code)
         try {
-          await js(
-            `window.triade.startDebate('Screenshot: come progettiamo un agente locale che usa la GPU AMD per la ricerca?', [], ${JSON.stringify(process.env.TRIADE_SHOT_PERSONA ?? '')})`
-          )
+          if (process.env.TRIADE_SHOT_TAB) {
+            await js(
+              "(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === 'impostazioni'); if (b) b.click(); return true })()"
+            )
+            await new Promise((r) => setTimeout(r, 600))
+            await js(
+              `(() => { const t = [...document.querySelectorAll('button.tab')].find((x) => x.textContent.trim() === ${JSON.stringify(
+                process.env.TRIADE_SHOT_TAB
+              )}); if (t) t.click(); return true })()`
+            )
+          } else {
+            await js(
+              `window.triade.startDebate('Screenshot: come progettiamo un agente locale che usa la GPU AMD per la ricerca?', [], ${JSON.stringify(process.env.TRIADE_SHOT_PERSONA ?? '')})`
+            )
+          }
           await new Promise((r) => setTimeout(r, Number(process.env.TRIADE_SHOT_DELAY ?? 30000)))
           const image = await mainWindow!.webContents.capturePage()
           const fs = await import('node:fs')
