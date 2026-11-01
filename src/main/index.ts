@@ -16,7 +16,7 @@ function createWindow(): void {
     show: false,
     backgroundColor: '#0b0e14',
     autoHideMenuBar: true,
-    title: 'TriadeAI',
+    title: `TriadeAI v${app.getVersion()}`,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       sandbox: false,

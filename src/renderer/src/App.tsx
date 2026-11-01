@@ -52,6 +52,26 @@ export default function App(): JSX.Element {
   const [onboarding, setOnboarding] = useState(false)
   const [version, setVersion] = useState('')
 
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      try {
+        const v = await window.triade.version()
+        if (alive && v) setVersion(String(v))
+      } catch {
+        try {
+          const info = await window.triade.appInfo()
+          if (alive && info?.version) setVersion(String(info.version))
+        } catch {
+          /* senza versione il badge resta vuoto, l'app funziona lo stesso */
+        }
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
+
   const locale: Locale = settings?.ui?.language ?? 'en'
   const t = (key: string, params?: Record<string, string | number>): string =>
     translate(locale, key, params)

@@ -733,6 +733,11 @@ button.ghost {
   color: var(--muted);
   font-weight: 500;
   vertical-align: middle;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  white-space: nowrap;
 }
 
 .sessionrow {
