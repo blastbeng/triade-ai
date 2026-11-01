@@ -7,3 +7,6 @@ node_modules/
 /.build/
 .aider*
 .build.env
+
+# chiavi e certificati generati localmente
+build/selfsign/

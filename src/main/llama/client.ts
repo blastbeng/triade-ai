@@ -96,7 +96,10 @@ export async function chat(baseUrl: string, req: ChatRequest): Promise<ChatResul
     method: 'POST',
     headers,
     body: JSON.stringify(body),
+    // timeout: una richiesta appesa non deve bloccare un turno del dibattito
     signal: req.signal
+      ? AbortSignal.any([req.signal, AbortSignal.timeout(600000)])
+      : AbortSignal.timeout(600000)
   })
   if (!res.ok || !res.body) {
     const text = await res.text().catch(() => '')
@@ -310,6 +313,8 @@ export async function anthropicChat(req: ChatRequest, baseUrlOverride?: string):
     },
     body: JSON.stringify(body),
     signal: req.signal
+      ? AbortSignal.any([req.signal, AbortSignal.timeout(600000)])
+      : AbortSignal.timeout(600000)
   })
   if (!res.ok || !res.body) {
     const text = await res.text().catch(() => '')
@@ -413,6 +418,8 @@ export async function ollamaChat(baseUrl: string, req: ChatRequest): Promise<Cha
       }
     }),
     signal: req.signal
+      ? AbortSignal.any([req.signal, AbortSignal.timeout(600000)])
+      : AbortSignal.timeout(600000)
   })
   if (!res.ok || !res.body) {
     const text = await res.text().catch(() => '')

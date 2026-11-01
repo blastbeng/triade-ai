@@ -307,7 +307,18 @@ export function registerIpc(): void {
             : `${baseUrl}/v1/models`
       const res = await fetch(url, { headers, signal: AbortSignal.timeout(20000) })
       const text = await res.text()
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
+      if (!res.ok) {
+        // Anthropic non espone /v1/models: si propone l'elenco noto
+        if (payload.backend === 'anthropic') {
+          return [
+            'claude-sonnet-4-5',
+            'claude-opus-4-1',
+            'claude-3-7-sonnet-latest',
+            'claude-3-5-haiku-latest'
+          ]
+        }
+        throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
+      }
       const data = JSON.parse(text) as {
         data?: { id: string }[]
         models?: { name: string }[]

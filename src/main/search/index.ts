@@ -157,7 +157,41 @@ export async function webSearch(query: string, max?: number, images = false): Pr
 }
 
 /** Estrae il testo leggibile di una pagina, senza dipendenze pesanti. */
+/** Rifiuta URL che puntano a reti locali/private (SSRF). */
+export function assertPublicUrl(raw: string): URL {
+  const url = new URL(raw)
+  if (!/^https?:$/.test(url.protocol)) throw new Error('protocollo non supportato')
+  const host = url.hostname.toLowerCase()
+  if (
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host.endsWith('.local') ||
+    host === '::1' ||
+    host === '[::1]' ||
+    host.startsWith('fe80:') ||
+    host.startsWith('fc') ||
+    host.startsWith('fd')
+  ) {
+    throw new Error('indirizzo locale non consentito')
+  }
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host)
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])]
+    const privato =
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      a >= 224
+    if (privato) throw new Error('indirizzo di rete privata non consentito')
+  }
+  return url
+}
+
 export async function fetchPage(url: string, maxChars = 6000): Promise<string> {
+  assertPublicUrl(url)
   const res = await fetch(url, {
     headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml,text/plain' },
     redirect: 'follow',

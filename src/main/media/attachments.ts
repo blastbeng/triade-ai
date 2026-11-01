@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import os from 'node:os'
 import zlib from 'node:zlib'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
@@ -115,9 +116,36 @@ function extractPdfText(file: string): string {
 }
 
 /** Testo da DOCX/ODT: XML dentro lo zip, tag rimossi. */
+function readZipEntry(file: string, entry: string): string {
+  try {
+    return execFileSync('unzip', ['-p', file, entry], { maxBuffer: 64 * 1024 * 1024 }).toString('utf8')
+  } catch {
+    // Windows non ha unzip: si usa PowerShell (Expand-Archive) in una cartella temporanea
+    if (process.platform !== 'win32') return ''
+    const tmp = path.join(os.tmpdir(), `triade-zip-${Date.now()}`)
+    try {
+      execFileSync('powershell', [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `Expand-Archive -Force -LiteralPath '${file}' -DestinationPath '${tmp}'; Get-Content -Raw -LiteralPath (Join-Path '${tmp}' '${entry}')`
+      ], { maxBuffer: 64 * 1024 * 1024 }).toString('utf8')
+      return fs.readFileSync(path.join(tmp, entry), 'utf8')
+    } catch {
+      return ''
+    } finally {
+      try {
+        fs.rmSync(tmp, { recursive: true, force: true })
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+}
+
 function extractZipXmlText(file: string, entry: string): string {
   try {
-    const xml = execFileSync('unzip', ['-p', file, entry], { maxBuffer: 64 * 1024 * 1024 }).toString('utf8')
+    const xml = readZipEntry(file, entry)
     return xml
       .replace(/<\/(w:p|text:p)>/g, '\n')
       .replace(/<[^>]+>/g, ' ')
