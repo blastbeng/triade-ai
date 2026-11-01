@@ -94,7 +94,7 @@ function createWindow(): void {
           if (process.env.TRIADE_SMOKE === '2') {
             console.log('[smoke] avvio dibattito reale…')
             await js(
-              "window.triade.startDebate('Smoke test: in due frasi, quale modello locale e quale GPU conviene per un agente di ricerca?', [])"
+              `window.triade.startDebate('Smoke test: in due frasi, quale modello locale e quale GPU conviene per un agente di ricerca?', [], ${JSON.stringify(process.env.TRIADE_SMOKE_PERSONA ?? '')})`
             )
             const deadline = Date.now() + 9 * 60 * 1000
             let turns = 0
