@@ -210,10 +210,24 @@ export function applyUpdate(newExe: string, version = ''): void {
   const backup = `${current}.old`
   markPending(version, backup)
   try {
-    if (fs.existsSync(current)) fs.copyFileSync(current, backup)
-    fs.copyFileSync(newExe, current)
+    // copiare sopra un eseguibile in esecuzione dà ETXTBSY: si sposta il vecchio
+    // e si mette il nuovo al suo posto (rename atomico, stesso filesystem).
+    fs.rmSync(backup, { force: true })
+    if (fs.existsSync(current)) fs.renameSync(current, backup)
+    try {
+      fs.renameSync(newExe, current)
+    } catch {
+      fs.copyFileSync(newExe, current)
+      fs.rmSync(newExe, { force: true })
+    }
     fs.chmodSync(current, 0o755)
   } catch (err) {
+    // ripristino immediato se qualcosa è andato storto a metà
+    try {
+      if (!fs.existsSync(current) && fs.existsSync(backup)) fs.renameSync(backup, current)
+    } catch {
+      /* ignore */
+    }
     throw new Error(`sostituzione dell'eseguibile fallita: ${(err as Error).message}`)
   }
   app.relaunch({ execPath: current, args: [] })

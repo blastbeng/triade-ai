@@ -36,7 +36,13 @@ function createWindow(): void {
       console.log(`[smoke][renderer] ${message}`)
     )
   }
-  mainWindow.on('ready-to-show', () => mainWindow?.show())
+  // nessun onboarding sotto il dialogo: la finestra appare solo a fine aggiornamento
+  mainWindow.on('ready-to-show', () => {
+    void (async () => {
+      await maybeUpdate()
+      mainWindow?.show()
+    })()
+  })
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url)
     return { action: 'deny' }
@@ -357,6 +363,7 @@ async function maybeUpdate(): Promise<void> {
     }
     if (choice !== 0) return
 
+    mainWindow?.hide()
     mainWindow?.setTitle(`TriadeAI — download aggiornamento…`)
     const nuovo = await downloadUpdate(info, (p) => {
       mainWindow?.setProgressBar(Math.min(1, p))
@@ -447,10 +454,6 @@ app.whenReady().then(async () => {
   }
 
   createWindow()
-  // dopo che la finestra è pronta, controllo aggiornamenti (bloccante ma con timeout)
-  mainWindow?.once('ready-to-show', () => {
-    void maybeUpdate()
-  })
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
