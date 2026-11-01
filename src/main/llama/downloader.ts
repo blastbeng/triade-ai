@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { validateGgufFile } from '../models/verify'
 import path from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
@@ -58,8 +59,9 @@ export async function statusFor(id: string): Promise<ModelStatus> {
     name: m.name,
     modelPath,
     mmprojPath,
-    modelReady: complete(modelBytes, expectedModel),
-    mmprojReady: !m.files.mmproj || complete(mmprojBytes, expectedMmproj),
+    modelReady: complete(modelBytes, expectedModel) && validateGgufFile(modelPath).ok,
+    mmprojReady:
+      !m.files.mmproj || (complete(mmprojBytes, expectedMmproj) && validateGgufFile(mmprojPath).ok),
     modelBytes,
     mmprojBytes,
     expectedBytes: (expectedModel || m.bytes) + expectedMmproj,
@@ -107,6 +109,11 @@ async function downloadWithResume(
     throw new Error('download incompleto: rilancia, riprenderà da dove si era fermato')
   }
   fs.renameSync(part, dest)
+  const check = validateGgufFile(dest)
+  if (!check.ok) {
+    fs.rmSync(dest, { force: true })
+    throw new Error(`file scaricato corrotto (${check.reason}): riprova il download`)
+  }
   onPct(1)
 }
 

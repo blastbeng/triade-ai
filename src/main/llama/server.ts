@@ -12,6 +12,7 @@ import { planLaunch } from './tuning'
 import { planPool } from './pool-budget'
 import { readGgufHints } from './gguf'
 import type { ServerStatus } from '../../shared/types'
+import { validateGgufFile } from '../models/verify'
 
 export interface ServerInfo {
   modelId: string
@@ -176,6 +177,23 @@ class LlamaInstance extends EventEmitter {
       const model = catalogModel(this.modelId)
       const modelPath = path.join(modelsDir(), model.files.model.name)
       const mmprojPath = model.files.mmproj ? path.join(modelsDir(), model.files.mmproj.name) : ''
+      // file troncato/corrotto: meglio un messaggio chiaro che 40 righe di log GGUF
+      const modelCheck = validateGgufFile(modelPath)
+      if (!modelCheck.ok) {
+        throw new Error(
+          `modello corrotto (${modelCheck.reason}): ${modelPath}. ` +
+            'Riscaricalo da impostazioni → modelli e download.'
+        )
+      }
+      if (mmprojPath) {
+        const visionCheck = validateGgufFile(mmprojPath)
+        if (!visionCheck.ok) {
+          throw new Error(
+            `mmproj corrotto (${visionCheck.reason}): ${mmprojPath}. ` +
+              'Riscaricalo da impostazioni → modelli e download.'
+          )
+        }
+      }
       const plan = planLaunch({
         device: this.device,
         contextSize: this.ctxOverride ?? s.contextSize,
