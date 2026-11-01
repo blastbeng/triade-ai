@@ -199,22 +199,30 @@ export function applyUpdate(newExe: string, version = ''): void {
     const helper = path.join(path.dirname(newExe), 'aggiorna.cmd')
     // Su Windows rinominare un eseguibile IN USO è permesso, copiarlo no:
     // per questo si usa move (rename atomico) con retry, non copy.
+    const exeName = path.basename(target)
     const script = [
       '@echo off',
       'setlocal',
-      `set LOG=%~dp0aggiorna.log`,
-      `echo [%DATE% %TIME%] avvio sostituzione >> "%LOG%" 2>&1`,
+      'set LOG=%~dp0aggiorna.log',
+      'echo [%DATE% %TIME%] avvio sostituzione >> "%LOG%" 2>&1',
       'ping 127.0.0.1 -n 4 >nul',
-      `move /Y "${target}" "${target}.old" >> "%LOG%" 2>&1`,
+      'move /Y "${target}" "${target}.old" >> "%LOG%" 2>&1',
       'for /L %%i in (1,1,15) do (',
-      `  move /Y "${newExe}" "${target}" >> "%LOG%" 2>&1`,
-      `  if exist "${target}" goto started`,
+      '  move /Y "${newExe}" "${target}" >> "%LOG%" 2>&1',
+      '  if exist "${target}" goto started',
       '  ping 127.0.0.1 -n 2 >nul',
       ')',
       ':started',
-      `if not exist "${target}" move /Y "${target}.old" "${target}" >nul 2>&1`,
-      `echo [%DATE% %TIME%] avvio nuova versione >> "%LOG%" 2>&1`,
-      `start "" "${target}"`,
+      'if not exist "${target}" move /Y "${target}.old" "${target}" >> "%LOG%" 2>&1',
+      'start "" "${target}"',
+      'ping 127.0.0.1 -n 9 >nul',
+      'tasklist /FI "IMAGENAME eq ${exeName}" | find /I "${exeName}" >nul',
+      'if errorlevel 1 (',
+      '  echo rollback: nuova versione non viva >> "%LOG%" 2>&1',
+      '  move /Y "${target}" "${target}.failed" >> "%LOG%" 2>&1',
+      '  move /Y "${target}.old" "${target}" >> "%LOG%" 2>&1',
+      '  start "" "${target}"',
+      ')',
       'del /Q "%~f0"'
     ].join('\r\n')
     fs.writeFileSync(helper, `${script}\r\n`)
