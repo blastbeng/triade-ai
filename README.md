@@ -209,10 +209,15 @@ Every change bumps the version: `npm run release:patch|minor|major`
 
 ```bash
 npm run typecheck
+npm test                 # vitest: update logic, scheduling, i18n, personalities
 npm run build            # main + preload + renderer
 npm run stage:linux      # copy bin/ into the bundle (real .so files, no symlinks)
 npm run stage:win        # same for the Windows payload
 ```
+
+The Windows update supervisor (`src/main/update-script.ts`) is exercised for real by
+`tests/update-script.test.ts`: swap, rollback and `swap-failed` run the generated
+PowerShell on a `windows-latest` runner, and are skipped elsewhere.
 
 Test switches: `TRIADE_SMOKE=1|2|…` (headless self-checks), `TRIADE_SHOT=1` (screenshot),
 `TRIADE_SHOT_TEST=search`, `TRIADE_DEBUG_SEARCH=1` (search diagnostics),
@@ -227,10 +232,8 @@ credentials are committed.
 - Default: `Ornith-1.5-9B-uncensored.i1-Q4_K_M` (imatrix) + `mmproj-Q8_0` from the base repo.
 - Downloads are taken in **64 MB verified blocks**, the size must match the byte and the
   SHA-256 must match the official HuggingFace one; otherwise the file is deleted and retried.
-- Runtime quant choice: `Q8_0 → Q4_K_M → Q3_K_M → Q2_K` when VRAM is tight.
 - Architecture `qwen35`, 32 layers (8 full-attention), 262144 native context, vision through
   `qwen3vl_merger`.
-- Runtime quant choice: `Q8_0 → Q4_K_M → Q3_K_M → Q2_K` when VRAM is tight.
 
 ## 8. Known limits
 
@@ -247,7 +250,7 @@ credentials are committed.
 
 | Branch | What runs | Result |
 |---|---|---|
-| `main` | `ci` workflow: typecheck, build, package on Linux + Windows | artifacts only, **no release** |
+| `main` | `ci` workflow: typecheck, tests, build, package on Linux + Windows | artifacts only, **no release** |
 | `release` | `release` workflow: verifies `release == main`, builds, signs, packages | **GitHub Release** `v<version>` with the Windows `.zip`, the Linux `.tar.gz` and `SHA256SUMS.txt` |
 
 `promote` runs on every push to `main` and decides whether the change is a **big one**: it compares

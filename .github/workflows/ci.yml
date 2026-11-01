@@ -26,6 +26,7 @@ jobs:
           cache: npm
       - run: npm ci --legacy-peer-deps
       - run: npm run typecheck
+      - run: npm test
       - run: npm run build
 
   package:
@@ -52,6 +53,8 @@ jobs:
           path: bin
           key: bin-${{ matrix.target }}-${{ hashFiles('scripts/fetch-binaries.mjs') }}
       - run: npm ci --legacy-peer-deps
+      - name: test (su Windows esegue anche il supervisore PowerShell)
+        run: npm test
       - run: npm run fetch:bin -- ${{ matrix.target }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -44,6 +44,14 @@ function createWindow(): void {
   // nessun onboarding sotto il dialogo: la finestra appare solo a fine aggiornamento
   mainWindow.on('ready-to-show', () => {
     void (async () => {
+      // il controllo GPU avviene dopo il marker di avvio: se mostra un dialogo
+      // modale (o chiude l'app) non deve più essere scambiato per "la nuova
+      // versione non è partita"
+      if (!(await assertGpu())) {
+        shuttingDown = true
+        app.exit(1)
+        return
+      }
       const exiting = await maybeUpdate()
       if (!exiting) liveWindow()?.show()
     })()
@@ -480,10 +488,40 @@ async function assertGpu(): Promise<boolean> {
 }
 
 app.whenReady().then(async () => {
-  if (!(await assertGpu())) {
-    app.exit(1)
-    return
+  // 1. Prova di vita, PRIMA di tutto: il supervisore dell'aggiornamento su
+  //    Windows aspetta questo marker. Qualunque cosa venisse prima (controllo
+  //    GPU, dialoghi modali, copia dei binari) può durare minuti e far scattare
+  //    un rollback ingiustificato ("la versione X non è riuscita ad avviarsi").
+  try {
+    const { markBooted, recoverFailedUpdate, cleanupUpdateLeftovers } = await import('./updater')
+    markBooted()
+    cleanupUpdateLeftovers()
+
+    // 2. I binari in dati/bin si aggiornano SUBITO: la rilevazione GPU usa
+    //    llama-server, e con DLL di build diverse (0xC0000139) non vedrebbe
+    //    nessuna GPU pur essendoci.
+    try {
+      const { ensureBinaries } = await import('./paths')
+      ensureBinaries()
+    } catch (err) {
+      log.error(`[paths] binari non aggiornati: ${(err as Error).message}`)
+    }
+
+    // 3. Solo ora si può dire se l'aggiornamento precedente è stato annullato
+    const rolledBack = recoverFailedUpdate()
+    if (rolledBack) {
+      dialog.showErrorBox(
+        t(rolledBack.rolledBack ? 'update.rollbackTitle' : 'update.notAppliedTitle'),
+        t(rolledBack.rolledBack ? 'update.rollbackMessage' : 'update.notAppliedMessage', {
+          version: rolledBack.version
+        })
+      )
+    }
+  } catch {
+    /* il controllo non deve impedire l'avvio */
   }
+
+  registerIpc()
   await llamaPool.cleanupOrphans()
   void (async () => {
     try {
@@ -493,36 +531,11 @@ app.whenReady().then(async () => {
       log.error('[memoria] preparazione embedding fallita:', (err as Error).message)
     }
   })()
-  registerIpc()
-  try {
-    const { recoverFailedUpdate } = await import('./updater')
-    const { cleanupUpdateLeftovers, markBooted } = await import('./updater')
-    cleanupUpdateLeftovers()
-    const rolledBack = recoverFailedUpdate()
-    // certifica che questa versione è viva: è la prova che il watchdog Windows attende
-    markBooted()
-    if (rolledBack) {
-      dialog.showErrorBox(
-        t('update.rollbackTitle'),
-        t('update.rollbackMessage', { version: rolledBack })
-      )
-    }
-  } catch {
-    /* il controllo non deve impedire l'avvio */
-  }
 
   void import('./housekeep').then(({ evictCache }) => {
     const freed = evictCache()
     if (freed > 0) log.info(`[cache] liberati ${(freed / 1024 ** 2).toFixed(1)} MiB`)
   })
-
-  // tutti i binari vivono in dati/bin (copiati dal pacchetto al primo avvio)
-  try {
-    const { ensureBinaries } = await import('./paths')
-    ensureBinaries()
-  } catch {
-    /* la copia non deve impedire l'avvio */
-  }
 
   createWindow()
   app.on('activate', () => {

@@ -77,6 +77,8 @@ jobs:
           path: bin
           key: bin-${{ matrix.target }}-${{ hashFiles('scripts/fetch-binaries.mjs') }}
       - run: npm ci --legacy-peer-deps
+      - name: test
+        run: npm test
       - run: npm run fetch:bin -- ${{ matrix.target }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

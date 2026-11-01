@@ -17,6 +17,41 @@ if (!fs.existsSync(from)) {
   process.exit(1)
 }
 
+/**
+ * Controllo di integrità: la radice di bin/<target> deve contenere esattamente
+ * i file dell'archivio ufficiale di llama.cpp (più ffmpeg), con le stesse
+ * dimensioni. Un file di whisper.cpp o della build CUDA finito qui sovrascrive
+ * una DLL di llama.cpp con una di un altro build: su Windows è 0xC0000139
+ * ("impossibile trovare il punto di ingresso ... in mtmd.dll").
+ */
+function verify(from) {
+  const manifest = path.join(from, '.llama-files.json')
+  if (!fs.existsSync(manifest)) {
+    console.error(`[stage] manca ${manifest}: esegui "npm run fetch:bin" prima della build`)
+    process.exit(1)
+  }
+  const expected = JSON.parse(fs.readFileSync(manifest, 'utf8'))
+  const bad = []
+  for (const [name, size] of Object.entries(expected)) {
+    const file = path.join(from, name)
+    if (!fs.existsSync(file)) bad.push(`${name}: mancante`)
+    else if (fs.statSync(file).size !== size) bad.push(`${name}: dimensione diversa (${size} → ${fs.statSync(file).size})`)
+  }
+  for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
+    if (!entry.isFile() || entry.name.startsWith('.')) continue
+    if (entry.name in expected) continue
+    if (/^(ffmpeg|ffprobe)(\.exe)?$/i.test(entry.name)) continue
+    bad.push(`${entry.name}: file estraneo (non proviene dall'archivio llama.cpp)`)
+  }
+  if (bad.length) {
+    console.error('[stage] BINARI INCONSISTENTI:')
+    for (const b of bad) console.error('  - ' + b)
+    console.error('[stage] rilancia "npm run fetch:bin -- ' + target + ' --force": la radice deve essere solo llama.cpp')
+    process.exit(1)
+  }
+  console.log(`[stage] integrità ok: ${Object.keys(expected).length} file llama.cpp + ffmpeg`)
+}
+
 /** Copia i contenuti reali: nel pacchetto i symlink relativi diventerebbero link rotti. */
 function copyReal(src, dest) {
   const stat = fs.statSync(src) // segue i symlink
@@ -30,9 +65,13 @@ function copyReal(src, dest) {
   fs.chmodSync(dest, stat.mode & 0o777)
 }
 
+verify(from)
+
 fs.rmSync(stage, { recursive: true, force: true })
 fs.mkdirSync(stage, { recursive: true })
 copyReal(from, stage)
+// il manifest è solo per il controllo, non deve finire nel pacchetto
+fs.rmSync(path.join(stage, '.llama-files.json'), { force: true })
 
 let count = 0
 const walk = (dir) => {

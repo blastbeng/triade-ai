@@ -6,6 +6,13 @@ import { app, BrowserWindow } from 'electron'
 import { translate } from '../shared/i18n'
 import { getSettings, saveSettings } from './settings'
 import { dataDir, runDir } from './paths'
+import { log } from './log'
+import {
+  decideUpdateOutcome,
+  type PendingUpdate,
+  type UpdateOutcome
+} from './update-plan'
+import { powershellSupervisor } from './update-script'
 
 const REPO = 'blastbeng/triade-ai'
 const TIMEOUT_MS = 7000
@@ -110,7 +117,12 @@ function fileHash(file: string): string {
 
 /** Scarica, verifica e applica l'aggiornamento. Ritorna il percorso del nuovo eseguibile. */
 export async function downloadUpdate(info: UpdateInfo, onPct?: (p: number) => void): Promise<string> {
-  const target = process.env.APPIMAGE ?? process.execPath
+  const target = updateTarget()
+  if (transientCopy()) {
+    throw new Error(
+      'stai eseguendo una copia temporanea di TriadeAI: scarica il pacchetto aggiornato dalla pagina Releases'
+    )
+  }
   try {
     fs.accessSync(path.dirname(target), fs.constants.W_OK)
   } catch {
@@ -162,29 +174,90 @@ export async function downloadUpdate(info: UpdateInfo, onPct?: (p: number) => vo
 }
 
 /**
- * Applica l'aggiornamento e riavvia l'app.
- * Linux: sostituisce l'AppImage (tiene un .old come riserva) e rilancia.
- * Windows: uno script .cmd attende la chiusura del processo, copia il nuovo exe
- *          al posto del vecchio e lo riavvia.
+ * File eseguibile che va sostituito per aggiornare davvero l'app.
+ *
+ * Windows: il target "portable" di electron-builder è un launcher che scompatta
+ * l'app in %TEMP%\<unpackDirName> e lancia QUELLA copia. `process.execPath`
+ * punta quindi al file temporaneo: sostituirlo non aggiorna nulla (la prossima
+ * estrazione lo riscrive) e soprattutto la nuova app partirebbe senza
+ * PORTABLE_EXECUTABLE_DIR, cioè con una cartella dati diversa da `dati/` — così
+ * il marker di avvio non comparirebbe mai e il watchdog farebbe rollback.
+ * Il file da sostituire è quello che l'utente avvia: PORTABLE_EXECUTABLE_FILE.
  */
-const pendingFile = (): string => path.join(dataDir(), 'aggiornamenti', 'pending.json')
-
-/** Segna un aggiornamento in corso: se al riavvio la versione non è quella nuova, si torna indietro. */
-function markPending(version: string, backup: string, target = '', finalPath = ''): void {
-  fs.mkdirSync(path.dirname(pendingFile()), { recursive: true })
-  fs.writeFileSync(
-    pendingFile(),
-    JSON.stringify({ version, backup, target, finalPath, at: Date.now() }),
-    'utf8'
-  )
+export function updateTarget(): string {
+  if (process.platform === 'win32') {
+    const portable = process.env.PORTABLE_EXECUTABLE_FILE
+    if (portable) return portable
+    return process.execPath
+  }
+  return process.env.APPIMAGE ?? process.execPath
 }
 
-/** Percorso del marker scritto dall'app all'avvio: prova che la nuova versione è partita. */
+/** true se stiamo girando da una copia temporanea (portable non rilevato). */
+function transientCopy(): boolean {
+  if (process.platform !== 'win32') return false
+  if (process.env.PORTABLE_EXECUTABLE_FILE) return false
+  return /[\\/]Temp[\\/]/i.test(process.execPath)
+}
+
+const updateDir = (): string => path.join(dataDir(), 'aggiornamenti')
+const pendingFile = (): string => path.join(updateDir(), 'pending.json')
+const esitoFile = (): string => path.join(updateDir(), 'esito.json')
+
+/** Legge un JSON tollerando il BOM che PowerShell 5.1 aggiunge. */
+function readJson<T>(file: string): T | null {
+  try {
+    const raw = fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')
+    return JSON.parse(raw) as T
+  } catch {
+    return null
+  }
+}
+
+function writeJson(file: string, data: unknown): void {
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, JSON.stringify(data), 'utf8')
+}
+
+/** Segna un aggiornamento in corso: è la base per capire, al riavvio, com'è andata. */
+function markPending(version: string, target: string): void {
+  writeJson(pendingFile(), {
+    version,
+    target,
+    backup: `${target}.old`,
+    at: Date.now()
+  } satisfies PendingUpdate)
+}
+
+/** Toglie i file di stato dell'aggiornamento e la copia di riserva. */
+function clearUpdateState(backup?: string): void {
+  for (const file of [pendingFile(), esitoFile()]) {
+    try {
+      fs.rmSync(file, { force: true })
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!backup) return
+  try {
+    if (fs.existsSync(backup)) fs.rmSync(backup, { force: true })
+  } catch {
+    /* in uso: verrà rimosso al prossimo avvio */
+  }
+}
+
+/** Percorso del marker scritto dall'app all'avvio: prova che la versione è partita. */
 export function bootMarker(version: string): string {
   return path.join(runDir(), `boot-${version}.ok`)
 }
 
-/** Chiamata all'avvio: certifica che questa versione è viva. */
+/**
+ * Chiamata come PRIMO passo all'avvio: certifica che questa versione è viva.
+ *
+ * Deve restare la prima istruzione di `whenReady`: qualunque cosa venga prima
+ * (controllo GPU, dialoghi modali, copia dei binari, primo download) può durare
+ * minuti e far scattare un rollback che non ha motivo di esistere.
+ */
 export function markBooted(): void {
   try {
     fs.mkdirSync(runDir(), { recursive: true })
@@ -192,94 +265,112 @@ export function markBooted(): void {
   } catch {
     /* ignore */
   }
+  // se stiamo girando con la versione appena installata, l'aggiornamento è
+  // riuscito: lo stato dell'aggiornamento non serve più e la copia di riserva
+  // (il vecchio eseguibile) può essere eliminata
+  try {
+    const data = readJson<PendingUpdate>(pendingFile())
+    if (!data?.version || data.version !== app.getVersion()) return
+    clearUpdateState(data.backup)
+    log.info(`[update] avvio della versione ${data.version} confermato`)
+  } catch {
+    /* ignore */
+  }
 }
 
 /**
- * Chiamata all'avvio: se esiste un aggiornamento segnato e stiamo girando con la
- * versione vecchia, significa che il nuovo eseguibile non è partito → ripristino.
+ * Chiamata all'avvio: dice se l'app è stata riportata indietro dopo un
+ * aggiornamento fallito (e, in quel caso, quale versione non è partita).
+ *
+ * Decide solo su prove concrete, mai su tempi: il verdetto lo scrive il
+ * supervisore (`esito.json`) oppure lo dà la versione in esecuzione.
  */
-export function recoverFailedUpdate(): string | null {
-  const file = pendingFile()
-  if (!fs.existsSync(file)) return null
-  try {
-    const data = JSON.parse(fs.readFileSync(file, 'utf8')) as { version: string; backup: string }
-    if (app.getVersion() === data.version) {
-      fs.rmSync(file, { force: true })
-      return null
+export function recoverFailedUpdate(): { version: string; rolledBack: boolean } | null {
+  const pending = readJson<PendingUpdate>(pendingFile())
+  if (!pending) return null
+  const esito = readJson<UpdateOutcome>(esitoFile())
+  const backupExists = Boolean(pending.backup) && fs.existsSync(pending.backup)
+
+  const decision = decideUpdateOutcome({
+    pending,
+    esito,
+    currentVersion: app.getVersion(),
+    now: Date.now(),
+    backupExists
+  })
+  if (!decision) {
+    // nessun problema: o siamo la versione nuova, o il supervisore sta lavorando
+    if (esito?.result === 'ok' || app.getVersion() === pending.version) {
+      clearUpdateState(pending.backup)
     }
-    const target = process.env.APPIMAGE ?? process.execPath
-    // se il nuovo file ha un nome diverso, va rimosso prima di ripristinare
-    const finalPath = (data as { finalPath?: string }).finalPath
-    if (finalPath && finalPath !== target && fs.existsSync(finalPath)) {
-      try {
-        fs.rmSync(finalPath, { force: true })
-      } catch {
-        /* ignore */
-      }
-    }
-    if (data.backup && fs.existsSync(data.backup)) {
-      fs.copyFileSync(data.backup, target)
-      if (process.platform !== 'win32') fs.chmodSync(target, 0o755)
-    }
-    fs.rmSync(file, { force: true })
-    return data.version
-  } catch {
-    fs.rmSync(file, { force: true })
     return null
   }
+
+  if (decision.restore) {
+    const target = pending.target || updateTarget()
+    try {
+      if (fs.existsSync(target)) fs.rmSync(target, { force: true })
+      fs.renameSync(pending.backup, target)
+      if (process.platform !== 'win32') fs.chmodSync(target, 0o755)
+      log.warn('[update] ripristinata la versione precedente dopo un aggiornamento interrotto')
+    } catch (err) {
+      log.warn(`[update] ripristino non riuscito: ${(err as Error).message}`)
+    }
+  }
+  clearUpdateState()
+  log.warn(`[update] esito ${decision.rolledBack ? 'rolledback' : 'non applicato'} (${decision.version})`)
+  return { version: decision.version, rolledBack: decision.rolledBack }
 }
 
 export function applyUpdate(newExe: string, version = ''): void {
   if (process.platform === 'win32') {
-    const target = process.execPath
-    markPending(version, `${target}.old`)
-    const helper = path.join(path.dirname(newExe), 'aggiorna.cmd')
-    // Su Windows rinominare un eseguibile IN USO è permesso, copiarlo no:
-    // per questo si usa move (rename atomico) con retry, non copy.
-    const finalPath = path.join(path.dirname(target), path.basename(newExe))
-    const marker = bootMarker(version)
-    const script = [
-      '@echo off',
-      'setlocal',
-      `set LOG=%~dp0aggiorna.log`,
-      `echo [%DATE% %TIME%] sostituzione verso ${path.basename(newExe)} >> "%LOG%" 2>&1`,
-      'ping 127.0.0.1 -n 4 >nul',
-      `move /Y "${target}" "${target}.old" >> "%LOG%" 2>&1`,
-      'for /L %%i in (1,1,15) do (',
-      `  move /Y "${newExe}" "${finalPath}" >> "%LOG%" 2>&1`,
-      `  if exist "${finalPath}" goto started`,
-      '  ping 127.0.0.1 -n 2 >nul',
-      ')',
-      ':started',
-      `if not exist "${finalPath}" move /Y "${target}.old" "${target}" >> "%LOG%" 2>&1`,
-      `if not exist "${finalPath}" goto done`,
-      `start "" "${finalPath}"`,
-      `echo [%DATE% %TIME%] avviata ${path.basename(newExe)}, attendo il marker >> "%LOG%" 2>&1`,
-      'set TRIES=0',
-      ':wait',
-      `set /a TRIES+=1`,
-      `if exist "${marker}" goto ok`,
-      'if %TRIES% GEQ 30 goto failed',
-      'ping 127.0.0.1 -n 4 >nul',
-      'goto wait',
-      ':failed',
-      `echo [%DATE% %TIME%] marker assente: rollback >> "%LOG%" 2>&1`,
-      `move /Y "${finalPath}" "${finalPath}.failed" >> "%LOG%" 2>&1`,
-      `move /Y "${target}.old" "${target}" >> "%LOG%" 2>&1`,
-      `start "" "${target}"`,
-      'goto done',
-      ':ok',
-      `echo [%DATE% %TIME%] aggiornamento completato >> "%LOG%" 2>&1`,
-      `del /Q "${target}.old" >nul 2>&1`,
-      ':done',
-      'del /Q "%~f0"'
-    ].join('\r\n')
-    fs.writeFileSync(helper, `${script}\r\n`)
-    spawn('cmd.exe', ['/c', `"${helper}"`], { detached: true, stdio: 'ignore' }).unref()
+    if (transientCopy()) {
+      throw new Error(
+        'stai eseguendo una copia temporanea di TriadeAI (scompattata da Windows): ' +
+          'scarica il pacchetto aggiornato dalla pagina Releases'
+      )
+    }
+    const target = updateTarget()
+    // il file in uso non si può sostituire: lo fa uno script esterno quando
+    // l'app è chiusa (portable = launcher NSIS, che poi riscompatta la nuova app)
+    markPending(version, target)
+    const helper = path.join(updateDir(), 'aggiorna.ps1')
+    fs.mkdirSync(updateDir(), { recursive: true })
+    fs.writeFileSync(
+      helper,
+      `${powershellSupervisor({
+        target,
+        newExe,
+        marker: bootMarker(version),
+        version,
+        pid: process.pid,
+        // il launcher portable: lo script deve aspettare anche lui (vedi sopra)
+        parentPid: process.ppid,
+        pending: pendingFile(),
+        esito: esitoFile(),
+        logFile: path.join(updateDir(), 'aggiorna.log')
+      })}\r\n`,
+      'utf8'
+    )
+    log.info(`[update] sostituzione di ${target} affidata a ${helper}`)
+    spawn(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-WindowStyle',
+        'Hidden',
+        '-File',
+        helper
+      ],
+      { detached: true, stdio: 'ignore', windowsHide: true }
+    ).unref()
     app.exit(0)
     return
   }
-  const current = process.env.APPIMAGE ?? process.execPath
+  const current = updateTarget()
   if (!process.env.APPIMAGE && app.isPackaged) {
     // estratta con --appimage-extract o simile: non c'è un file AppImage da sostituire
     throw new Error(
@@ -288,7 +379,12 @@ export function applyUpdate(newExe: string, version = ''): void {
   }
   const backup = `${current}.old`
   const finalPath = path.join(path.dirname(current), path.basename(newExe))
-  markPending(version, backup, current, finalPath)
+  writeJson(pendingFile(), {
+    version,
+    target: finalPath,
+    backup,
+    at: Date.now()
+  } satisfies PendingUpdate)
   try {
     // copiare sopra un eseguibile in esecuzione dà ETXTBSY: si sposta il vecchio
     // e si mette il nuovo al suo posto (rename atomico, stesso filesystem).
@@ -375,7 +471,7 @@ export function cleanupUpdateLeftovers(maxAgeDays = 1): number {
         const st = fs.statSync(file)
         const old = now - st.mtimeMs > maxAgeDays * 24 * 60 * 60 * 1000
         const isUnpack = name === 'nuovo'
-        const isArchive = /\.(zip|tar\.gz|AppImage)$/i.test(name)
+        const isArchive = /\.(zip|tar\.gz|AppImage)$/i.test(name) || /^aggiorna\.(ps1|cmd|log)$/i.test(name)
         if (old && (isUnpack || isArchive)) {
           fs.rmSync(file, { recursive: true, force: true })
           removed++
@@ -388,7 +484,7 @@ export function cleanupUpdateLeftovers(maxAgeDays = 1): number {
     /* ignore */
   }
   try {
-    const exe = process.env.APPIMAGE ?? process.execPath
+    const exe = updateTarget()
     const dir = path.dirname(exe)
     const base = path.basename(exe)
     const now = Date.now()

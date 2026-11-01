@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
+import { createHash } from 'node:crypto'
 import { log } from './log'
 
 /**
@@ -135,6 +136,78 @@ function copyTree(from: string, to: string): void {
  * vengono copiati lì al primo avvio (con le loro sottocartelle, es. `whisper/`),
  * così il runtime non dipende mai dalla cartella temporanea di scompattazione.
  */
+/**
+ * Impronta dell'intero albero dei binari inclusi nel pacchetto (percorso, dimensione
+ * e mtime di ogni file). Basta guardare l'eseguibile per perdere i cambi di sole
+ * DLL — che sono proprio quelli che rompono l'avvio su Windows (0xC0000139).
+ */
+function treeStamp(dir: string): string {
+  const rows: string[] = []
+  const walk = (base: string, rel: string): void => {
+    let entries: fs.Dirent[] = []
+    try {
+      entries = fs.readdirSync(path.join(base, rel), { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      const next = rel ? path.join(rel, e.name) : e.name
+      if (e.isDirectory()) {
+        walk(base, next)
+        continue
+      }
+      if (e.name === '.stamp' || e.name.startsWith('.')) continue
+      try {
+        const st = fs.statSync(path.join(base, next))
+        rows.push(`${next}:${st.size}:${Math.round(st.mtimeMs)}`)
+      } catch {
+        /* file sparito */
+      }
+    }
+  }
+  walk(dir, '')
+  return rows.length ? createHash('sha1').update(rows.join('|')).digest('hex') : ''
+}
+
+/** Toglie da `target` ciò che non è più nel pacchetto (es. residui di release precedenti). */
+function pruneExtras(source: string, target: string): number {
+  let removed = 0
+  let names: string[] = []
+  try {
+    names = fs.readdirSync(source)
+  } catch {
+    return 0
+  }
+  const wanted = new Set(names)
+  let present: string[] = []
+  try {
+    present = fs.readdirSync(target)
+  } catch {
+    return 0
+  }
+  for (const name of present) {
+    if (name === '.stamp') continue
+    const file = path.join(target, name)
+    if (!wanted.has(name)) {
+      try {
+        fs.rmSync(file, { recursive: true, force: true })
+        removed++
+      } catch {
+        /* in uso: verrà rimosso al prossimo avvio */
+      }
+      continue
+    }
+    let st: fs.Stats | null = null
+    try {
+      st = fs.statSync(file)
+    } catch {
+      continue
+    }
+    if (st.isDirectory()) removed += pruneExtras(path.join(source, name), file)
+  }
+  return removed
+}
+
 export function ensureBinaries(): string {
   const target = path.join(dataDir(), 'bin')
   const exe = process.platform === 'win32' ? 'llama-server.exe' : 'llama-server'
@@ -144,13 +217,7 @@ export function ensureBinaries(): string {
   // identità dei binari inclusi nel pacchetto: se cambia, si ricopia.
   // `dati/` sopravvive agli aggiornamenti, quindi senza questo controllo una
   // release con un llama.cpp nuovo continuerebbe a usare i binari vecchi.
-  let stamp = ''
-  try {
-    const st = fs.statSync(path.join(source, exe))
-    stamp = `${st.size}-${Math.round(st.mtimeMs)}`
-  } catch {
-    stamp = ''
-  }
+  const stamp = treeStamp(source)
 
   const present = fs.existsSync(path.join(target, exe))
   let current = ''
@@ -166,8 +233,14 @@ export function ensureBinaries(): string {
   try {
     fs.mkdirSync(target, { recursive: true })
     copyTree(source, target)
+    // si pota solo se la sorgente è completa: mai svuotare dati/bin per una
+    // cartella di pacchetto parziale
+    const removed = fs.existsSync(path.join(source, exe)) ? pruneExtras(source, target) : 0
     if (stamp) fs.writeFileSync(stampFile, stamp, 'utf8')
-    log.info(`[paths] binari ${present ? 'aggiornati' : 'copiati'} in ${target}`)
+    log.info(
+      `[paths] binari ${present ? 'aggiornati' : 'copiati'} in ${target}` +
+        (removed ? ` (rimossi ${removed} file obsoleti)` : '')
+    )
   } catch (err) {
     log.error(`[paths] copia binari fallita: ${(err as Error).message}`)
   }

@@ -74,18 +74,74 @@ function untar(tgz, dest) {
   execFileSync('tar', ['-xf', tgz, '-C', dest])
 }
 
-function flatten(dir) {
-  // estrae i file dai sottodirectory (llama-bXXXX/) nella radice
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue
-    if (['stage', 'win', 'linux'].includes(entry.name)) continue
-    const sub = path.join(dir, entry.name)
-    for (const f of fs.readdirSync(sub)) {
-      const from = path.join(sub, f)
-      if (fs.statSync(from).isFile()) fs.renameSync(from, path.join(dir, f))
-    }
-    fs.rmSync(sub, { recursive: true, force: true })
+/**
+ * Cartella utile dentro un archivio appena estratto: quella che contiene
+ * l'eseguibile (gli archivi di llama.cpp hanno una sola radice, llama-bXXXX/).
+ */
+function archiveRoot(tmp, exe) {
+  if (fs.existsSync(path.join(tmp, exe))) return tmp
+  const dirs = fs
+    .readdirSync(tmp, { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => path.join(tmp, e.name))
+  const withExe = dirs.find((d) => fs.existsSync(path.join(d, exe)))
+  if (withExe) return withExe
+  return dirs.length === 1 ? dirs[0] : tmp
+}
+
+/** Copia ricorsiva che segue i symlink (nel pacchetto diventerebbero link rotti). */
+function copyTree(src, dest) {
+  const st = fs.statSync(src)
+  if (st.isDirectory()) {
+    fs.mkdirSync(dest, { recursive: true })
+    for (const name of fs.readdirSync(src)) copyTree(path.join(src, name), path.join(dest, name))
+    return
   }
+  fs.mkdirSync(path.dirname(dest), { recursive: true })
+  fs.copyFileSync(src, dest)
+  if (process.platform !== 'win32') {
+    try {
+      fs.chmodSync(dest, st.mode & 0o777)
+    } catch {
+      /* permessi non applicabili */
+    }
+  }
+}
+
+/**
+ * La radice di bin/<target> deve contenere SOLO l'archivio ufficiale di llama.cpp
+ * (più ffmpeg). whisper.cpp e la build CUDA stanno in sottocartelle: se un loro
+ * file finisce nella radice si sovrascrive una DLL di llama.cpp con una di un
+ * altro build → all'avvio Windows fallisce con 0xC0000139 (entry point mancante).
+ */
+function verifyRoot(target, expected) {
+  const dir = path.join(BIN, target)
+  const problems = []
+  if (!expected) return [`${target}: archivio llama.cpp non estratto`]
+  const allowedExtra = /^(ffmpeg|ffprobe)(\.exe)?$/i
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) {
+      const file = path.join(dir, entry.name)
+      if (entry.name.startsWith('.')) continue
+      if (!expected.has(entry.name)) {
+        if (!allowedExtra.test(entry.name)) {
+          problems.push(`${entry.name}: file estraneo nella radice di bin/${target}`)
+        }
+        continue
+      }
+      const size = fs.statSync(file).size
+      if (size !== expected.get(entry.name)) {
+        problems.push(
+          `${entry.name}: sovrascritto da un altro build (${expected.get(entry.name)} → ${size} byte)`
+        )
+      }
+      continue
+    }
+    // nelle sottocartelle i nomi possono ripetersi (whisper/ ha le sue ggml),
+    // ma la radice non deve MAI prendere file da lì: nessun controllo di nome,
+    // solo l'integrità dei file in radice qui sopra.
+  }
+  return problems
 }
 
 /** Trova l'URL di un asset nelle release recenti (i nomi dei file cambiano spesso). */
@@ -137,36 +193,60 @@ async function llamaCuda(target) {
     log(`build CUDA non disponibile per ${target}: ${err.message}`)
     return
   }
+  const tmp = path.join(BIN, `cuda-tmp-${target}`)
+  fs.rmSync(tmp, { recursive: true, force: true })
+  fs.mkdirSync(tmp, { recursive: true })
+  fs.rmSync(dir, { recursive: true, force: true })
   if (isWin) {
-    unzip(archive, dir)
+    unzip(archive, tmp)
     const cudart = path.join(BIN, cudartName)
     try {
       await download(
         `https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_BUILD}/${cudartName}`,
         cudart
       )
-      unzip(cudart, dir)
+      unzip(cudart, tmp)
     } catch (err) {
       log(`cudart non scaricato: ${err.message}`)
     }
   } else {
-    untar(archive, dir)
+    untar(archive, tmp)
   }
-  flatten(dir)
+  // la build CUDA vive in una sottocartella: non deve MAI toccare la radice
+  fs.rmSync(dir, { recursive: true, force: true })
+  copyTree(archiveRoot(tmp, isWin ? 'llama-server.exe' : 'llama-server'), dir)
+  fs.rmSync(tmp, { recursive: true, force: true })
   log(`llama-server CUDA pronto in bin/${target}/cuda`)
 }
 
 async function llama(target) {
   const dir = path.join(BIN, target)
   const isWin = target === 'win'
+  const exe = isWin ? 'llama-server.exe' : 'llama-server'
   const name = isWin ? `llama-${LLAMA_BUILD}-bin-win-vulkan-x64.zip` : `llama-${LLAMA_BUILD}-bin-ubuntu-vulkan-x64.tar.gz`
   const url = `https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_BUILD}/${name}`
   const archive = path.join(BIN, name)
   await download(url, archive)
-  if (isWin) unzip(archive, dir)
-  else untar(archive, dir)
-  flatten(dir)
-  log(`llama-server pronto in bin/${target}`)
+  const tmp = path.join(BIN, `llama-tmp-${target}`)
+  fs.rmSync(tmp, { recursive: true, force: true })
+  fs.mkdirSync(tmp, { recursive: true })
+  if (isWin) unzip(archive, tmp)
+  else untar(archive, tmp)
+  // si riparte da zero: nessun residuo di esecuzioni precedenti (whisper/, cuda/)
+  // può restare mescolato con le DLL di llama.cpp
+  fs.rmSync(dir, { recursive: true, force: true })
+  copyTree(archiveRoot(tmp, exe), dir)
+  fs.rmSync(tmp, { recursive: true, force: true })
+  const files = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile())
+  const map = new Map(files.map((e) => [e.name, fs.statSync(path.join(dir, e.name)).size]))
+  expected.set(target, map)
+  // manifest per il controllo di integrità in fase di staging
+  fs.writeFileSync(
+    path.join(dir, '.llama-files.json'),
+    JSON.stringify(Object.fromEntries(map), null, 1),
+    'utf8'
+  )
+  log(`llama-server pronto in bin/${target} (${files.length} file)`)
 }
 
 async function ffmpeg(target) {
@@ -256,6 +336,9 @@ async function whisperModel() {
 
 const targets = only ? [only] : ['win', 'linux']
 const problems = []
+/** file dell'archivio ufficiale di llama.cpp, per target: la radice deve restare identica */
+const expected = new Map()
+const integrity = []
 
 // whisper (modello ASR) è opzionale: se manca, l'app avvisa ma non si blocca
 try {
@@ -279,6 +362,17 @@ for (const t of targets) {
       problems.push(`${nome} (${t}): ${err.message}`)
     }
   }
+  if (expected.has(t)) integrity.push(...verifyRoot(t, expected.get(t)))
+}
+
+if (integrity.length) {
+  console.error('[bin] BINARI INCONSISTENTI (la build si ferma):')
+  for (const p of integrity) console.error('  - ' + p)
+  console.error(
+    '[bin] la radice di bin/<target> deve contenere solo llama.cpp: ' +
+      'whisper e CUDA vanno in sottocartelle (altrimenti su Windows: 0xC0000139)'
+  )
+  process.exit(1)
 }
 
 if (problems.length) {
