@@ -6,6 +6,8 @@ import { detectGpus } from './gpu/devices'
 import { engine } from './debate/engine'
 import { translate } from '../shared/i18n'
 import { getSettings } from './settings'
+import { onShutdown, shutdownAll } from './lifecycle'
+import { stopEmbedServer } from './memory/embed-client'
 import { log } from './log'
 
 let mainWindow: BrowserWindow | null = null
@@ -507,9 +509,12 @@ app.on('before-quit', (event) => {
   event.preventDefault()
   shuttingDown = true
   void (async () => {
+    // ordine inverso di registrazione: prima il motore, poi i server
+    onShutdown(() => stopEmbedServer())
+    onShutdown(() => llamaPool.stopAll())
+    onShutdown(() => engine.pause())
     try {
-      await engine.pause()
-      await llamaPool.stopAll()
+      await shutdownAll()
     } finally {
       app.quit()
     }
