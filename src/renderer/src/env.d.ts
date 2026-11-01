@@ -56,6 +56,9 @@ interface Api {
     deviceName: string | null
     ok: boolean
     reason: string
+    reasonCode: string
+    reasonParams: Record<string, string | number>
+    notes: { code: string; params: Record<string, string | number> }[]
     moe: boolean
     mode: 'full' | 'partial' | 'none'
     arch: string

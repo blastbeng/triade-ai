@@ -10,6 +10,8 @@ import type {
   UiFont
 } from '../../shared/types'
 import ChatColumn, { type Phase } from './components/ChatColumn'
+import { LocaleContext } from './i18n'
+import { translate, type Locale } from '../../shared/i18n'
 import Composer from './components/Composer'
 import SettingsPanel from './components/SettingsPanel'
 import Onboarding from './components/Onboarding'
@@ -47,6 +49,10 @@ export default function App(): JSX.Element {
   const [showMemory, setShowMemory] = useState(false)
   const [showLog, setShowLog] = useState(false)
   const [onboarding, setOnboarding] = useState(false)
+
+  const locale: Locale = settings?.ui?.language ?? 'en'
+  const t = (key: string, params?: Record<string, string | number>): string =>
+    translate(locale, key, params)
 
   const pushLog = useCallback((msg: string) => {
     setLogs((prev) => [...prev.slice(-300), `${new Date().toLocaleTimeString('it-IT')} ${msg}`])
@@ -285,13 +291,14 @@ export default function App(): JSX.Element {
   }
 
   return (
+    <LocaleContext.Provider value={locale}>
     <div className="shell">
       <aside className="sidebar">
         <button className="primary newchat" onClick={() => void newChat()}>
-          + nuova chat
+          {t('app.newChat')}
         </button>
         <div className="sessionlist">
-          {sessions.length === 0 && <p className="empty">nessuna chat salvata</p>}
+          {sessions.length === 0 && <p className="empty">{t('app.noSessions')}</p>}
           {sessions.map((s) => (
             <div key={s.id} className={`sessionrow ${session?.id === s.id ? 'selected' : ''}`}>
               <button className="rowbtn" onClick={() => void openSession(s.id)}>
@@ -299,15 +306,16 @@ export default function App(): JSX.Element {
                   {s.topic.split('\n')[0].slice(0, 90)}
                 </span>
                 <span className="sub">
-                  {s.turns} turni · {s.state} · {new Date(s.updatedAt).toLocaleDateString('it-IT')}
+                  {t('app.turns', { n: s.turns })} · {s.state} ·{' '}
+                {new Date(s.updatedAt).toLocaleDateString(settings?.ui?.language ?? 'en')}
                 </span>
               </button>
               <button
                 className="del"
-                title="Elimina questa chat e tutta la sua memoria"
+                title={t('app.deleteChat')}
                 onClick={async (e) => {
                   e.stopPropagation()
-                  if (!window.confirm('Eliminare questa chat? Verrà rimossa anche la memoria che ha prodotto.')) return
+                  if (!window.confirm(t('app.deleteChat'))) return
                   const res = await window.triade.deleteSession(s.id)
                   setSessions(res.sessions)
                   if (session?.id === s.id) setSession(null)
@@ -319,7 +327,7 @@ export default function App(): JSX.Element {
           ))}
         </div>
         <button className="ghost memorybtn" onClick={() => setShowMemory(true)}>
-          memoria condivisa
+          {t('app.memory')}
         </button>
       </aside>
 
@@ -329,13 +337,13 @@ export default function App(): JSX.Element {
             <span className="logo">◆▲●</span>
             <div>
               <h1>TriadeAI</h1>
-              <p>tre personalità · {activeModel ? activeModel.name : 'modello'} · un dibattito</p>
+              <p>{t('app.tagline', { model: activeModel ? activeModel.name : 'model' })}</p>
             </div>
           </div>
 
           <div className="badges">
             <span className={`badge ${servers.some((s) => s.running) ? 'ok' : 'off'}`}>
-              server {servers.filter((s) => s.running).length}/{servers.length || 0}
+              {t('app.server')} {servers.filter((s) => s.running).length}/{servers.length || 0}
             </span>
             {servers
               .filter((s) => s.running)
@@ -352,17 +360,17 @@ export default function App(): JSX.Element {
                   : 'contesto richiesto nelle impostazioni'
               }
             >
-              ctx{' '}
+              {t('app.ctx')}{' '}
               {servers.find((s) => s.running)?.contextSize || settings?.contextSize || '—'}
               {servers.some(
                 (s) => s.modelMaxCtx > 0 && s.modelMaxCtx < (settings?.contextSize ?? 0)
-              ) && ' (max modello)'}
+              ) && ` ${t('app.maxModelCtx')}`}
             </span>
             <span
               className="badge ctxbadge"
               title={`token del prompt nell'ultimo turno su ${settings?.contextSize ?? 0}`}
             >
-              prompt {Math.round(ctxUsed * 100)}%
+              {t('app.prompt')} {Math.round(ctxUsed * 100)}%
               {lastTokens > 0 && (
                 <span className="tokcount">
                   {lastTokens > 1000 ? `${(lastTokens / 1000).toFixed(1)}k` : lastTokens}/
@@ -378,16 +386,16 @@ export default function App(): JSX.Element {
           <div className="actions">
             {isRunning && (
               <button className="warn" onClick={() => void pause()}>
-                pausa
+                {t('app.pause')}
               </button>
             )}
             {(isRunning || session?.state === 'paused') && (
               <button
                 className="danger"
-                title="Chiudi il dibattito: nessun altro turno automatico"
+                title={t('app.stop')}
                 onClick={() => void stopDebate()}
               >
-                stop
+                {t('app.stop')}
               </button>
             )}
             {!isRunning && (
@@ -396,14 +404,14 @@ export default function App(): JSX.Element {
                 disabled={!session || busy || session.state === 'concluded'}
                 onClick={() => void resume()}
               >
-                riprendi
+                {t('app.resume')}
               </button>
             )}
             <button className="ghost" onClick={() => setShowSettings(true)}>
-              impostazioni
+              {t('app.settings')}
             </button>
             <button className="ghost" onClick={() => setShowLog((v) => !v)}>
-              log
+              {t('app.log')}
             </button>
           </div>
         </header>
@@ -441,10 +449,11 @@ export default function App(): JSX.Element {
 
         {session?.consensus && (
           <section className="consensus">
-            <h3>Consenso</h3>
+            <h3>{t('app.consensus')}</h3>
             <p>{session.consensus.answer}</p>
             <small>
-              proposto da {session.consensus.proposedBy} · validato da {session.consensus.validatedBy}
+              {t('app.proposedBy', { name: session.consensus.proposedBy })} ·{' '}
+              {t('app.validatedBy', { name: session.consensus.validatedBy })}
             </small>
           </section>
         )}
@@ -473,10 +482,10 @@ export default function App(): JSX.Element {
             <div className="loghead">
               <strong>log</strong>
               <button className="ghost" onClick={() => setShowLog(false)}>
-                chiudi
+                {t('common.close')}
               </button>
             </div>
-            <pre>{logs.join('\n') || 'nessun evento'}</pre>
+            <pre>{logs.join('\n') || '—'}</pre>
             {servers.map((s) => (
               <pre className="serverlog" key={s.modelId}>
                 --- {s.modelId} ---{'\n'}
@@ -509,6 +518,14 @@ export default function App(): JSX.Element {
         {onboarding && settings && (
           <Onboarding
             catalog={catalog}
+            language={locale}
+            onLanguage={async (l) => {
+              const next = await window.triade.saveSettings({
+                ui: { ...(settings.ui ?? {}), language: l } as Settings['ui']
+              })
+              setSettings(next)
+              setCatalog(await window.triade.modelsCatalog())
+            }}
             onDone={async (installed, active) => {
               const next = await window.triade.saveSettings({
                 onboardingDone: true,
@@ -523,5 +540,6 @@ export default function App(): JSX.Element {
         )}
       </div>
     </div>
+    </LocaleContext.Provider>
   )
 }

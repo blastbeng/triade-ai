@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import type { Persona, SearchProvider, Settings } from '../../../shared/types'
 import type { CatalogEntry } from '../env'
 import ModelSearch from './ModelSearch'
+import { LOCALES, type Locale } from '../../../shared/i18n'
+import { useT } from '../i18n'
 
 interface Props {
   settings: Settings
@@ -30,9 +32,20 @@ interface GpuInfo {
   error?: string
 }
 
+function renderPreview(text: string): JSX.Element[] {
+  const parts = text.split(/(<b>.*?<\/b>|<i>.*?<\/i>|<c>.*?<\/c>)/g)
+  return parts.filter(Boolean).map((part, index) => {
+    if (part.startsWith('<b>')) return <strong key={index}>{part.slice(3, -4)}</strong>
+    if (part.startsWith('<i>')) return <em key={index}>{part.slice(3, -4)}</em>
+    if (part.startsWith('<c>')) return <code key={index}>{part.slice(3, -4)}</code>
+    return <span key={index}>{part}</span>
+  })
+}
+
 export default function SettingsPanel({ settings, catalog, onClose, onSave, onRefresh }: Props): JSX.Element {
   const [draft, setDraft] = useState<Settings>(structuredClone(settings))
-  const [tab, setTab] = useState<Tab>('generale')
+  const t = useT()
+  const [activeTab, setActiveTab] = useState<Tab>('generale')
   const [downloading, setDownloading] = useState<string | null>(null)
   const [gpu, setGpu] = useState<GpuInfo | null>(null)
   const [gpuDraft, setGpuDraft] = useState<Record<string, string>>({})
@@ -58,19 +71,27 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
   return (
     <div className="modal" onClick={onClose}>
       <div className="modalbox settings" onClick={(e) => e.stopPropagation()}>
-        <h2>Impostazioni</h2>
+        <h2>{t('settings.title')}</h2>
         <nav className="tabs">
-          {(['generale', 'ui', 'ricerca', 'gpu', 'personas', 'modelli'] as Tab[]).map((t) => (
-            <button key={t} className={tab === t ? 'tab active' : 'tab'} onClick={() => setTab(t)}>
-              {t === 'personas' ? 'personalità' : t === 'modelli' ? 'modelli e download' : t}
+          {(['generale', 'ui', 'ricerca', 'gpu', 'personas', 'modelli'] as Tab[]).map((tab) => (
+            <button
+              key={tab}
+              className={activeTab === tab ? 'tab active' : 'tab'}
+              onClick={() => setActiveTab(tab)}
+            >
+              {tab === 'personas'
+                ? t('settings.tab.personas')
+                : tab === 'modelli'
+                  ? t('settings.tab.models')
+                  : t(`settings.tab.${tab}`)}
             </button>
           ))}
         </nav>
 
-        {tab === 'generale' && (
+        {activeTab === 'generale' && (
           <div className="form">
             <label>
-              Contesto (token, uguale per le 3 chat)
+              {t('settings.context')}
               <input
                 type="number"
                 min={2048}
@@ -80,7 +101,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
               />
             </label>
             <label>
-              Prompt compression a
+              {t('settings.compression')}
               <div className="inline">
                 <input
                   type="range"
@@ -93,7 +114,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
               </div>
             </label>
             <label>
-              Max token per turno (0 = nessun tetto, il limite è solo il contesto)
+              {t('settings.maxTokens')}
               <input
                 type="number"
                 min={0}
@@ -104,7 +125,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
               />
             </label>
             <label>
-              Max turni (stop automatico)
+              {t('settings.maxTurns')}
               <input
                 type="number"
                 min={3}
@@ -113,7 +134,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
               />
             </label>
             <label>
-              Temperatura
+              {t('settings.temperature')}
               <input
                 type="number"
                 min={0}
@@ -124,7 +145,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
               />
             </label>
             <label>
-              Strati su GPU (-ngl)
+              {t('settings.gpuLayers')}
               <input
                 type="number"
                 min={0}
@@ -139,10 +160,10 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                 checked={draft.flashAttention}
                 onChange={(e) => setDraft({ ...draft, flashAttention: e.target.checked })}
               />
-              Flash attention
+              {t('settings.flashAttention')}
             </label>
             <label>
-              KV cache
+              {t('settings.kv')}
               <select
                 value={draft.kvCacheType}
                 onChange={(e) => setDraft({ ...draft, kvCacheType: e.target.value as 'f16' | 'q8_0' })}
@@ -157,7 +178,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                 checked={draft.autoTune}
                 onChange={(e) => setDraft({ ...draft, autoTune: e.target.checked })}
               />
-              Auto-tuning dei parametri llama-server (contesto, KV, offload) in base alla VRAM
+              {t('settings.autoTune')}
             </label>
             <label className="check">
               <input
@@ -165,33 +186,49 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                 checked={draft.toolsEnabled}
                 onChange={(e) => setDraft({ ...draft, toolsEnabled: e.target.checked })}
               />
-              Tool abilitati (ricerca web, immagini, media)
+              {t('settings.tools')}
             </label>
             <label>
-              Modello whisper (ASR)
+              {t('settings.asrModel')}
               <input
                 value={draft.asr.modelFile}
                 onChange={(e) => setDraft({ ...draft, asr: { ...draft.asr, modelFile: e.target.value } })}
               />
             </label>
             <label>
-              Lingua trascrizione
+              {t('settings.asrLang')}
               <input
                 value={draft.asr.language}
                 onChange={(e) => setDraft({ ...draft, asr: { ...draft.asr, language: e.target.value } })}
               />
             </label>
             <p className="note">
-              Contesto, strati GPU, flash attention, KV cache e modelli forzano il riavvio dei
+              Contesto, strati GPU, flash attention, {t('settings.kv')} e modelli forzano il riavvio dei
               llama-server attivi.
             </p>
           </div>
         )}
 
-        {tab === 'ui' && (
+        {activeTab === 'ui' && (
           <div className="form">
             <label>
-              Dimensione del testo
+              {t('settings.language')}
+              <select
+                value={draft.ui?.language ?? 'en'}
+                onChange={(e) =>
+                  setDraft({ ...draft, ui: { ...draft.ui, language: e.target.value as Locale } })
+                }
+              >
+                {LOCALES.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.flag} {l.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              {t('settings.textSize')}
               <div className="inline">
                 <input
                   type="range"
@@ -209,7 +246,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
             </label>
 
             <label>
-              Carattere
+              {t('settings.font')}
               <select
                 value={draft.ui?.fontFamily ?? 'system'}
                 onChange={(e) =>
@@ -219,15 +256,15 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                   })
                 }
               >
-                <option value="system">Sistema (consigliato)</option>
-                <option value="sans">Sans (Inter/Helvetica)</option>
-                <option value="serif">Serif (Georgia)</option>
-                <option value="mono">Monospace (JetBrains Mono)</option>
+                <option value="system">{t('settings.fontSystem')}</option>
+                <option value="sans">{t('settings.fontSans')}</option>
+                <option value="serif">{t('settings.fontSerif')}</option>
+                <option value="mono">{t('settings.fontMono')}</option>
               </select>
             </label>
 
             <label>
-              Densità
+              {t('settings.density')}
               <select
                 value={draft.ui?.density ?? 'comfortable'}
                 onChange={(e) =>
@@ -237,13 +274,13 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                   })
                 }
               >
-                <option value="comfortable">Comoda</option>
-                <option value="compact">Compatta (più messaggi a schermo)</option>
+                <option value="comfortable">{t('settings.densityComfort')}</option>
+                <option value="compact">{t('settings.densityCompact')}</option>
               </select>
             </label>
 
             <label>
-              Interlinea
+              {t('settings.lineHeight')}
               <div className="inline">
                 <input
                   type="range"
@@ -263,7 +300,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
             </label>
 
             <label>
-              Angoli
+              {t('settings.radius')}
               <div className="inline">
                 <input
                   type="range"
@@ -280,7 +317,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
             </label>
 
             <label className="inline">
-              Colore di evidenza
+              {t('settings.accent')}
               <input
                 type="color"
                 value={draft.ui?.accent ?? '#5eead4'}
@@ -305,7 +342,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                 checked={draft.ui?.showTokens ?? true}
                 onChange={(e) => setDraft({ ...draft, ui: { ...draft.ui, showTokens: e.target.checked } })}
               />
-              Mostra il conteggio dei token di prompt
+              {t('settings.showTokens')}
             </label>
 
             <label className="check">
@@ -314,17 +351,17 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                 checked={draft.ui?.markdown ?? true}
                 onChange={(e) => setDraft({ ...draft, ui: { ...draft.ui, markdown: e.target.checked } })}
               />
-              Formattazione markdown nelle risposte (testo grezzo se disattivata)
+              {t('settings.markdown')}
             </label>
 
             <div className="uipreview">
               <span className="previewtitle">Anteprima</span>
               <p>
-                Testo normale con <strong>grassetto</strong>, <em>corsivo</em> e <code>codice</code>.
+                {renderPreview(t('settings.previewText'))}
               </p>
               <ul>
-                <li>primo punto dell'elenco</li>
-                <li>secondo punto dell'elenco</li>
+                <li>{t('settings.previewItem1')}</li>
+                <li>{t('settings.previewItem2')}</li>
               </ul>
               <p className="note">
                 Le modifiche a carattere, densità, interlinea, angoli e colore si vedono subito dopo
@@ -334,10 +371,10 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
           </div>
         )}
 
-        {tab === 'ricerca' && (
+        {activeTab === 'ricerca' && (
           <div className="form">
             <label>
-              Provider
+              {t('settings.provider')}
               <select
                 value={draft.search.provider}
                 onChange={(e) =>
@@ -352,7 +389,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
               </select>
             </label>
             <label>
-              URL SearXNG
+              {t('settings.searxUrl')}
               <input
                 value={draft.search.searxngUrl}
                 onChange={(e) => setDraft({ ...draft, search: { ...draft.search, searxngUrl: e.target.value } })}
@@ -360,7 +397,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
               />
             </label>
             <label>
-              Risultati massimi
+              {t('settings.maxResults')}
               <input
                 type="number"
                 min={1}
@@ -370,7 +407,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
               />
             </label>
             <label>
-              Brave API key
+              {t('settings.braveKey')}
               <input
                 type="password"
                 value={draft.search.braveKey}
@@ -378,7 +415,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
               />
             </label>
             <label>
-              Tavily API key
+              {t('settings.tavilyKey')}
               <input
                 type="password"
                 value={draft.search.tavilyKey}
@@ -386,7 +423,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
               />
             </label>
             <label>
-              Google API key
+              {t('settings.googleKey')}
               <input
                 type="password"
                 value={draft.search.googleKey}
@@ -394,7 +431,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
               />
             </label>
             <label>
-              Google CX
+              {t('settings.googleCx')}
               <input
                 value={draft.search.googleCx}
                 onChange={(e) => setDraft({ ...draft, search: { ...draft.search, googleCx: e.target.value } })}
@@ -403,7 +440,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
           </div>
         )}
 
-        {tab === 'gpu' && (
+        {activeTab === 'gpu' && (
           <div className="form">
             {gpu?.error && <p className="error">{gpu.error}</p>}
             {gpu && !gpu.selectable && (
@@ -441,7 +478,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
               </tbody>
             </table>
             <button className="ghost" onClick={() => void loadGpu(true)}>
-              rileva di nuovo
+              {t('settings.redetect')}
             </button>
             <div className="gpuassign">
               {draft.personas.map((p) => (
@@ -453,7 +490,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                     onChange={(e) => setGpuDraft({ ...gpuDraft, [p.id]: e.target.value })}
                   >
                     <option value="auto">
-                      {gpu && gpu.usable.length === 1 ? `automatica (${gpu.usable[0].name})` : 'automatica'}
+                      {gpu && gpu.usable.length === 1 ? gpu.usable[0].name : t('settings.autoDevice')}
                     </option>
                     {(gpu?.usable ?? []).map((d) => (
                       <option key={d.key} value={d.key}>
@@ -465,15 +502,13 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
               ))}
             </div>
             <p className="note">
-              Ogni chat può usare una GPU diversa: il pool avvia un llama-server per ogni coppia
-              modello+GPU. Le GPU integrate (es. Radeon del Ryzen) sono escluse. Nessun supporto
-              ROCm/HIP: solo Vulkan e, se la build CUDA è presente, CUDA.
-              {gpu && !gpu.cudaBuild && ' Build CUDA non installata (si scarica con fetch:bin --cuda).'}
+              {t('settings.gpuNote')}
+              {gpu && !gpu.cudaBuild && ` ${t('settings.cudaMissing')}`}
             </p>
           </div>
         )}
 
-        {tab === 'personas' && (
+        {activeTab === 'personas' && (
           <div className="form personas">
             {draft.personas.map((p, i) => (
               <fieldset key={p.id}>
@@ -504,14 +539,11 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                 <textarea rows={7} value={p.prompt} onChange={(e) => setPersona(i, { prompt: e.target.value })} />
               </fieldset>
             ))}
-            <p className="note">
-              Le personalità sono solo system prompt. Il modello è per chat: stesso modello per tutte
-              e tre = un solo processo llama-server; modelli diversi = un processo per modello.
-            </p>
+            <p className="note">{t('settings.personasNote')}</p>
           </div>
         )}
 
-        {tab === 'modelli' && (
+        {activeTab === 'modelli' && (
           <div className="form">
             {catalog.map((m) => (
               <div className={`modelcard ${m.active ? 'active' : ''}`} key={m.id}>
@@ -519,7 +551,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                   <strong>{m.name}</strong>
                   {m.recommended && <span className="tag">consigliato</span>}
                   {m.installed && <span className="tag ok">installato</span>}
-                  {m.active && <span className="tag">attivo</span>}
+                  {m.active && <span className="tag">{t('settings.active')}</span>}
                 </div>
                 <p>{m.description}</p>
                 <span className="meta">
@@ -527,8 +559,9 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                 </span>
                 {m.status && (
                   <p className="note">
-                    stato: {m.status.modelReady ? 'modello ok' : 'modello mancante'} ·{' '}
-                    {m.status.mmprojReady ? 'mmproj ok' : 'mmproj mancante'}
+                    {t('settings.status')}:{' '}
+                    {m.status.modelReady ? t('settings.modelOk') : t('settings.modelMissing')} ·{' '}
+                    {m.status.mmprojReady ? t('settings.mmprojOk') : t('settings.mmprojMissing')}
                     {m.status.downloading && ` · ${m.status.phase} ${Math.round(m.status.progress * 100)}%`}
                   </p>
                 )}
@@ -546,13 +579,13 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                       }
                     }}
                   >
-                    {m.installed ? 'verifica / riprendi' : 'scarica'}
+                    {m.installed ? t('settings.verify') : t('settings.download')}
                   </button>
                   <button className="ghost" onClick={async () => {
                     await window.triade.modelsSetActive(m.id)
                     await onRefresh()
                   }}>
-                    usa come attivo
+                    {t('settings.useActive')}
                   </button>
                   {m.installed && (
                     <button
@@ -562,16 +595,17 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                         await onRefresh()
                       }}
                     >
-                      elimina file
+                      {t('settings.deleteFiles')}
                     </button>
                   )}
                 </div>
-                {m.assignedTo.length > 0 && <p className="note">in uso da: {m.assignedTo.join(', ')}</p>}
+                {m.assignedTo.length > 0 && (
+                  <p className="note">{t('settings.inUseBy', { names: m.assignedTo.join(', ') })}</p>
+                )}
               </div>
             ))}
             <p className="note">
-              I file stanno in <code>dati/modelli/</code>, accanto all’eseguibile. Il download riprende
-              da dove si era interrotto.
+              {t('settings.modelsNote')}
             </p>
           </div>
         )}

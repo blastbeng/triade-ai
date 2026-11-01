@@ -51,7 +51,12 @@ export interface HfVerdict {
   totalMiB: number
   availableMiB: number
   ok: boolean
+  /** motivo in italiano (log) */
   reason: string
+  /** motivo strutturato: il renderer lo traduce nella lingua dell'interfaccia */
+  reasonCode: string
+  reasonParams: Record<string, string | number>
+  notes: { code: string; params: Record<string, string | number> }[]
   variants: QuantVariant[]
   downloads?: number
 }
@@ -251,11 +256,20 @@ export async function inspectRepo(
   const ramNeededMiB = best ? Math.round(best.bytes / 1024 ** 2 + 800) : 0
 
   let reason = ''
+  let reasonCode = 'reason.noFiles'
+  let reasonParams: Record<string, string | number> = {}
+  const notes: { code: string; params: Record<string, string | number> }[] = []
   let ok = false
-  if (!files.length) reason = 'file del repository non leggibili (repo privato o inaccessibile)'
-  else if (!mmproj) {
+  if (!files.length) {
+    reasonCode = 'reason.noFiles'
+    reason = 'file del repository non leggibili (repo privato o inaccessibile)'
+  } else if (!mmproj) {
+    reasonCode = 'reason.noMmproj'
     reason = 'nessun file mmproj: il modello non supporta le immagini/video, quindi è escluso'
-  } else if (!variants.length) reason = 'nessun quant GGUF utilizzabile nel repository'
+  } else if (!variants.length) {
+    reasonCode = 'reason.noQuant'
+    reason = 'nessun quant GGUF utilizzabile nel repository'
+  }
   else if (!best) {
     reason = moe
       ? `MoE ma non entra: il più piccolo (${smallestVariant?.quant}) chiede ${smallestVariant?.totalMiB} MiB di VRAM (${available} disponibili) e in RAM servirebbero ${Math.round(
@@ -265,19 +279,31 @@ export async function inspectRepo(
   } else {
     ok = true
     if (mode === 'full') {
+      reasonCode = 'reason.full'
+      reasonParams = { quant: best.quant, total: best.totalMiB, available }
       reason = `usabile, tutto in GPU: ${best.quant} occupa circa ${best.totalMiB} MiB su ${available} MiB`
       if (modelMaxCtx > 0 && modelMaxCtx < compat.contextSize) {
+        notes.push({ code: 'reason.modelMaxCtx', params: { n: modelMaxCtx } })
         reason += ` — contesto max del modello ${modelMaxCtx}`
       }
       if (best.quant !== variants[0].quant) {
+        notes.push({ code: 'reason.smallerWouldNotFit', params: { quant: variants[0].quant } })
         reason += ` — il quant più grande (${variants[0].quant}) non entrerebbe`
       }
     } else {
+      reasonCode = 'reason.partial'
+      reasonParams = {
+        quant: best.quant,
+        vram: Math.round((best.bytes / 1024 ** 2) * 0.55),
+        available,
+        ctx: contextSuggestion
+      }
       reason =
         `usabile con offload parziale (MoE): ${best.quant} tiene gli esperti in CPU — ` +
         `~${Math.round((best.bytes / 1024 ** 2) * 0.55)} MiB di VRAM su ${available} MiB, ` +
         `contesto consigliato ${contextSuggestion} token`
       if (contextSuggestion < ctxForEstimate) {
+        notes.push({ code: 'reason.partialCtx', params: { ctx: ctxForEstimate } })
         reason += ` (i ${ctxForEstimate} pieni non entrerebbero)`
       }
     }
@@ -304,6 +330,9 @@ export async function inspectRepo(
     availableMiB: available,
     ok,
     reason,
+    reasonCode,
+    reasonParams,
+    notes,
     variants,
     downloads: modelRow?.downloads
   }

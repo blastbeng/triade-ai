@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import type { Attachment, Persona } from '../../../shared/types'
+import { useT } from '../i18n'
 
 interface Props {
   disabled: boolean
@@ -27,6 +28,7 @@ export default function Composer({
   personas,
   modelOf
 }: Props): JSX.Element {
+  const t = useT()
   const [text, setText] = useState('')
   const [responder, setResponder] = useState<string>('auto')
   const [dragging, setDragging] = useState(false)
@@ -70,13 +72,18 @@ export default function Composer({
       )}
 
       <div className="row">
-        <button className="ghost attach" onClick={() => void onAttach()} disabled={disabled}>
+        <button
+          className="ghost attach"
+          title={t('composer.attach')}
+          onClick={() => void onAttach()}
+          disabled={disabled}
+        >
           +
         </button>
-        <label className="responder" title="Scegli quale personalità risponde al tuo messaggio">
-          <span>risponde</span>
+        <label className="responder" title={t('composer.attach')}>
+          <span>{t('composer.responder')}</span>
           <select value={responder} onChange={(e) => setResponder(e.target.value)} disabled={running}>
-            <option value="auto">turno automatico</option>
+            <option value="auto">{t('composer.auto')}</option>
             {personas.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.emoji} {p.name} · {modelOf(p.id)}
@@ -89,10 +96,10 @@ export default function Composer({
           value={text}
           placeholder={
             running
-              ? 'Dibattito in corso: metti in pausa per scrivere un nuovo argomento.'
+              ? t('composer.placeholderRunning')
               : mode === 'continua'
-                ? 'Aggiungi un’istruzione alla chat caricata: la discussione riparte da qui…'
-                : 'Scrivi l’argomento del dibattito, allega immagini/video/audio, poi invia…'
+                ? t('composer.placeholderContinue')
+                : t('composer.placeholder')
           }
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -105,11 +112,11 @@ export default function Composer({
           disabled={running}
         />
         <button className="primary send" onClick={() => void send()} disabled={disabled || !text.trim()}>
-          {mode === 'continua' ? 'invia' : 'avvia'}
+          {mode === 'continua' ? t('composer.send') : t('composer.start')}
         </button>
       </div>
       <div className="hint">
-        Invio = avvia · Shift+Invio = nuova riga · i tre agenti discutono da soli fino al consenso o allo stop
+        {t('composer.hint')}
       </div>
     </footer>
   )

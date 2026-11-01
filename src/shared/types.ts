@@ -20,10 +20,14 @@ export interface SearchSettings {
   maxResults: number
 }
 
+import type { Locale } from './i18n'
+
 export type UiFont = 'system' | 'sans' | 'serif' | 'mono'
 export type UiDensity = 'comfortable' | 'compact'
 
 export interface UiSettings {
+  /** lingua dell'interfaccia */
+  language: Locale
   /** scala del testo (0.85 - 1.6) */
   fontScale: number
   fontFamily: UiFont
@@ -256,6 +260,7 @@ export const DEFAULT_SETTINGS: Settings = {
   temperature: 0.85,
   textScale: 1,
   ui: {
+    language: 'en',
     fontScale: 1,
     fontFamily: 'system',
     density: 'comfortable',

@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Persona, Turn, UiSettings } from '../../../shared/types'
 import Markdown from '../markdown'
+import { useT } from '../i18n'
 
 export type Phase = 'prefill' | 'thinking' | 'writing' | 'tool' | 'idle'
 
-const PHASE_LABEL: Record<Phase, string> = {
-  prefill: 'preparazione del prompt',
-  thinking: 'sta ragionando',
-  writing: 'sta scrivendo',
-  tool: 'sta usando un tool',
+const PHASE_KEY: Record<Phase, string> = {
+  prefill: 'chat.phase.prefill',
+  thinking: 'chat.phase.thinking',
+  writing: 'chat.phase.writing',
+  tool: 'chat.phase.tool',
   idle: ''
 }
 
@@ -38,6 +39,7 @@ export default function ChatColumn({
   ui,
   active
 }: Props): JSX.Element {
+  const t = useT()
   const boxRef = useRef<HTMLDivElement>(null)
   const reasoningRef = useRef<HTMLPreElement>(null)
   const stickRef = useRef(true)
@@ -91,21 +93,24 @@ export default function ChatColumn({
         {busy && (
           <span className={`phase ${phase}`}>
             <span className="spinner" />
-            {PHASE_LABEL[phase as Phase]}
+            {t(PHASE_KEY[phase as Phase])}
             {elapsed > 0 && ` · ${elapsed}s`}
           </span>
         )}
-        {!busy && calledBy && <span className="calledby">chiamato da {calledBy}</span>}
-        {!busy && !calledBy && nextUp && <span className="nextup">ha la parola</span>}
+        {!busy && calledBy && <span className="calledby">{t('chat.calledBy', { name: calledBy })}</span>}
+        {!busy && !calledBy && nextUp && <span className="nextup">{t('chat.nextUp')}</span>}
         <span className="count">{turns.length}</span>
       </header>
 
       <div className="messages" ref={boxRef} onScroll={onScroll}>
         {turns.length === 0 && !streaming && !streamReasoning && (
           <p className="empty">
-            {persona.name} non è ancora intervenuto.
-            <br />
-            Avvia un dibattito: riceverà il turno in automatico.
+            {t('chat.empty', { name: persona.name }).split('\n').map((line, i) => (
+              <span key={i}>
+                {line}
+                <br />
+              </span>
+            ))}
           </p>
         )}
 
@@ -115,19 +120,21 @@ export default function ChatColumn({
             className={`bubble ${turn.agentId === 'utente' ? 'user' : ''} ${turn.interrupted ? 'interrupted' : ''}`}
           >
             <div className="meta">
-              {turn.agentId === 'utente' ? 'tu' : 'turno'}
+              {turn.agentId === 'utente' ? t('chat.you') : t('chat.turn')}
               {(ui?.showTimestamps ?? true) && ` · ${new Date(turn.ts).toLocaleTimeString('it-IT')}`}
-              {turn.agentId === 'utente' && <span className="tok"> · messaggio inviato</span>}
+              {turn.agentId === 'utente' && <span className="tok"> · {t('chat.sent')}</span>}
               {(ui?.showTokens ?? true) && turn.tokensIn > 0 && (
-                <span className="tok"> · {turn.tokensIn} token di prompt</span>
+                <span className="tok"> · {t('chat.promptTokens', { n: turn.tokensIn })}</span>
               )}
-              {turn.cut === 'loop' && <span className="tok"> · fermato: ripetizione</span>}
-              {turn.cut === 'budget' && <span className="tok"> · vicino al limite di contesto</span>}
+              {turn.cut === 'loop' && <span className="tok"> · {t('chat.cutLoop')}</span>}
+              {turn.cut === 'budget' && <span className="tok"> · {t('chat.cutBudget')}</span>}
               {turn.cut === 'handoff' && (
                 <span className="tok">
                   {' '}
-                  · ha passato la parola a{' '}
-                  {personas.find((p) => p.id === turn.handoffTo)?.name ?? 'un altro agente'}
+                  ·{' '}
+                  {t('chat.handoff', {
+                    name: personas.find((p) => p.id === turn.handoffTo)?.name ?? '—'
+                  })}
                 </span>
               )}
             </div>
@@ -147,7 +154,7 @@ export default function ChatColumn({
 
             {turn.reasoning && (
               <details className="reasoning">
-                <summary>ragionamento ({turn.reasoning.length} caratteri)</summary>
+                <summary>{t('chat.reasoning', { n: turn.reasoning.length })}</summary>
                 <pre>{turn.reasoning}</pre>
               </details>
             )}
@@ -178,7 +185,7 @@ export default function ChatColumn({
             {streamReasoning && (
               <details className="reasoning live" open>
                 <summary>
-                  <span className="spinner" /> sta ragionando…
+                  <span className="spinner" /> {t('chat.thinkingNow')}
                 </summary>
                 <pre ref={reasoningRef}>{streamReasoning}</pre>
               </details>
@@ -193,7 +200,7 @@ export default function ChatColumn({
               !streamReasoning && (
                 <div className="waiting">
                   <span className="spinner" />
-                  {PHASE_LABEL[(phase ?? 'prefill') as Phase]}…
+                  {t(PHASE_KEY[(phase ?? 'prefill') as Phase])}…
                 </div>
               )
             )}

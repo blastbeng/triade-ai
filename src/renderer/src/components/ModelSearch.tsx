@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useT } from '../i18n'
 
 type Verdict = Awaited<ReturnType<typeof window.triade.hfInspect>>
 type Row = { repo: string; downloads: number; tags: string[] }
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function ModelSearch({ onInstalled, onError }: Props): JSX.Element {
+  const t = useT()
   const [query, setQuery] = useState('')
   const [rows, setRows] = useState<Row[]>([])
   const [busy, setBusy] = useState(false)
@@ -55,7 +57,7 @@ export default function ModelSearch({ onInstalled, onError }: Props): JSX.Elemen
     setMessage(null)
     try {
       const res = await window.triade.modelsAddCustom(verdict.repo, quant)
-      setMessage(`aggiunto: ${verdict.name} ${quant} — download in corso`)
+      setMessage(t('search.added', { name: verdict.name, quant }))
       await window.triade.modelsInstall(res.entry.id)
       onInstalled?.(res.entry.id)
     } catch (err) {
@@ -67,19 +69,25 @@ export default function ModelSearch({ onInstalled, onError }: Props): JSX.Elemen
     }
   }
 
+  const reasonText = (v: Verdict): string => {
+    const main = t(v.reasonCode || 'reason.noFiles', v.reasonParams)
+    const notes = (v.notes ?? []).map((n) => t(n.code, n.params)).join('')
+    return `${main}${notes}`
+  }
+
   return (
     <div className="modelsearch">
       <div className="inline">
         <input
           value={query}
-          placeholder="cerca un modello GGUF su HuggingFace (es. qwen2.5-vl, gemma-3, mistral)"
+          placeholder={t('search.placeholder')}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') void search()
           }}
         />
         <button className="ghost" onClick={() => void search()} disabled={busy}>
-          cerca
+          {t('search.find')}
         </button>
       </div>
 
@@ -90,8 +98,10 @@ export default function ModelSearch({ onInstalled, onError }: Props): JSX.Elemen
               <button className="hfrepo" onClick={() => void inspect(r.repo)} disabled={busy}>
                 <span className="repo">{r.repo}</span>
                 <span className="meta">
-                  {r.downloads.toLocaleString('it-IT')} download
-                  {r.tags.includes('image-text-to-text') || r.tags.includes('vision') ? ' · vision' : ''}
+                  {t('search.downloads', { n: r.downloads.toLocaleString() })}
+                  {r.tags.includes('image-text-to-text') || r.tags.includes('vision')
+                    ? ` · ${t('search.vision')}`
+                    : ''}
                 </span>
               </button>
             </li>
@@ -104,41 +114,48 @@ export default function ModelSearch({ onInstalled, onError }: Props): JSX.Elemen
           <div className="vhead">
             <strong>{verdict.name}</strong>
             <span className={`tag ${verdict.ok ? 'ok' : 'ko'}`}>
-              {verdict.ok ? 'usabile' : 'escluso'}
+              {verdict.ok ? t('search.usable') : t('search.excluded')}
             </span>
           </div>
-          <p>{verdict.reason}</p>
+          <p>{reasonText(verdict)}</p>
           <p className="note">
-            GPU: {verdict.deviceName ?? 'nessuna'} · VRAM disponibile {verdict.availableMiB} MiB · RAM{' '}
-            {(verdict.ramMiB / 1024).toFixed(0)} GB · vision: {verdict.vision ? 'sì' : 'no'}
+            {t('search.gpu')}: {verdict.deviceName ?? t('search.none')} ·{' '}
+            {t('search.available', { n: verdict.availableMiB })} ·{' '}
+            {t('search.ram', { n: (verdict.ramMiB / 1024).toFixed(0) })} ·{' '}
+            {verdict.vision ? t('search.visionYes') : t('search.visionNo')}
           </p>
           <div className="chips">
             <span className="chip">{verdict.arch}</span>
-            {verdict.moe && <span className="chip moe">MoE · esperti</span>}
-            {verdict.mode === 'partial' && <span className="chip warn">esperti su CPU</span>}
-            {verdict.mode === 'full' && <span className="chip ok">tutto in GPU</span>}
+            {verdict.moe && <span className="chip moe">{t('search.moe')}</span>}
+            {verdict.mode === 'partial' && <span className="chip warn">{t('search.expertsOnCpu')}</span>}
+            {verdict.mode === 'full' && <span className="chip ok">{t('search.allInGpu')}</span>}
             {verdict.ok && verdict.contextSuggestion > 0 && (
-              <span className="chip">contesto consigliato {verdict.contextSuggestion}</span>
+              <span className="chip">{t('search.ctxSuggestion', { n: verdict.contextSuggestion })}</span>
             )}
             {verdict.ok && verdict.mode === 'partial' && (
-              <span className="chip">RAM ~{(verdict.ramNeededMiB / 1024).toFixed(1)} GB</span>
+              <span className="chip">{t('search.ramNeeded', { n: (verdict.ramNeededMiB / 1024).toFixed(1) })}</span>
             )}
           </div>
 
           {verdict.ok && (
             <>
               <label>
-                Quant
+                {t('search.quant')}
                 <select value={quant} onChange={(e) => setQuant(e.target.value)}>
                   {verdict.variants.map((v) => (
                     <option key={v.quant} value={v.quant} disabled={!v.fits && !v.fitsPartial}>
-                      {v.quant} · {gb(v.bytes)} · {v.fits ? `tutto in GPU (ctx ${v.ctxFull})` : v.fitsPartial ? `esperti in CPU (ctx ${v.ctxPartial})` : 'non entra'}
+                      {v.quant} · {gb(v.bytes)} ·{' '}
+                      {v.fits
+                        ? t('search.allGpu', { n: v.ctxFull })
+                        : v.fitsPartial
+                          ? t('search.expertsCpu', { n: v.ctxPartial })
+                          : t('search.noFit')}
                     </option>
                   ))}
                 </select>
               </label>
               <button className="primary" onClick={() => void add()} disabled={busy || !quant}>
-                scarica e aggiungi
+                {t('search.add')}
               </button>
             </>
           )}
@@ -146,7 +163,7 @@ export default function ModelSearch({ onInstalled, onError }: Props): JSX.Elemen
       )}
 
       {message && <p className="note">{message}</p>}
-      {busy && <p className="note">verifica in corso…</p>}
+      {busy && <p className="note">{t('search.checking')}</p>}
     </div>
   )
 }

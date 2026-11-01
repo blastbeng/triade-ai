@@ -14,6 +14,7 @@ function merge(base: Settings, patch: Partial<Settings>): Settings {
     ui: {
       ...base.ui,
       ...(patch.ui ?? {}),
+      language: patch.ui?.language ?? base.ui.language,
       fontScale: patch.ui?.fontScale ?? patch.textScale ?? base.ui.fontScale
     },
     search: { ...base.search, ...(patch.search ?? {}) },

@@ -1,25 +1,42 @@
 import { useEffect, useState } from 'react'
+import { LOCALES, translate, type Locale } from '../../../shared/i18n'
 import type { CatalogEntry } from '../env'
 import ModelSearch from './ModelSearch'
 
 interface Props {
   catalog: CatalogEntry[]
+  language: Locale
+  onLanguage: (locale: Locale) => Promise<void> | void
   onDone: (installed: string[], active: string) => Promise<void>
   onProgress: () => Promise<void>
 }
 
-export default function Onboarding({ catalog, onDone, onProgress }: Props): JSX.Element {
-  const [selected, setSelected] = useState<string[]>(
-    catalog.filter((m) => m.recommended && !m.installed).map((m) => m.id)
-  )
+export default function Onboarding({
+  catalog,
+  language,
+  onLanguage,
+  onDone,
+  onProgress
+}: Props): JSX.Element {
+  const [step, setStep] = useState<'language' | 'models'>('language')
+  const [locale, setLocale] = useState<Locale>(language)
+  const [selected, setSelected] = useState<string[]>([])
   const [phase, setPhase] = useState<string>('')
-  const [pct, setPct] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
 
+  const t = (key: string, params?: Record<string, string | number>): string =>
+    translate(locale, key, params)
+
+  useEffect(() => {
+    setSelected(catalog.filter((m) => m.recommended && !m.installed).map((m) => m.id))
+  }, [catalog])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') void onDone(catalog.filter((m) => m.installed).map((m) => m.id), catalog[0]?.id ?? '')
+      if (e.key === 'Escape') {
+        void onDone(catalog.filter((m) => m.installed).map((m) => m.id), catalog[0]?.id ?? '')
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -48,13 +65,46 @@ export default function Onboarding({ catalog, onDone, onProgress }: Props): JSX.
     }
   }
 
+  if (step === 'language') {
+    return (
+      <div className="modal">
+        <div className="modalbox onboarding langpick">
+          <h2>{t('onboarding.langTitle')}</h2>
+          <p className="lead">{t('onboarding.langLead')}</p>
+          <div className="langgrid">
+            {LOCALES.map((l) => (
+              <button
+                key={l.id}
+                className={`langbutton ${l.id === locale ? 'selected' : ''}`}
+                onClick={() => setLocale(l.id)}
+              >
+                <span className="flag">{l.flag}</span>
+                <span>{l.label}</span>
+              </button>
+            ))}
+          </div>
+          <footer className="modalfooter">
+            <button
+              className="primary"
+              onClick={async () => {
+                await onLanguage(locale)
+                setStep('models')
+              }}
+            >
+              {t('onboarding.continue')}
+            </button>
+          </footer>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="modal">
       <div className="modalbox onboarding">
-        <h2>Benvenuto in TriadeAI</h2>
+        <h2>{t('onboarding.title')}</h2>
         <p className="lead">
-          Scegli quali modelli vuoi usare. Puoi selezionarne più di uno: verranno scaricati in
-          <code> dati/modelli/</code>, accanto all’app. Ogni chat potrà poi usare il proprio modello.
+          {t('onboarding.lead')} <code>dati/modelli/</code> {t('onboarding.lead2')}
         </p>
 
         <ul className="catalog">
@@ -69,13 +119,13 @@ export default function Onboarding({ catalog, onDone, onProgress }: Props): JSX.
                 />
                 <div>
                   <strong>
-                    {m.name} {m.recommended && <span className="tag">consigliato</span>}
-                    {m.installed && <span className="tag ok">installato</span>}
+                    {m.name} {m.recommended && <span className="tag">{t('onboarding.recommended')}</span>}
+                    {m.installed && <span className="tag ok">{t('onboarding.installed')}</span>}
                   </strong>
                   <p>{m.description}</p>
                   <span className="meta">
                     {m.architecture} · {(m.bytes / 1024 ** 3).toFixed(1)} GB ·{' '}
-                    {m.vision ? 'vision' : 'solo testo'} · {m.license}
+                    {m.vision ? t('onboarding.vision') : t('onboarding.textOnly')} · {m.license}
                   </span>
                 </div>
               </label>
@@ -83,11 +133,8 @@ export default function Onboarding({ catalog, onDone, onProgress }: Props): JSX.
           ))}
         </ul>
 
-        <h3 className="searchtitle">oppure cerca un altro modello su HuggingFace</h3>
-        <p className="lead small">
-          Ogni candidato viene verificato prima di essere proposto: se non ha la vision (mmproj) o se
-          nessun quant entra nella tua GPU, viene escluso con il motivo.
-        </p>
+        <h3 className="searchtitle">{t('onboarding.searchTitle')}</h3>
+        <p className="lead small">{t('onboarding.searchLead')}</p>
         <ModelSearch
           onInstalled={async (id) => {
             setSelected((prev) => (prev.includes(id) ? prev : [...prev, id]))
@@ -96,19 +143,23 @@ export default function Onboarding({ catalog, onDone, onProgress }: Props): JSX.
           onError={setError}
         />
 
-        {working && (
-          <p className="note">
-            download di {phase}: {Math.round(pct)}%
-          </p>
-        )}
+        {working && <p className="note">{t('onboarding.downloading', { model: phase, pct: 0 })}</p>}
         {error && <p className="error">{error}</p>}
 
         <footer className="modalfooter">
-          <button className="ghost" onClick={() => void onDone(catalog.filter((m) => m.installed).map((m) => m.id), catalog[0].id)}>
-            salta per ora
+          <button
+            className="ghost"
+            onClick={() =>
+              void onDone(
+                catalog.filter((m) => m.installed).map((m) => m.id),
+                catalog[0]?.id ?? ''
+              )
+            }
+          >
+            {t('onboarding.skip')}
           </button>
           <button className="primary" onClick={() => void start()} disabled={working || !selected.length}>
-            scarica e inizia
+            {t('onboarding.start')}
           </button>
         </footer>
       </div>

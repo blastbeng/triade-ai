@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { MemoryItem, MemoryStats } from '../env'
 
+import { useT } from '../i18n'
+
 export default function MemoryPanel({ onClose }: { onClose: () => void }): JSX.Element {
+  const t = useT()
   const [stats, setStats] = useState<MemoryStats | null>(null)
   const [items, setItems] = useState<MemoryItem[]>([])
   const [query, setQuery] = useState('')
@@ -29,35 +32,35 @@ export default function MemoryPanel({ onClose }: { onClose: () => void }): JSX.E
   return (
     <div className="modal" onClick={onClose}>
       <div className="modalbox" onClick={(e) => e.stopPropagation()}>
-        <h2>Memoria condivisa</h2>
-        <p className="lead">
-          Tutto ciò che le chat hanno prodotto finisce in un vector store locale
-          (<code>dati/memoria/</code>): i fatti delle sessioni passate vengono richiamati per
-          similarità quando servono.
-        </p>
+        <h2>{t('memory.title')}</h2>
+        <p className="lead">{t('memory.lead')}</p>
         {stats && (
           <div className="memstats">
-            <span>{stats.entries} elementi</span>
+            <span>{t('memory.entries', { n: stats.entries })}</span>
             {Object.entries(stats.byKind).map(([k, v]) => (
               <span key={k}>
                 {k}: {v}
               </span>
             ))}
             <span>{(stats.bytes / 1024).toFixed(0)} KB</span>
-            {stats.lastTs > 0 && <span>ultimo: {new Date(stats.lastTs).toLocaleString('it-IT')}</span>}
+            {stats.lastTs > 0 && (
+              <span>
+                {t('memory.last', { date: new Date(stats.lastTs).toLocaleString() })}
+              </span>
+            )}
           </div>
         )}
         <div className="inline">
           <input
             value={query}
-            placeholder="cerca nella memoria…"
+            placeholder={t('memory.search')}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') void search()
             }}
           />
           <button className="ghost" onClick={() => void search()}>
-            cerca
+            {t('memory.find')}
           </button>
         </div>
         <ul className="memlist">
@@ -67,16 +70,16 @@ export default function MemoryPanel({ onClose }: { onClose: () => void }): JSX.E
               <div>
                 <p>{m.text}</p>
                 <small>
-                  {new Date(m.ts).toLocaleString('it-IT')}
+                  {new Date(m.ts).toLocaleString()}
                   {typeof m.score === 'number' && ` · score ${m.score.toFixed(3)}`}
                 </small>
               </div>
-              <button className="memdel" title="Elimina questa voce dalla memoria" onClick={() => void remove(m.id)}>
+              <button className="memdel" title={t('memory.delete')} onClick={() => void remove(m.id)}>
                 ×
               </button>
             </li>
           ))}
-          {items.length === 0 && <li className="empty">memoria vuota</li>}
+          {items.length === 0 && <li className="empty">{t('memory.empty')}</li>}
         </ul>
         <footer className="modalfooter">
           <button
@@ -86,10 +89,10 @@ export default function MemoryPanel({ onClose }: { onClose: () => void }): JSX.E
               setItems([])
             }}
           >
-            svuota memoria
+            {t('memory.clear')}
           </button>
           <button className="ghost" onClick={onClose}>
-            chiudi
+            {t('memory.close')}
           </button>
         </footer>
       </div>
