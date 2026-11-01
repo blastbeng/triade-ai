@@ -22,6 +22,9 @@ concurrency:
 jobs:
   promote:
     runs-on: ubuntu-latest
+    outputs:
+      big: ${{ steps.check.outputs.big }}
+      version: ${{ steps.check.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -79,3 +82,12 @@ jobs:
         run: |
           echo "v${{ steps.check.outputs.version }} è solo una patch: nessuna release."
           echo "Per forzarla: Actions → promote → Run workflow → force."
+
+  publish:
+    name: publish release
+    needs: promote
+    if: needs.promote.outputs.big == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    secrets: inherit
