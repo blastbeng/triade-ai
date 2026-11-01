@@ -40,8 +40,15 @@ async function get(url: string, accept = 'text/html,application/xhtml+xml'): Pro
       redirect: 'follow',
       signal: AbortSignal.timeout(15000)
     })
-    if (!res.ok) return null
-    return await res.text()
+    if (!res.ok) {
+      if (process.env.TRIADE_DEBUG_SEARCH) console.log(`[search] GET ${url} → HTTP ${res.status}`)
+      return null
+    }
+    const body = await res.text()
+    if (process.env.TRIADE_DEBUG_SEARCH) {
+      console.log(`[search] GET ${url} → ${res.status}, ${body.length} byte, b_algo=${(body.match(/<li class="b_algo/g) ?? []).length}`)
+    }
+    return body
   } catch {
     return null
   }
@@ -156,6 +163,9 @@ export async function fallbackSearch(
   ]
   for (const engine of chain) {
     const hits = await engine.run()
+    if (process.env.TRIADE_DEBUG_SEARCH) {
+      console.log(`[search] ${engine.name} → ${hits.length} risultati`)
+    }
     if (hits.length) return { hits, engine: engine.name }
   }
   return { hits: [], engine: 'none' }
