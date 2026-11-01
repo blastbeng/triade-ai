@@ -225,8 +225,6 @@ credentials are committed.
 
 ## 8. Known limits
 
-- **Code signing**: SmartScreen warnings disappear only with a certificate. The pipeline is ready
-  (`CSC_LINK` / `CSC_KEY_PASSWORD`), nothing is bypassed in code.
 - **Public SearXNG** instances usually answer with a captcha: use your own instance for reliable
   web search.
 - **OpenAI/Anthropic real calls** require your keys; the *test* button reports the exact error.
@@ -236,43 +234,7 @@ credentials are committed.
   recommended.
 - App icon still the Electron default.
 
-## 9. Windows trust (no SmartScreen warnings)
-
-Windows warns about any executable that is not signed by a certificate the SmartScreen service
-trusts. There is no code trick to bypass it — the only honest routes are these:
-
-| Route | Cost | User warnings | Notes |
-|---|---|---|---|
-| **Microsoft Store (MSIX)** | **free** for individual developers (registration fee waived, ID verification via government ID + selfie) | **none** — the package is signed by Microsoft | best "free and zero warnings" path; review time and Store policies apply |
-| **SignPath Foundation** | **free** for eligible OSS projects (OV-level certificate, signing runs in their pipeline) | practically none after reputation builds | requires public repo + OSI licence; apply at signpath.org |
-| **Azure Artifact Signing** (ex Trusted Signing) | ~**9.99 USD/month** | none in practice (own certificate, reputation per identity) | individual identity validation supported; fully managed, best DX |
-| Traditional OV certificate | ~150-300 USD/year | may warn until reputation accrues | HSM/token required since 2023 |
-| EV certificate | ~300-600 USD/year | none, immediately | the paid guarantee |
-| Self-signed certificate | free | **still warns** on other machines | only useful inside a managed fleet where you install the root CA |
-
-**Recommendation for TriadeAI:** publish on the **Microsoft Store as MSIX** (free, zero warnings) and,
-in parallel, apply to **SignPath Foundation** to sign the portable `.exe` for direct distribution.
-Keep the portable artifact as a secondary channel with published SHA-256 checksums.
-
-The build is already wired for signing:
-
-```bash
-# PFX (OV/EV) — jsign + timestamp server
-CSC_LINK=/path/cert.pfx CSC_KEY_PASSWORD=… npm run sign:win
-
-# Azure Artifact Signing
-AZURE_SIGNING_ENDPOINT=https://weu.codesigning.azure.net/ \
-AZURE_SIGNING_ACCOUNT=… AZURE_SIGNING_PROFILE=… npm run sign:win
-
-# checksums for the release page
-npm run checksums        # → dist/SHA256SUMS.txt
-```
-
-Without credentials the script exits cleanly and the artifacts stay unsigned (never silently
-"looks signed"). Signing is applied to every `.exe/.msi/.msix` in `dist/`, and the timestamp server
-keeps the signature valid after the certificate expires.
-
-## 10. CI and automatic releases (GitHub Actions)
+## 9. CI and automatic releases (GitHub Actions)
 
 The repository lives on GitHub, so the pipeline is **GitHub Actions** (`.github/workflows/pipeline.yml`);
 GitLab CI cannot run on GitHub-hosted repositories, it would only apply to a GitLab mirror.
@@ -282,9 +244,7 @@ What happens on every push:
 1. **check** — `npm ci`, `npm run typecheck`, `npm run build`.
 2. **linux** — fetch the bundles (cached by `scripts/fetch-binaries.mjs` hash), build the AppImage,
    generate checksums, upload the artifact.
-3. **windows** — same on a native `windows-latest` runner (no wine needed), portable `.exe`,
-   optional signing when these secrets exist: `CSC_LINK`, `CSC_KEY_PASSWORD` or
-   `AZURE_SIGNING_*`.
+3. **windows** — same on a native `windows-latest` runner (no wine needed), portable `.exe`.
 4. **release** — on `main` (or a `v*` tag), if the version in `package.json` has no release yet, it
    creates the tag `v<version>` and publishes a GitHub Release with the AppImage, the portable exe
    and a merged `SHA256SUMS.txt`, with notes generated from the commits.
@@ -292,7 +252,7 @@ What happens on every push:
 So the release flow is: **change → `npm run release:minor` → commit → push**. The runner publishes the
 release automatically; pushing again with the same version does nothing (no duplicate releases).
 
-## 11. License
+## 10. License
 
 MIT for the code. The model has its own license — see the
 [junafinity/Ornith-1.5-9B-uncensored](https://huggingface.co/junafinity/Ornith-1.5-9B-uncensored)
