@@ -13,8 +13,27 @@ export function appRoot(): string {
   // AppImage: l'exe gira da un mount temporaneo, i dati stanno accanto al file .AppImage
   const appImage = process.env.APPIMAGE
   if (appImage) return path.dirname(appImage)
+  // AppImage lanciata con --appimage-extract-and-run (o runtime senza FUSE):
+  // ricostruiamo il percorso del file .AppImage dal comando di avvio
+  if (process.platform === 'linux') {
+    try {
+      const argv0 = fs.readFileSync('/proc/self/cmdline', 'utf8').split('\0')[0]
+      const original = process.env.OWD ? path.resolve(process.env.OWD, argv0) : path.resolve(argv0)
+      if (/\.AppImage$/i.test(original) && fs.existsSync(original)) {
+        return path.dirname(original)
+      }
+    } catch {
+      // nessun cmdline leggibile
+    }
+  }
   if (app.isPackaged) {
     const dir = path.dirname(app.getPath('exe'))
+    // directory temporanea di scompattazione: non è una sede valida per i dati
+    if (/[\\/](appimage_extracted_|\.mount_|temp[\\/]|AppData[\\/]Local[\\/]Temp)/i.test(dir) && !process.env.PORTABLE_EXECUTABLE_DIR) {
+      const fallback = path.join(app.getPath('userData'), 'dati-app')
+      fs.mkdirSync(fallback, { recursive: true })
+      return fallback
+    }
     // installazione in /usr/bin o Program Files: meglio la cartella utente
     try {
       fs.accessSync(dir, fs.constants.W_OK)
