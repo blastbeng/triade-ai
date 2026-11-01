@@ -8,7 +8,16 @@ import { humanizeError } from '../errors'
 import { extractInlineToolCalls } from './tools'
 import { mediaUrl } from '../paths'
 import { defaultModelId } from '../models/registry'
-import type { Attachment, Backend, DebateEvent, Mention, Persona, Session, Turn } from '../../shared/types'
+import type {
+  Attachment,
+  Backend,
+  Conclusion,
+  DebateEvent,
+  Mention,
+  Persona,
+  Session,
+  Turn
+} from '../../shared/types'
 import { buildMessages, summarize, tokenCountOf } from './context'
 import { attachmentContext } from './document'
 import { loadSession, newSession, provisionalTitle, saveSession } from './store'
@@ -16,9 +25,8 @@ import { submitTarget } from './target'
 import { distillSession, rememberTurn, rememberUserNote } from '../memory/integrate'
 import { TOOL_SPECS, runTool } from './tools'
 import { HANDOFF, chooseNextSpeaker, parseHandoff } from './schedule'
-
-const CONSENSUS = /\[\[\s*CONSENSO\s*(?::([\s\S]*?))?\s*\]\]/i
-/** cessione della parola: [[PASSA A: Nome]] */
+import { impossibleTooEarly, parseClosing, stripClosingMarkers } from './conclusion'
+import { turnLimitReached } from '../../shared/turns'
 
 const MAX_TOOL_ROUNDS = 2
 
@@ -189,7 +197,9 @@ export class DebateEngine extends EventEmitter {
       }
       session.turns.push(turn)
       session.turnIndex = session.turns.length
+      // una nuova istruzione riapre il dibattito: l'esito precedente non vale più
       session.consensus = undefined
+      session.conclusion = undefined
       if (attachments.length) {
         session.attachments = [...(session.attachments ?? []), ...attachments]
         session.pendingImages = [
@@ -393,6 +403,83 @@ export class DebateEngine extends EventEmitter {
     })
   }
 
+  /**
+   * Chiude il dibattito lasciando una risposta finale: la UI la mostra sopra
+   * le colonne, così l'utente vede che il ciclo è finito e perché.
+   */
+  private finish(conclusion: Conclusion): void {
+    if (!this.session) return
+    this.session.conclusion = conclusion
+    // il campo `consensus` resta per le chat e le versioni precedenti
+    if (conclusion.kind === 'consenso') {
+      this.session.consensus = {
+        answer: conclusion.answer,
+        proposedBy: conclusion.proposedBy ?? '',
+        validatedBy: conclusion.validatedBy ?? ''
+      }
+    } else {
+      this.session.consensus = undefined
+    }
+    saveSession(this.session)
+    this.emitEvent({ type: 'conclusion', conclusion })
+    const finished = this.session
+    this.setState('concluded')
+    this.distillInBackground(finished)
+  }
+
+  /**
+   * Tetto di turni raggiunto: prima di chiudere si chiede una sintesi finale.
+   * Se il modello non risponde (o è interrotto) resta l'ultimo scambio, mai
+   * una conclusione vuota.
+   */
+  private async closeOnLimit(personas: Persona[]): Promise<void> {
+    const session = this.session
+    if (!session) return
+    const meaningful = session.turns.filter((t) => t.text.trim().length > 0)
+    let answer = ''
+    try {
+      const persona = personas[0] ?? activePersonas(getSettings())[0]
+      const ep = await this.endpointFor(persona)
+      const transcript = meaningful
+        .slice(-12)
+        .map((t) => `[${t.name}] ${t.text}`)
+        .join('\n\n')
+        .slice(-9000)
+      const res = await chat(ep.baseUrl, {
+        backend: ep.backend,
+        apiKey: ep.apiKey,
+        model: ep.model,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Chiudi un dibattito tra più assistenti. Rispondi SOLO con la sintesi finale, in italiano, in 5 righe al massimo: la risposta migliore raggiunta, i punti ancora aperti, niente preamboli e niente domande.'
+          },
+          { role: 'user', content: `DIBATTITO:\n${transcript}` }
+        ],
+        temperature: 0.2,
+        maxTokens: 400,
+        noThinking: true,
+        signal: this.abort?.signal
+      })
+      answer = (res.content ?? '').trim()
+    } catch (err) {
+      this.emitEvent({ type: 'log', message: `sintesi finale non generata: ${(err as Error).message}` })
+    }
+    if (!answer) {
+      const last = meaningful.slice(-3)
+      answer = last.length
+        ? last.map((t) => `${t.name}: ${t.text}`).join('\n\n')
+        : 'Il dibattito si è chiuso senza una risposta condivisa.'
+    }
+    this.finish({
+      kind: 'limite',
+      answer,
+      reason: `limite di ${getSettings().maxTurns} turni`,
+      at: Date.now()
+    })
+  }
+
   private async runLoop(): Promise<void> {
     try {
       while (this.session && this.session.state === 'running') {
@@ -400,11 +487,12 @@ export class DebateEngine extends EventEmitter {
         const personas = activePersonas(settings)
         const agentTurns = this.session.turns.filter((t) => t.agentId !== 'utente').length
         const turnIndex = agentTurns
-        if (turnIndex >= settings.maxTurns) {
+        // maxTurns = 0 (default) significa illimitato: qui si passa solo se
+        // l'utente ha scelto un tetto, e in quel caso il dibattito non può
+        // chiudersi in silenzio — serve comunque una risposta finale
+        if (turnLimitReached(settings.maxTurns, turnIndex)) {
           this.emitEvent({ type: 'log', message: `limite di ${settings.maxTurns} turni raggiunto` })
-          const finished = this.session
-          this.setState('concluded')
-          this.distillInBackground(finished)
+          await this.closeOnLimit(personas)
           break
         }
         const persona = this.pickSpeaker(personas)
@@ -660,11 +748,9 @@ export class DebateEngine extends EventEmitter {
           this.emitEvent({ type: 'log', message: `${persona.name} passa la parola a ${target.name}` })
         }
 
-        const clean = text
-          .replace(CONSENSUS, '')
-          .replace(HANDOFF, '')
-          .trim()
-        const marker = CONSENSUS.exec(text)
+        const clean = stripClosingMarkers(text.replace(HANDOFF, ''))
+        // il marcatore con cui l'agente chiude il dibattito (consenso o impossibilità)
+        const closing = parseClosing(text)
         const turn: Turn = {
           id: randomUUID(),
           agentId: persona.id,
@@ -723,20 +809,42 @@ export class DebateEngine extends EventEmitter {
           break
         }
 
-        if (marker) {
-          const proposed = (marker[1] ?? clean).trim()
+        // il gruppo dichiara che una soluzione condivisa non esiste: si chiude
+        // con quella sintesi, senza giudice (non c'è nulla da validare), ma solo
+        // dopo una discussione reale
+        if (closing?.kind === 'impossibile') {
+          const agentTurns = this.session.turns.filter((t) => t.agentId !== 'utente').length
+          if (impossibleTooEarly(agentTurns)) {
+            this.emitEvent({
+              type: 'log',
+              message: `${persona.name}: chiusura per impossibilità ignorata (dibattito troppo breve)`
+            })
+          } else {
+            this.finish({
+              kind: 'impossibile',
+              answer:
+                closing.answer ||
+                clean ||
+                'Il gruppo ha accertato che non esiste una soluzione condivisa.',
+              proposedBy: persona.name,
+              reason: closing.answer ? undefined : 'motivo non indicato',
+              at: Date.now()
+            })
+            break
+          }
+        }
+
+        if (closing?.kind === 'consenso') {
+          const proposed = closing.answer || clean
           const validated = await this.validateConsensus(ep, persona, proposed, controller.signal)
           if (validated.ok) {
-            this.session.consensus = {
+            this.finish({
+              kind: 'consenso',
               answer: validated.answer || proposed,
               proposedBy: persona.name,
-              validatedBy: validated.by
-            }
-            saveSession(this.session)
-            this.emitEvent({ type: 'consensus', consensus: this.session.consensus })
-            const finished = this.session
-            this.setState('concluded')
-            this.distillInBackground(finished)
+              validatedBy: validated.by,
+              at: Date.now()
+            })
             break
           }
           this.emitEvent({ type: 'log', message: `consenso respinto dal giudice: ${validated.reason}` })

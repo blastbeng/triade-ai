@@ -103,6 +103,7 @@ export interface Settings {
   flashAttention: boolean
   kvCacheType: 'f16' | 'q8_0'
   maxTokensPerTurn: number
+  /** tetto di turni degli agenti; 0 = illimitato (default) */
   maxTurns: number
   temperature: number
   /** scala del testo dell'interfaccia (1 = base) */
@@ -179,6 +180,24 @@ export interface Consensus {
   validatedBy: string
 }
 
+export type ConclusionKind = 'consenso' | 'impossibile' | 'limite'
+
+/**
+ * Come si è chiuso il dibattito. `answer` è la risposta finale mostrata sopra
+ * le colonne: il dibattito non finisce mai “in silenzio”.
+ */
+export interface Conclusion {
+  kind: ConclusionKind
+  answer: string
+  /** chi ha chiuso il dibattito (consenso e impossibilità) */
+  proposedBy?: string
+  /** chi ha verificato la proposta (solo consenso) */
+  validatedBy?: string
+  /** perché il dibattito è chiuso: utile per impossibilità e limite */
+  reason?: string
+  at: number
+}
+
 export interface Session {
   /** titolo breve generato all'avvio (stile ChatGPT/OpenWebUI) */
   title?: string
@@ -200,6 +219,8 @@ export interface Session {
   /** prossimo interlocutore richiesto da una menzione o da una cessione di parola */
   nextSpeakerId?: string
   consensus?: Consensus
+  /** esito finale: consenso, impossibilità dichiarata o limite di turni */
+  conclusion?: Conclusion
   lastError?: string
   /** Immagini da mostrare al prossimo turno (ricerca immagini / frame video). */
   pendingImages?: string[]
@@ -255,6 +276,7 @@ export interface DebateEvent {
     | 'tool'
     | 'compression'
     | 'consensus'
+    | 'conclusion'
     | 'error'
     | 'log'
     | 'session'
@@ -269,6 +291,12 @@ import { defaultPersonas } from './personas'
 /** Personalità predefinite in inglese (lingua predefinita dell'app). */
 export const DEFAULT_PERSONAS: Persona[] = defaultPersonas('en')
 
+/**
+ * Il vecchio default era 40 turni. Chi ha ancora quel valore non ha mai scelto
+ * un limite: al caricamento viene riportato a 0 (illimitato).
+ */
+export const LEGACY_MAX_TURNS = 40
+
 export const DEFAULT_SETTINGS: Settings = {
   contextSize: 131072,
   compressionThreshold: 0.75,
@@ -277,7 +305,9 @@ export const DEFAULT_SETTINGS: Settings = {
   flashAttention: true,
   kvCacheType: 'q8_0',
   maxTokensPerTurn: 0,
-  maxTurns: 40,
+  // 0 = illimitato: il dibattito si chiude solo con un consenso o con
+  // l'accertata impossibilità di arrivarci, non per un tetto di turni
+  maxTurns: 0,
   temperature: 0.85,
   textScale: 1,
   ui: {

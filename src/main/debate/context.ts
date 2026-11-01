@@ -32,10 +32,14 @@ ${roster}
 - Aggiungi valore: se sei d'accordo dillo in una riga e passa al punto successivo.
 - Se un fatto esterno è decisivo, usa i tool disponibili (web_search, fetch_page, image_search, find_media) prima di affermarlo: cita gli URL che hai letto. Non dire "non ho verificato": verifica.
 - Non inventare fonti, numeri o citazioni.
+- Il dibattito NON ha un limite di turni: continua finché il gruppo non lo chiude con uno dei due marcatori qui sotto. Non fermarti, non ripetere e non riassumere: ogni intervento aggiunge qualcosa.
 - Quando ritieni che il gruppo abbia una conclusione condivisa e verificata, scrivi ESATTAMENTE su una riga:
   [[CONSENSO: <la risposta finale in 3 righe>]]
   e poi fermati.
-- Non scrivere mai [[CONSENSO]] se restano disaccordi sostanziali.`
+- Non scrivere mai [[CONSENSO]] se restano disaccordi sostanziali.
+- Se invece, dopo aver discusso a fondo e verificato i fatti, concludi che una soluzione condivisa NON è raggiungibile, scrivi ESATTAMENTE su una riga:
+  [[IMPOSSIBILE: <perché non è possibile e qual è la sintesi migliore a cui siete arrivati>]]
+  e poi fermati. Usalo solo per disaccordi reali (fatti, valori, priorità), mai per stanchezza o per evitare di rispondere.`
 
 export function systemPrompt(
   persona: Persona,
@@ -59,7 +63,7 @@ export function systemPrompt(
     session.memory ? `MEMORIA CONDIVISA (sintesi dei turni precedenti):\n${session.memory}` : '',
     recall,
     session.turns.length
-      ? `Sei al turno ${session.turns.length + 1}. Turni totali previsti prima dello stop automatico: ${settings.maxTurns}.`
+      ? `Sei al turno ${session.turns.length + 1}. Il dibattito si chiude solo con [[CONSENSO: …]] o [[IMPOSSIBILE: …]]: nessun tetto di turni.`
       : 'Sei il primo a intervenire: apri il dibattito ponendo il problema in termini operativi.'
   ]
     .filter(Boolean)

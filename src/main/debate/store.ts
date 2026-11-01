@@ -49,6 +49,16 @@ export function loadSession(id: string): Session | null {
     const session = JSON.parse(fs.readFileSync(file, 'utf8')) as Session
     // un processo chiuso a metà non può essere ancora "running"
     if (session.state === 'running') session.state = 'paused'
+    // le chat salvate prima di `conclusion` avevano solo il consenso
+    if (!session.conclusion && session.consensus) {
+      session.conclusion = {
+        kind: 'consenso',
+        answer: session.consensus.answer,
+        proposedBy: session.consensus.proposedBy,
+        validatedBy: session.consensus.validatedBy,
+        at: session.updatedAt ?? Date.now()
+      }
+    }
     return session
   } catch {
     return null

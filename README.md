@@ -39,8 +39,15 @@ Anthropic, Ollama).
   called column shows `called by Architect`.
 - **Mid-sentence hand-off** with `[[PASSA A: Name]]`: generation is aborted at the marker, the text
   written so far is kept, the marker removed, and the floor passes immediately (real interruption).
-- **Consensus** only when a judge call validates the proposal (`[[CONSENSO: …]]`); otherwise the
-  debate continues until `maxTurns`, error, or your stop.
+- **No turn limit by default** (`maxTurns = 0`): the debate keeps going on its own until the group
+  closes it, with no silent stop.
+- **Two explicit endings**, both validated in the transcript: **consensus** when a judge call
+  validates the proposal (`[[CONSENSO: …]]`), or **declared impossibility**
+  (`[[IMPOSSIBILE: …]]`) when the group has verified that no shared answer exists — accepted only
+  after at least three agent turns. If you *do* set a `maxTurns` limit, the engine asks for a
+  closing synthesis instead of stopping silently.
+- **The final answer appears above the three columns** (`conclusion`: kind, answer, who proposed
+  and who validated it), so the end of the cycle is visible at a glance.
 - **Pause / stop / resume**: pause aborts generation instantly and keeps the chat resumable; stop
   closes it (state `stopped`, facts distilled into memory); resume continues from the exact turn,
   even after restarting the app. A message sent into an existing conversation always continues it.

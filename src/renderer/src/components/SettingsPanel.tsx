@@ -262,9 +262,12 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
               {t('settings.maxTurns')}
               <input
                 type="number"
-                min={3}
+                min={0}
+                step={1}
                 value={draft.maxTurns}
-                onChange={(e) => setDraft({ ...draft, maxTurns: Number(e.target.value) })}
+                onChange={(e) =>
+                  setDraft({ ...draft, maxTurns: Math.max(0, Number(e.target.value) || 0) })
+                }
               />
             </label>
             <label>

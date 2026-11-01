@@ -336,16 +336,19 @@ button.ghost {
   margin: 4px 0 0;
 }
 
-/* ---------- consensus ---------- */
-.consensus {
+/* ---------- esito del dibattito (sopra le chat) ---------- */
+.conclusion {
   margin: 0 16px 8px;
   padding: 12px 14px;
   border-radius: 10px;
   border: 1px solid #1d5b60;
   background: #0f2429;
+  /* una sintesi lunga non deve schiacciare le colonne */
+  max-height: 38vh;
+  overflow: auto;
 }
 
-.consensus h3 {
+.conclusion h3 {
   margin: 0 0 6px;
   font-size: 15px;
   color: var(--accent);
@@ -353,12 +356,32 @@ button.ghost {
   text-transform: uppercase;
 }
 
-.consensus p {
+.conclusion p {
   margin: 0 0 6px;
   white-space: pre-wrap;
 }
 
-.consensus small {
+.conclusion small {
+  color: var(--muted);
+}
+
+/* nessuna soluzione condivisa: ambra, non verde */
+.conclusion.kind-impossibile {
+  border-color: #6b4b1d;
+  background: #241a0f;
+}
+
+.conclusion.kind-impossibile h3 {
+  color: #fbbf24;
+}
+
+/* tetto di turni raggiunto: neutro, non è un esito del gruppo */
+.conclusion.kind-limite {
+  border-color: #3b4252;
+  background: #141a22;
+}
+
+.conclusion.kind-limite h3 {
   color: var(--muted);
 }
 

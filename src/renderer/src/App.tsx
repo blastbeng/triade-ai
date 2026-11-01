@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type {
   Turn,
   Attachment,
+  Conclusion,
   DebateEvent,
   ModelStatus,
   ServerStatus,
@@ -148,6 +149,14 @@ export default function App(): JSX.Element {
         case 'consensus':
           setNotice('Consenso raggiunto')
           break
+        case 'conclusion': {
+          const conclusion = event.conclusion as Conclusion | undefined
+          if (conclusion) {
+            setSession((prev) => (prev ? { ...prev, conclusion } : prev))
+            pushLog(`dibattito chiuso: ${conclusion.kind}`)
+          }
+          break
+        }
         case 'error':
           setNotice(String(event.message))
           pushLog(`ERRORE: ${String(event.message)}`)
@@ -229,6 +238,18 @@ export default function App(): JSX.Element {
     return out
   }
   const isRunning = session?.state === 'running'
+  /** esito finale del dibattito: le chat vecchie hanno solo `consensus` */
+  const conclusion: Conclusion | undefined =
+    session?.conclusion ??
+    (session?.consensus
+      ? {
+          kind: 'consenso',
+          answer: session.consensus.answer,
+          proposedBy: session.consensus.proposedBy,
+          validatedBy: session.consensus.validatedBy,
+          at: session.updatedAt
+        }
+      : undefined)
   const activeModel = catalog.find((m) => m.active)
   const lastTokens = session?.turns[session.turns.length - 1]?.tokensIn ?? 0
   const ctxUsed = useMemo(() => {
@@ -521,6 +542,23 @@ export default function App(): JSX.Element {
 
         {notice && <div className="notice">{notice}</div>}
 
+        {/* la risposta finale sta sopra le chat: si vede subito che il ciclo è chiuso */}
+        {conclusion && (
+          <section className={`conclusion kind-${conclusion.kind}`}>
+            <h3>{t(`app.conclusion.${conclusion.kind}`)}</h3>
+            <p>{conclusion.answer}</p>
+            <small>
+              {[
+                conclusion.proposedBy ? t('app.proposedBy', { name: conclusion.proposedBy }) : '',
+                conclusion.validatedBy ? t('app.validatedBy', { name: conclusion.validatedBy }) : '',
+                conclusion.reason ?? ''
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </small>
+          </section>
+        )}
+
         <main className={`columns cols-${personas.length}`}>
           {personas.map((persona) => (
             <ChatColumn
@@ -552,17 +590,6 @@ export default function App(): JSX.Element {
             />
           ))}
         </main>
-
-        {session?.consensus && (
-          <section className="consensus">
-            <h3>{t('app.consensus')}</h3>
-            <p>{session.consensus.answer}</p>
-            <small>
-              {t('app.proposedBy', { name: session.consensus.proposedBy })} ·{' '}
-              {t('app.validatedBy', { name: session.consensus.validatedBy })}
-            </small>
-          </section>
-        )}
 
         <Composer
           disabled={busy || isRunning}

@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { DEFAULT_SETTINGS, type Settings } from '../shared/types'
+import { DEFAULT_SETTINGS, LEGACY_MAX_TURNS, type Settings } from '../shared/types'
 import { areDefaultPersonas, defaultPersonas } from '../shared/personas'
 import { settingsFile } from './paths'
 import { safeStorage } from 'electron'
@@ -151,6 +151,11 @@ export function getSettings(): Settings {
   }
   if (!loaded.contextSize || loaded.contextSize < 2048) loaded.contextSize = 65536
   if (!loaded.compressionThreshold) loaded.compressionThreshold = 0.75
+  // 0 = illimitato (default). Il vecchio default era 40 turni: chi ha ancora
+  // quel valore non ha mai scelto un limite, quindi il dibattito prosegue
+  // finché il gruppo non lo chiude con consenso o impossibilità dichiarata.
+  if (loaded.maxTurns === LEGACY_MAX_TURNS) loaded.maxTurns = 0
+  if (typeof loaded.maxTurns !== 'number' || loaded.maxTurns < 0) loaded.maxTurns = 0
   decryptSecrets(loaded)
   cached = loaded
   return loaded
