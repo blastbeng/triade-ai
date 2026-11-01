@@ -1,0 +1,67 @@
+name: ci
+# Build + test a ogni push su main e su ogni pull request. Nessuna release qui.
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: typecheck & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+
+  package:
+    name: package (${{ matrix.os }})
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux
+          - os: windows-latest
+            target: win
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: cache bundles (llama.cpp, ffmpeg, whisper)
+        uses: actions/cache@v4
+        with:
+          path: bin
+          key: bin-${{ matrix.target }}-${{ hashFiles('scripts/fetch-binaries.mjs') }}
+      - run: npm ci
+      - run: npm run fetch:bin
+      - run: npm run build
+      - run: npm run stage:${{ matrix.target }}
+      - name: package
+        run: npx electron-builder --${{ matrix.target }} --publish never
+      - run: npm run package:release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: artifact-${{ matrix.target }}
+          path: |
+            dist/*-windows-x64-portable.zip
+            dist/*-linux-x64-appimage.tar.gz
+          if-no-files-found: error

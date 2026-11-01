@@ -1,0 +1,81 @@
+name: promote
+# Dopo un push su main decide se è una "big change" (minor o major)
+# e in quel caso allinea il branch release a main (fast-forward).
+# Il push su release fa partire release.yml.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Pubblica comunque una release (anche per patch)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: promote
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: check
+        name: is this a big change?
+        run: |
+          set -euo pipefail
+          NEW=$(node -p "require('./package.json').version")
+          PREV=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null | sed 's/^v//' || true)
+          echo "nuova=$NEW precedente=${PREV:-none} force=${{ inputs.force }}"
+          big=false
+          if [ -z "$PREV" ]; then
+            big=true   # prima release in assoluto
+          else
+            new_major=${NEW%%.*}; rest=${NEW#*.}; new_minor=${rest%%.*}
+            prev_major=${PREV%%.*}; rest2=${PREV#*.}; prev_minor=${rest2%%.*}
+            if [ "$new_major" != "$prev_major" ] || [ "$new_minor" != "$prev_minor" ]; then
+              big=true
+            fi
+          fi
+          if [ "${{ inputs.force }}" = "true" ]; then big=true; fi
+          echo "big=$big" >> "$GITHUB_OUTPUT"
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+
+      - name: align release branch to main
+        if: steps.check.outputs.big == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git fetch origin release --depth=1 || true
+          if git rev-parse --verify origin/release >/dev/null 2>&1; then
+            if git merge-base --is-ancestor origin/release HEAD; then
+              echo "release è indietro: fast-forward consentito"
+            else
+              echo "::error::Il branch release contiene commit non presenti in main. Allinealo (release deve essere identico a main) e riprova."
+              exit 1
+            fi
+            if [ "$(git rev-parse origin/release)" = "$(git rev-parse HEAD)" ]; then
+              echo "release già allineato: niente da fare"
+              exit 0
+            fi
+          else
+            echo "branch release non esiste: lo creo da main"
+          fi
+          git push origin "HEAD:refs/heads/release"
+          echo "release allineato a $(git rev-parse --short HEAD) (v${{ steps.check.outputs.version }})"
+
+      - name: skip notice
+        if: steps.check.outputs.big != 'true'
+        run: |
+          echo "v${{ steps.check.outputs.version }} è solo una patch: nessuna release."
+          echo "Per forzarla: Actions → promote → Run workflow → force."

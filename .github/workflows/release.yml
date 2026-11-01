@@ -1,0 +1,125 @@
+name: release
+# Parte SOLO su push del branch release (che promote allinea a main).
+on:
+  push:
+    branches: [release]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: release branch == main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: pkg
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: alignment check
+        run: |
+          set -euo pipefail
+          git fetch origin main release --depth=1
+          REL=$(git rev-parse HEAD)
+          MAIN=$(git rev-parse origin/main)
+          echo "release=$REL main=$MAIN"
+          if [ "$REL" != "$MAIN" ]; then
+            echo "::error::Il branch release non è identico a main: le release devono nascere da main senza modifiche aggiuntive."
+            exit 1
+          fi
+      - name: already released?
+        id: exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "v${{ steps.pkg.outputs.version }}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::v${{ steps.pkg.outputs.version }} è già pubblicata"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+    outputs:
+      version: ${{ steps.pkg.outputs.version }}
+      released: ${{ steps.exists.outputs.found }}
+
+  build:
+    needs: verify
+    if: needs.verify.outputs.released == 'false'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux
+          - os: windows-latest
+            target: win
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: cache bundles
+        uses: actions/cache@v4
+        with:
+          path: bin
+          key: bin-${{ matrix.target }}-${{ hashFiles('scripts/fetch-binaries.mjs') }}
+      - run: npm ci
+      - run: npm run fetch:bin
+      - run: npm run build
+      - run: npm run stage:${{ matrix.target }}
+      - name: package
+        run: npx electron-builder --${{ matrix.target }} --publish never
+      - name: sign (self-signed, o certificato reale se i secret esistono)
+        run: npm run sign:win
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      - run: npm run package:release
+      - run: npm run checksums
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: |
+            dist/*-windows-x64-portable.zip
+            dist/*-linux-x64-appimage.tar.gz
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+  publish:
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: merge checksums
+        run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.verify.outputs.version }}
+          name: TriadeAI v${{ needs.verify.outputs.version }}
+          generate_release_notes: true
+          body: |
+            **TriadeAI v${{ needs.verify.outputs.version }}**
+
+            - Windows: `TriadeAI-${{ needs.verify.outputs.version }}-windows-x64-portable.zip`
+              (unzip, run the exe — no installation)
+            - Linux: `TriadeAI-${{ needs.verify.outputs.version }}-linux-x64-appimage.tar.gz`
+              (extract, `chmod +x`, run)
+            - Verify downloads with `SHA256SUMS.txt`.
+
+            Models are downloaded on first run into `data/` next to the executable.
+          files: |
+            dist/*-windows-x64-portable.zip
+            dist/*-linux-x64-appimage.tar.gz
+            dist/SHA256SUMS.txt
+          fail_on_unmatched_files: true
