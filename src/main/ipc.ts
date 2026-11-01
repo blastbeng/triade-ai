@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { getSettings, saveSettings } from './settings'
 import { activePersonas } from '../shared/personas'
 import type { Backend } from '../shared/types'
@@ -311,6 +311,8 @@ export function registerIpc(): void {
       return meta.testBackend(payload)
     }
   )
+
+  ipcMain.handle('app:version', () => app.getVersion())
 
   ipcMain.handle('search:web', async (_e, payload: { query: string; max?: number }) => {
     const { webSearchDetailed } = await import('./search')

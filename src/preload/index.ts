@@ -73,6 +73,7 @@ const api = {
 
   listSessions: (): Promise<{ id: string; topic: string; updatedAt: number; state: string; turns: number }[]> =>
     ipcRenderer.invoke('session:list'),
+  version: (): Promise<string> => ipcRenderer.invoke('app:version'),
   remoteModels: (
     backend: string,
     baseUrl?: string,

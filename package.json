@@ -1,6 +1,6 @@
 {
   "name": "triade-ai",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Tre personalita, un solo modello, un dibattito che arriva a una conclusione",
   "main": "./out/main/index.js",
   "author": "blast",
@@ -17,7 +17,10 @@
     "dist:linux": "npm run build && npm run stage:linux && electron-builder --linux",
     "dist:win": "npm run build && npm run stage:win && electron-builder --win",
     "dist:linux:remote": "bash scripts/build-remote.sh linux",
-    "dist:win:remote": "bash scripts/build-remote.sh win"
+    "dist:win:remote": "bash scripts/build-remote.sh win",
+    "release:patch": "node scripts/bump.mjs patch",
+    "release:minor": "node scripts/bump.mjs minor",
+    "release:major": "node scripts/bump.mjs major"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

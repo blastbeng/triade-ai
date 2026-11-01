@@ -81,6 +81,12 @@ data/
 On first start the app asks for the language, then which models to use (Ornith 1.5 9B is
 preselected) and downloads them with resume inside `data/models/`.
 
+## Versioning
+
+Every change bumps the version (`npm run release:patch|minor|major`, script `scripts/bump.mjs`):
+patch for fixes, minor for new features, major for breaking changes. The version is shown in the
+title bar and used in the artifact names.
+
 ## Development
 
 ```bash

@@ -98,6 +98,7 @@ interface Api {
   stopServer(): Promise<ServerStatus[]>
   listSessions(): Promise<{ id: string; topic: string; updatedAt: number; state: string; turns: number }[]>
   loadSession(id: string): Promise<Session | null>
+  version(): Promise<string>
   remoteModels(backend: string, baseUrl?: string, apiKey?: string): Promise<string[]>
   remoteTest(payload: {
     backend: string

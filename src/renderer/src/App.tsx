@@ -50,6 +50,7 @@ export default function App(): JSX.Element {
   const [showMemory, setShowMemory] = useState(false)
   const [showLog, setShowLog] = useState(false)
   const [onboarding, setOnboarding] = useState(false)
+  const [version, setVersion] = useState('')
 
   const locale: Locale = settings?.ui?.language ?? 'en'
   const t = (key: string, params?: Record<string, string | number>): string =>
@@ -346,7 +347,9 @@ export default function App(): JSX.Element {
           <div className="brand">
             <span className="logo">◆▲●</span>
             <div>
-              <h1>TriadeAI</h1>
+              <h1>
+              TriadeAI <span className="version">v{version}</span>
+            </h1>
               <p>
                 {t(
                   personas.length <= 1
