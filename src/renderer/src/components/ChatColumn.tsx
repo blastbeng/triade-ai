@@ -105,7 +105,10 @@ export default function ChatColumn({
       <div className="messages" ref={boxRef} onScroll={onScroll}>
         {turns.length === 0 && !streaming && !streamReasoning && (
           <p className="empty">
-            {t('chat.empty', { name: persona.name }).split('\n').map((line, i) => (
+            {(personas.length <= 1
+              ? t('chat.emptySingle', { name: persona.name })
+              : t('chat.empty', { name: persona.name })
+            ).split('\n').map((line, i) => (
               <span key={i}>
                 {line}
                 <br />

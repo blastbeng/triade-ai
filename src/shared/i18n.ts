@@ -11,6 +11,10 @@ export const LOCALES: { id: Locale; label: string; flag: string }[] = [
 export type Dict = Record<string, string>
 
 const en: Dict = {
+  'app.taglineSingle': "{model} · assistant chat",
+  'app.taglineTwo': "two personalities · {model} · a debate",
+  'composer.hintSingle': "Enter = send · Shift+Enter = new line · the assistant answers directly",
+  'chat.emptySingle': "{name} hasn't answered yet.\nWrite a message to start.",
   'settings.personasCount': 'Personalities in use',
   'settings.personasOne': '1 — single assistant (no debate)',
   'settings.personasTwo': '2 — two agents debating',
@@ -230,6 +234,10 @@ const en: Dict = {
 }
 
 const it: Dict = {
+  'app.taglineSingle': "{model} · chat assistente",
+  'app.taglineTwo': "due personalità · {model} · un dibattito",
+  'composer.hintSingle': "Invio = invia · Shift+Invio = nuova riga · l'assistente risponde direttamente",
+  'chat.emptySingle': "{name} non ha ancora risposto.\nScrivi un messaggio per iniziare.",
   'settings.personasCount': 'Personalità in uso',
   'settings.personasOne': '1 — assistente singolo (nessun dibattito)',
   'settings.personasTwo': '2 — due agenti che discutono',
@@ -446,6 +454,10 @@ const it: Dict = {
 }
 
 const de: Dict = {
+  'app.taglineSingle': "{model} · Assistenten-Chat",
+  'app.taglineTwo': "zwei Persönlichkeiten · {model} · eine Debatte",
+  'composer.hintSingle': "Enter = senden · Shift+Enter = neue Zeile · der Assistent antwortet direkt",
+  'chat.emptySingle': "{name} hat noch nicht geantwortet.\nSchreibe eine Nachricht.",
   'settings.personasCount': 'Persönlichkeiten',
   'settings.personasOne': '1 — einzelner Assistent (keine Debatte)',
   'settings.personasTwo': '2 — zwei Agenten debattieren',
@@ -661,6 +673,10 @@ const de: Dict = {
 }
 
 const fr: Dict = {
+  'app.taglineSingle': "{model} · chat assistant",
+  'app.taglineTwo': "deux personnalités · {model} · un débat",
+  'composer.hintSingle': "Entrée = envoyer · Maj+Entrée = nouvelle ligne · l'assistant répond directement",
+  'chat.emptySingle': "{name} n'a pas encore répondu.\nÉcrivez un message.",
   'settings.personasCount': 'Personnalités utilisées',
   'settings.personasOne': '1 — assistant unique (pas de débat)',
   'settings.personasTwo': '2 — deux agents débattent',
@@ -876,6 +892,10 @@ const fr: Dict = {
 }
 
 const es: Dict = {
+  'app.taglineSingle': "{model} · chat asistente",
+  'app.taglineTwo': "dos personalidades · {model} · un debate",
+  'composer.hintSingle': "Enter = enviar · Mayús+Enter = nueva línea · el asistente responde directamente",
+  'chat.emptySingle': "{name} aún no ha respondido.\nEscribe un mensaje.",
   'settings.personasCount': 'Personalidades en uso',
   'settings.personasOne': '1 — asistente único (sin debate)',
   'settings.personasTwo': '2 — dos agentes debaten',

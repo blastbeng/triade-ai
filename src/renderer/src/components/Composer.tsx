@@ -118,7 +118,7 @@ export default function Composer({
         </button>
       </div>
       <div className="hint">
-        {t('composer.hint')}
+        {personas.length <= 1 ? t('composer.hintSingle') : t('composer.hint')}
       </div>
     </footer>
   )

@@ -347,7 +347,19 @@ export default function App(): JSX.Element {
             <span className="logo">◆▲●</span>
             <div>
               <h1>TriadeAI</h1>
-              <p>{t('app.tagline', { model: activeModel ? activeModel.name : 'model' })}</p>
+              <p>
+                {t(
+                  personas.length <= 1
+                    ? 'app.taglineSingle'
+                    : personas.length === 2
+                      ? 'app.taglineTwo'
+                      : 'app.tagline',
+                  {
+                    model: activeModel ? activeModel.name : 'model',
+                    n: personas.length
+                  }
+                )}
+              </p>
             </div>
           </div>
 
