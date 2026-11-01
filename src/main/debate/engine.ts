@@ -541,7 +541,8 @@ export class DebateEngine extends EventEmitter {
           id: randomUUID(),
           agentId: persona.id,
           name: persona.name,
-          text: clean || (interrupted ? '[interrotto]' : '[nessun contenuto]'),
+          // pausa a vuoto (nessun token utile): il turno non viene nemmeno aggiunto
+          text: clean || (interrupted ? '' : '[nessun contenuto]'),
           reasoning: reasoning.trim() || undefined,
           ts: Date.now(),
           tokensIn: tokens,
@@ -552,16 +553,22 @@ export class DebateEngine extends EventEmitter {
           handoffTo,
           mentions: extractMentions(clean, personas, persona.id)
         }
-        this.session.turns.push(turn)
-        this.session.turnIndex = this.session.turns.length
+        // pausa prima del primo token utile: niente turno fantasma in chat
+        const emptyInterrupted = interrupted && !clean && !turn.reasoning
+        if (!emptyInterrupted) {
+          this.session.turns.push(turn)
+          this.session.turnIndex = this.session.turns.length
+        }
         if (!handoffTo && turn.mentions?.length) {
           // chi è stato chiamato per nome parla al turno successivo
           const target = turn.mentions.find((m) => m.targetId !== persona.id)
           if (target) this.session.nextSpeakerId = target.targetId
         }
         saveSession(this.session)
-        rememberTurn(this.session, turn)
-        this.emitEvent({ type: 'turn', turn })
+        if (!emptyInterrupted) {
+          rememberTurn(this.session, turn)
+          this.emitEvent({ type: 'turn', turn })
+        }
         this.emitEvent({ type: 'session', session: this.session })
 
         if (interrupted) {
