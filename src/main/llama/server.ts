@@ -247,7 +247,10 @@ class LlamaInstance extends EventEmitter {
         const port = await freePort()
         const args = [
           '-m', modelPath,
-          ...(this.deviceArg() ? ['--device', this.deviceArg()] : []),
+          ...(() => {
+            const dev = this.deviceArg()
+            return dev ? ['--device', dev] : []
+          })(),
           ...(mmprojPath ? ['--mmproj', mmprojPath] : []),
           // +1024 di slack: il conteggio lato app è una stima, il server non deve mai rifiutare
           '-c', String(plan.ctx + 1024),
