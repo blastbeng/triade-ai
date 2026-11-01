@@ -272,7 +272,27 @@ Without credentials the script exits cleanly and the artifacts stay unsigned (ne
 "looks signed"). Signing is applied to every `.exe/.msi/.msix` in `dist/`, and the timestamp server
 keeps the signature valid after the certificate expires.
 
-## 10. License
+## 10. CI and automatic releases (GitHub Actions)
+
+The repository lives on GitHub, so the pipeline is **GitHub Actions** (`.github/workflows/pipeline.yml`);
+GitLab CI cannot run on GitHub-hosted repositories, it would only apply to a GitLab mirror.
+
+What happens on every push:
+
+1. **check** — `npm ci`, `npm run typecheck`, `npm run build`.
+2. **linux** — fetch the bundles (cached by `scripts/fetch-binaries.mjs` hash), build the AppImage,
+   generate checksums, upload the artifact.
+3. **windows** — same on a native `windows-latest` runner (no wine needed), portable `.exe`,
+   optional signing when these secrets exist: `CSC_LINK`, `CSC_KEY_PASSWORD` or
+   `AZURE_SIGNING_*`.
+4. **release** — on `main` (or a `v*` tag), if the version in `package.json` has no release yet, it
+   creates the tag `v<version>` and publishes a GitHub Release with the AppImage, the portable exe
+   and a merged `SHA256SUMS.txt`, with notes generated from the commits.
+
+So the release flow is: **change → `npm run release:minor` → commit → push**. The runner publishes the
+release automatically; pushing again with the same version does nothing (no duplicate releases).
+
+## 11. License
 
 MIT for the code. The model has its own license — see the
 [junafinity/Ornith-1.5-9B-uncensored](https://huggingface.co/junafinity/Ornith-1.5-9B-uncensored)
