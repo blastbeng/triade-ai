@@ -50,6 +50,9 @@ jobs:
             fi
           fi
           if [ "${{ inputs.force }}" = "true" ]; then big=true; fi
+          # una correzione urgente può forzare la release con [release] nel messaggio
+          MSG=$(git log -1 --pretty=%B)
+          case "$MSG" in *"[release]"*) big=true ;; esac
           echo "big=$big" >> "$GITHUB_OUTPUT"
           echo "version=$NEW" >> "$GITHUB_OUTPUT"
 
