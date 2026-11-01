@@ -538,9 +538,18 @@ app.on('before-quit', (event) => {
     onShutdown(() => llamaPool.stopAll())
     onShutdown(() => engine.pause())
     try {
-      await shutdownAll()
+      // la pulizia non deve poter bloccare l'uscita (era la causa dei processi appesi)
+      await Promise.race([shutdownAll(), new Promise((r) => setTimeout(r, 5000))])
+    } catch {
+      /* ignore */
     } finally {
-      app.quit()
+      // su Windows i processi figli trattengono la VRAM: chiusura forzata garantita
+      try {
+        llamaPool.forceKillAll()
+      } catch {
+        /* ignore */
+      }
+      app.exit(0)
     }
   })()
 })

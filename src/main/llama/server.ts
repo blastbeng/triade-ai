@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
+import { execFile } from 'node:child_process'
 import { rotateLog } from '../housekeep'
 import { cacheDir, dataDir, findBinary, modelsDir, runDir } from '../paths'
 import { getSettings } from '../settings'
@@ -106,6 +107,21 @@ class LlamaInstance extends EventEmitter {
       /* ignore */
     }
     return `${dir}/llama-server.log`
+  }
+
+  /** Chiusura immediata del processo (e dei suoi figli su Windows). */
+  killNow(): void {
+    const pid = this.child?.pid
+    try {
+      if (pid && process.platform === 'win32') {
+        execFile('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }, () => undefined)
+      } else if (pid) {
+        this.child?.kill('SIGKILL')
+      }
+    } catch {
+      /* ignore */
+    }
+    this.child = null
   }
 
   private push(line: string): void {
@@ -396,6 +412,12 @@ class LlamaPool extends EventEmitter {
 
   async restartAll(): Promise<void> {
     await this.stopAll()
+  }
+
+  /** Rete di sicurezza all'uscita: nessun llama-server deve restare in VRAM. */
+  forceKillAll(): void {
+    for (const i of this.instances.values()) i.killNow()
+    this.instances.clear()
   }
 
   async stopAll(): Promise<void> {
