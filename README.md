@@ -236,7 +236,43 @@ credentials are committed.
   recommended.
 - App icon still the Electron default.
 
-## 9. License
+## 9. Windows trust (no SmartScreen warnings)
+
+Windows warns about any executable that is not signed by a certificate the SmartScreen service
+trusts. There is no code trick to bypass it — the only honest routes are these:
+
+| Route | Cost | User warnings | Notes |
+|---|---|---|---|
+| **Microsoft Store (MSIX)** | **free** for individual developers (registration fee waived, ID verification via government ID + selfie) | **none** — the package is signed by Microsoft | best "free and zero warnings" path; review time and Store policies apply |
+| **SignPath Foundation** | **free** for eligible OSS projects (OV-level certificate, signing runs in their pipeline) | practically none after reputation builds | requires public repo + OSI licence; apply at signpath.org |
+| **Azure Artifact Signing** (ex Trusted Signing) | ~**9.99 USD/month** | none in practice (own certificate, reputation per identity) | individual identity validation supported; fully managed, best DX |
+| Traditional OV certificate | ~150-300 USD/year | may warn until reputation accrues | HSM/token required since 2023 |
+| EV certificate | ~300-600 USD/year | none, immediately | the paid guarantee |
+| Self-signed certificate | free | **still warns** on other machines | only useful inside a managed fleet where you install the root CA |
+
+**Recommendation for TriadeAI:** publish on the **Microsoft Store as MSIX** (free, zero warnings) and,
+in parallel, apply to **SignPath Foundation** to sign the portable `.exe` for direct distribution.
+Keep the portable artifact as a secondary channel with published SHA-256 checksums.
+
+The build is already wired for signing:
+
+```bash
+# PFX (OV/EV) — jsign + timestamp server
+CSC_LINK=/path/cert.pfx CSC_KEY_PASSWORD=… npm run sign:win
+
+# Azure Artifact Signing
+AZURE_SIGNING_ENDPOINT=https://weu.codesigning.azure.net/ \
+AZURE_SIGNING_ACCOUNT=… AZURE_SIGNING_PROFILE=… npm run sign:win
+
+# checksums for the release page
+npm run checksums        # → dist/SHA256SUMS.txt
+```
+
+Without credentials the script exits cleanly and the artifacts stay unsigned (never silently
+"looks signed"). Signing is applied to every `.exe/.msi/.msix` in `dist/`, and the timestamp server
+keeps the signature valid after the certificate expires.
+
+## 10. License
 
 MIT for the code. The model has its own license — see the
 [junafinity/Ornith-1.5-9B-uncensored](https://huggingface.co/junafinity/Ornith-1.5-9B-uncensored)
