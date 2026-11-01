@@ -3,6 +3,7 @@ import type { Persona, SearchProvider, Settings } from '../../../shared/types'
 import type { CatalogEntry } from '../env'
 import ModelSearch from './ModelSearch'
 import BackendPanel from './BackendPanel'
+import { renderRichText } from '../richtext'
 import { LOCALES, type Locale } from '../../../shared/i18n'
 import { useT } from '../i18n'
 
@@ -33,21 +34,12 @@ interface GpuInfo {
   error?: string
 }
 
-function renderPreview(text: string): JSX.Element[] {
-  const parts = text.split(/(<b>.*?<\/b>|<i>.*?<\/i>|<c>.*?<\/c>)/g)
-  return parts.filter(Boolean).map((part, index) => {
-    if (part.startsWith('<b>')) return <strong key={index}>{part.slice(3, -4)}</strong>
-    if (part.startsWith('<i>')) return <em key={index}>{part.slice(3, -4)}</em>
-    if (part.startsWith('<c>')) return <code key={index}>{part.slice(3, -4)}</code>
-    return <span key={index}>{part}</span>
-  })
-}
-
 export default function SettingsPanel({ settings, catalog, onClose, onSave, onRefresh }: Props): JSX.Element {
   const [draft, setDraft] = useState<Settings>(structuredClone(settings))
   const t = useT()
   const [activeTab, setActiveTab] = useState<Tab>('generale')
   const [downloading, setDownloading] = useState<string | null>(null)
+  const [modelsError, setModelsError] = useState<string | null>(null)
   const [gpu, setGpu] = useState<GpuInfo | null>(null)
   const [gpuDraft, setGpuDraft] = useState<Record<string, string>>({})
   const [embedProbe, setEmbedProbe] = useState<string | null>(null)
@@ -499,7 +491,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
             <div className="uipreview">
               <span className="previewtitle">Anteprima</span>
               <p>
-                {renderPreview(t('settings.previewText'))}
+                {renderRichText(t('settings.previewText'))}
               </p>
               <ul>
                 <li>{t('settings.previewItem1')}</li>
@@ -783,6 +775,20 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
 
         {activeTab === 'modelli' && (
           <div className="form">
+            <h3 className="searchtitle">{t('settings.searchModelsTitle')}</h3>
+            <ModelSearch
+              showProgress
+              onInstalled={async () => {
+                setModelsError(null)
+                // il modello appena aggiunto deve comparire subito fra le card
+                // (e i suoi file vanno controllati come gli altri)
+                await onRefresh()
+                await refreshIntegrity()
+              }}
+              onError={setModelsError}
+            />
+            {modelsError && <p className="error">{modelsError}</p>}
+
             {catalog.map((m) => (
               <div className={`modelcard ${m.active ? 'active' : ''}`} key={m.id}>
                 <div className="modelhead">
@@ -874,7 +880,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
               </div>
             ))}
             <p className="note">
-              {t('settings.modelsNote')}
+              {renderRichText(t('settings.modelsNote'))}
             </p>
           </div>
         )}
@@ -886,7 +892,12 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
           <button
             className="primary"
             onClick={async () => {
-              await onSave(draft)
+              // i modelli aggiunti dalla ricerca vivono in `models.custom` e
+              // vengono salvati subito: il draft è una fotografia del momento in
+              // cui si è aperta la finestra, quindi si riprende la lista vera
+              // (altrimenti “salva” cancellerebbe il modello appena aggiunto)
+              const fresh = await window.triade.getSettings()
+              await onSave({ ...draft, models: { ...draft.models, custom: fresh.models.custom } })
               for (const p of draft.personas) {
                 const id = draft.models.byPersona[p.id] ?? draft.models.active
                 await window.triade.modelsAssign(p.id, id)

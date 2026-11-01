@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { MemoryItem, MemoryStats } from '../env'
 
 import { useT } from '../i18n'
+import { renderRichText } from '../richtext'
 
 export default function MemoryPanel({ onClose }: { onClose: () => void }): JSX.Element {
   const t = useT()
@@ -33,7 +34,7 @@ export default function MemoryPanel({ onClose }: { onClose: () => void }): JSX.E
     <div className="modal" onClick={onClose}>
       <div className="modalbox" onClick={(e) => e.stopPropagation()}>
         <h2>{t('memory.title')}</h2>
-        <p className="lead">{t('memory.lead')}</p>
+        <p className="lead">{renderRichText(t('memory.lead'))}</p>
         {stats && (
           <div className="memstats">
             <span>{t('memory.entries', { n: stats.entries })}</span>

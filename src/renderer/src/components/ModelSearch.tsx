@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useT } from '../i18n'
 
 type Verdict = Awaited<ReturnType<typeof window.triade.hfInspect>>
@@ -10,9 +10,11 @@ interface Props {
   /** chiamata dopo che il modello è stato aggiunto (e avviato il download) */
   onInstalled?: (id: string) => void
   onError?: (message: string) => void
+  /** barra di avanzamento del download (in impostazioni non ce n'è un'altra) */
+  showProgress?: boolean
 }
 
-export default function ModelSearch({ onInstalled, onError }: Props): JSX.Element {
+export default function ModelSearch({ onInstalled, onError, showProgress }: Props): JSX.Element {
   const t = useT()
   const [query, setQuery] = useState('')
   const [rows, setRows] = useState<Row[]>([])
@@ -20,6 +22,27 @@ export default function ModelSearch({ onInstalled, onError }: Props): JSX.Elemen
   const [verdict, setVerdict] = useState<Verdict | null>(null)
   const [quant, setQuant] = useState<string>('')
   const [message, setMessage] = useState<string | null>(null)
+  const [installing, setInstalling] = useState<string | null>(null)
+  const [progress, setProgress] = useState<{ pct: number; phase: string } | null>(null)
+
+  // un modello da 5 GB non si scarica in un attimo: senza avanzamento la
+  // finestra sembrerebbe bloccata (l'IPC di install ritorna a fine download)
+  useEffect(() => {
+    if (!showProgress) return
+    return window.triade.onEvent((event) => {
+      if (event.type !== 'model') return
+      const st = event.status as
+        | { id?: string; progress?: number; phase?: string; downloading?: boolean }
+        | undefined
+      if (!st) return
+      if (installing && st.id !== installing) return
+      if (!st.downloading) {
+        setProgress(null)
+        return
+      }
+      setProgress({ pct: Math.round((st.progress ?? 0) * 100), phase: st.phase ?? '' })
+    })
+  }, [showProgress, installing])
 
   const search = async (): Promise<void> => {
     const q = query.trim()
@@ -55,10 +78,17 @@ export default function ModelSearch({ onInstalled, onError }: Props): JSX.Elemen
     if (!verdict || !quant) return
     setBusy(true)
     setMessage(null)
+    setProgress(null)
     try {
       const res = await window.triade.modelsAddCustom(verdict.repo, quant)
       setMessage(t('search.added', { name: verdict.name, quant }))
-      await window.triade.modelsInstall(res.entry.id)
+      setInstalling(res.entry.id)
+      try {
+        await window.triade.modelsInstall(res.entry.id)
+      } finally {
+        setInstalling(null)
+        setProgress(null)
+      }
       onInstalled?.(res.entry.id)
     } catch (err) {
       const text = (err as Error).message
@@ -162,6 +192,16 @@ export default function ModelSearch({ onInstalled, onError }: Props): JSX.Elemen
         </div>
       )}
 
+      {progress && (
+        <>
+          <div className="dlbar">
+            <div className="dlfill" style={{ width: `${progress.pct}%` }} />
+          </div>
+          <p className="note">
+            {progress.phase} · {progress.pct}%
+          </p>
+        </>
+      )}
       {message && <p className="note">{message}</p>}
       {busy && <p className="note">{t('search.checking')}</p>}
     </div>
