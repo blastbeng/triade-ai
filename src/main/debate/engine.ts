@@ -161,12 +161,15 @@ export class DebateEngine extends EventEmitter {
           nextSpeakerId: session.nextSpeakerId,
           rotationOffset: session.rotationOffset
         }).id
+      // i documenti allegati a metà conversazione devono arrivare al modello:
+      // prima venivano salvati ma il loro testo non entrava nel messaggio
+      const docContext = attachments.length ? attachmentContext(attachments, text) : ''
       const turn: Turn = {
         id: randomUUID(),
         agentId: 'utente',
         name: 'Utente',
         toPersonaId: responder,
-        text,
+        text: docContext ? `${text}\n\nMateriale allegato:\n${docContext}` : text,
         ts: Date.now(),
         tokensIn: 0,
         tokensOut: 0,
