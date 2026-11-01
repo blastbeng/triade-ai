@@ -11,8 +11,9 @@ CUDA, per GPU NVIDIA. Nessun supporto ROCm/HIP.
   GGUF è uno e condiviso, quindi non triplica la VRAM.
 - **Dibattito autonomo.** Gli agenti si rispondono a turno; si fermano al consenso
   (`[[CONSENSO: …]]`, validato da un turno-giudice) o al limite di turni.
-- **Interrompi e riprendi.** Ogni turno è su disco: "pausa" annulla la generazione in corso,
-  "riprendi" riparte dalla sessione esatta, anche dopo aver chiuso l'app.
+- **Pausa, stop e ripresa.** Ogni turno è su disco: **pausa** interrompe la generazione e lascia la
+  chat riprendibile, **stop** chiude il dibattito (nessun altro turno automatico, fatti distillati
+  nella memoria), **riprendi** riparte dalla sessione esatta, anche dopo aver chiuso l'app.
 - **Sessioni come ChatGPT/OpenWebUI.** Sidebar con tutte le chat: aprirne una nuova non perde le
   precedenti; selezionando una chat vecchia si continua da lì.
 - **Memoria persistente + vector DB.** Ogni turno finisce in un indice vettoriale locale
@@ -182,7 +183,8 @@ Per Azure Trusted Signing si aggiunge `win.azureSignOptions` in `electron-builde
 
 1. Primo avvio: scelta del modello (multi-selezione; per ora solo Ornith) e download.
 2. Scrivi l'argomento, allega eventualmente media, premi **avvia**.
-3. Le tre colonne si riempiono a turno; `pausa` ferma subito, `riprendi` continua.
+3. Le tre colonne si riempiono a turno; `pausa` sospende, `stop` chiude il dibattito, `riprendi`
+   continua da dove era rimasto.
 4. Impostazioni → generale: contesto, soglia di compressione (75%), tetto token per turno (0 = nessuno), limite
    turni, temperatura, dimensione del testo, strati GPU, flash attention, KV cache, auto-tuning.
 5. Impostazioni → ricerca: provider e chiavi. → gpu: GPU per chat. → personalità: i tre prompt e il
