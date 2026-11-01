@@ -127,10 +127,15 @@ export default function App(): JSX.Element {
           setStreamReasoning(null)
           void window.triade.listSessions().then(setSessions)
           break
-        case 'session':
-          setSession(event.session as Session | null)
+        case 'session': {
+          const next = event.session as Session | null
+          setSession(next)
+          // cambiando chat il testo in arrivo apparteneva alla precedente
+          setStream(null)
+          setStreamReasoning(null)
           void window.triade.listSessions().then(setSessions)
           break
+        }
         case 'state':
           setSession((prev) => (prev ? { ...prev, state: event.state as Session['state'] } : prev))
           break
@@ -305,7 +310,9 @@ export default function App(): JSX.Element {
       if (!(await checkIntegrity())) return
       await ensureReady()
       const files = attachments.map((a) => a.path)
-      const created = await window.triade.submit(topic, files, personaId)
+      // la chat aperta qui decide dove finisce il messaggio: senza id l'engine
+      // continuerebbe la sessione che ha in memoria (contesti mescolati)
+      const created = await window.triade.submit(topic, files, personaId, session?.id ?? null)
       setSession(created)
       setAttachments([])
       setSessions(await window.triade.listSessions())
@@ -328,10 +335,16 @@ export default function App(): JSX.Element {
   }
 
   const openSession = async (id: string): Promise<void> => {
-    const loaded = await window.triade.loadSession(id)
-    if (loaded) {
+    try {
+      // non basta leggerla da disco: va resa corrente anche nell'engine, altrimenti
+      // i turni nuovi finirebbero nella chat precedente (stesso contesto ovunque)
+      const loaded = await window.triade.openSession(id)
       setSession(loaded)
       setStream(null)
+      setStreamReasoning(null)
+      setSessions(await window.triade.listSessions())
+    } catch (err) {
+      setNotice((err as Error).message)
     }
   }
 

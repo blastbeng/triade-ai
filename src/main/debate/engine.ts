@@ -12,6 +12,7 @@ import type { Attachment, Backend, DebateEvent, Mention, Persona, Session, Turn 
 import { buildMessages, summarize, tokenCountOf } from './context'
 import { attachmentContext } from './document'
 import { loadSession, newSession, provisionalTitle, saveSession } from './store'
+import { submitTarget } from './target'
 import { distillSession, rememberTurn, rememberUserNote } from '../memory/integrate'
 import { TOOL_SPECS, runTool } from './tools'
 import { HANDOFF, chooseNextSpeaker, parseHandoff } from './schedule'
@@ -145,7 +146,18 @@ export class DebateEngine extends EventEmitter {
     })
   }
 
-  async submit(text: string, attachments: Attachment[] = [], startWith?: string): Promise<Session> {
+  async submit(
+    text: string,
+    attachments: Attachment[] = [],
+    startWith?: string,
+    sessionId?: string | null
+  ): Promise<Session> {
+    // il contesto segue la chat aperta nell'interfaccia: se è un'altra sessione
+    // si carica quella (l'eventuale ciclo in corso viene fermato), se è una chat
+    // nuova quella in memoria viene chiusa
+    const target = submitTarget(this.session, sessionId)
+    if (target.kind === 'new' && this.session) await this.reset()
+    if (target.kind === 'open') await this.open(target.sessionId)
     // un messaggio inviato in una conversazione esistente la continua SEMPRE:
     // se il dibattito è in corso lo si mette in pausa, non si crea una chat nuova
     if (this.session && this.session.turns.length > 0) {
@@ -314,14 +326,34 @@ export class DebateEngine extends EventEmitter {
     return session
   }
 
-  async resume(id: string): Promise<Session> {
-    if (this.session?.id === id && this.session.state === 'running') return this.session
+  /**
+   * Rende corrente una sessione già su disco. Chi stava girando viene fermato:
+   * due sessioni non devono mai condividere il contesto in memoria.
+   */
+  async open(id: string): Promise<Session> {
+    if (this.session?.id === id) return this.session
     await this.halt()
+    if (this.session) {
+      // chi si lascia alle spalle resta su disco nello stato in cui era
+      if (this.session.state === 'running') this.setState('paused')
+      else saveSession(this.session)
+    }
     const loaded = loadSession(id)
     if (!loaded) throw new Error('sessione non trovata')
     this.session = loaded
     loaded.lastError = undefined
+    // il flag riguarda il modello della sessione appena chiusa
+    this.clampedNoticed = false
+    // `loadSession` degrada 'running' a 'paused': il ciclo riparte solo su richiesta
+    saveSession(loaded)
     this.emitEvent({ type: 'session', session: loaded })
+    this.emitEvent({ type: 'state', state: loaded.state })
+    return loaded
+  }
+
+  async resume(id: string): Promise<Session> {
+    if (this.session?.id === id && this.session.state === 'running') return this.session
+    const loaded = await this.open(id)
     this.setState('running')
     void this.loop()
     return loaded

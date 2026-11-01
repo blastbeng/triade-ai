@@ -219,6 +219,8 @@ export function registerIpc(): void {
   ipcMain.handle('session:list', () => listSessions())
   ipcMain.handle('session:load', (_e, id: string) => loadSession(id))
   ipcMain.handle('session:current', () => engine.current)
+  // cambio chat: la sessione aperta diventa quella corrente, con il suo contesto
+  ipcMain.handle('session:open', (_e, id: string) => engine.open(id))
   ipcMain.handle('session:delete', async (_e, id: string) => {
     deleteSession(id)
     memory.removeSession(id)
@@ -239,12 +241,15 @@ export function registerIpc(): void {
   )
   ipcMain.handle(
     'debate:submit',
-    async (_e, payload: { topic: string; files: string[]; personaId?: string }) => {
+    async (
+      _e,
+      payload: { topic: string; files: string[]; personaId?: string; sessionId?: string | null }
+    ) => {
       const attachments: Attachment[] = []
       for (const file of payload.files ?? []) {
         attachments.push(await ingest(file, (m) => broadcast({ type: 'log', message: m })))
       }
-      return engine.submit(payload.topic, attachments, payload.personaId)
+      return engine.submit(payload.topic, attachments, payload.personaId, payload.sessionId)
     }
   )
   ipcMain.handle('debate:pause', async () => {

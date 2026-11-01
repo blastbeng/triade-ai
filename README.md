@@ -147,6 +147,9 @@ point the setting at your own instance for serious use. *Settings → search* ha
   model (provisional title immediately, refined asynchronously), word-wrapped to two lines.
 - Open any past chat to continue it, delete it (with its memory), nothing is ever lost by starting a
   new one.
+- Each chat keeps **its own context**: opening a chat also switches the session the engine works on
+  (the previous one is stopped and saved), so a new turn can never land in another conversation.
+  Only the vector memory is shared, and past sessions are recalled by similarity — never pasted in.
 
 ### Interface
 - 5 languages (English default, Italian, German, French, Spanish), switchable at first run and in

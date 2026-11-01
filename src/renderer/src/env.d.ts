@@ -98,6 +98,7 @@ interface Api {
   stopServer(): Promise<ServerStatus[]>
   listSessions(): Promise<{ id: string; topic: string; updatedAt: number; state: string; turns: number }[]>
   loadSession(id: string): Promise<Session | null>
+  openSession(id: string): Promise<Session>
   modelsIntegrity(): Promise<
     { id: string; name: string; ok: boolean; reason?: string; repairable: boolean; bytes: number }[]
   >
@@ -128,7 +129,12 @@ interface Api {
     memory: MemoryStats
   }>
   startDebate(topic: string, files: string[], personaId?: string): Promise<Session>
-  submit(topic: string, files: string[], personaId?: string): Promise<Session>
+  submit(
+    topic: string,
+    files: string[],
+    personaId?: string,
+    sessionId?: string | null
+  ): Promise<Session>
   pauseDebate(): Promise<Session | null>
   stopDebate(): Promise<Session | null>
   resumeDebate(id: string): Promise<Session>

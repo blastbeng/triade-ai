@@ -98,6 +98,8 @@ const api = {
   ): Promise<{ hits: { title: string; url: string; snippet: string }[]; engine: string }> =>
     ipcRenderer.invoke('search:web', { query, max }),
   loadSession: (id: string): Promise<Session | null> => ipcRenderer.invoke('session:load', id),
+  /** apre la chat e la rende corrente nell'engine: il contesto non si mescola */
+  openSession: (id: string): Promise<Session> => ipcRenderer.invoke('session:open', id),
   currentSession: (): Promise<Session | null> => ipcRenderer.invoke('session:current'),
   deleteSession: (id: string): Promise<{
     sessions: { id: string; topic: string; updatedAt: number; state: string; turns: number }[]
@@ -106,8 +108,12 @@ const api = {
 
   startDebate: (topic: string, files: string[], personaId?: string): Promise<Session> =>
     ipcRenderer.invoke('debate:start', { topic, files, personaId }),
-  submit: (topic: string, files: string[], personaId?: string): Promise<Session> =>
-    ipcRenderer.invoke('debate:submit', { topic, files, personaId }),
+  submit: (
+    topic: string,
+    files: string[],
+    personaId?: string,
+    sessionId?: string | null
+  ): Promise<Session> => ipcRenderer.invoke('debate:submit', { topic, files, personaId, sessionId }),
   pauseDebate: (): Promise<Session | null> => ipcRenderer.invoke('debate:pause'),
   stopDebate: (): Promise<Session | null> => ipcRenderer.invoke('debate:stop'),
   resumeDebate: (id: string): Promise<Session> => ipcRenderer.invoke('debate:resume', id),
