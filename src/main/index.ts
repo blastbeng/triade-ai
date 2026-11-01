@@ -48,6 +48,42 @@ function createWindow(): void {
       void (async () => {
         const js = (code: string): Promise<unknown> => mainWindow!.webContents.executeJavaScript(code)
         try {
+          if (process.env.TRIADE_SHOT_TEST === 'onboarding') {
+            const click = (label: string): Promise<unknown> =>
+              js(`(() => {
+                 const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim().includes(${JSON.stringify(label)}));
+                 if (b) { b.click(); return true } return false
+               })()`)
+            const state = (): Promise<unknown> =>
+              js(`(() => {
+                 const primary = document.querySelector('.modalfooter .primary');
+                 return {
+                   modal: Boolean(document.querySelector('.modal')),
+                   label: primary ? primary.textContent.trim() : null,
+                   disabled: primary ? Boolean(primary.disabled) : null,
+                   step: document.querySelector('.modalbox.onboarding h2')?.textContent ?? null
+                 }
+               })()`)
+            console.log('[ob] lingua:', JSON.stringify(await state()))
+            console.log('[ob] continua:', await click('continua'))
+            await new Promise((r) => setTimeout(r, 900))
+            console.log('[ob] passo backend:', JSON.stringify(await state()))
+            const back1 = await click('indietro')
+            await new Promise((r) => setTimeout(r, 700))
+            console.log('[ob] indietro dal backend:', back1, JSON.stringify(await state()))
+            await click('continua')
+            await new Promise((r) => setTimeout(r, 900))
+            await click('continua')
+            await new Promise((r) => setTimeout(r, 1200))
+            console.log('[ob] passo modelli:', JSON.stringify(await state()))
+            const done = await click('concludi')
+            await new Promise((r) => setTimeout(r, 1500))
+            const after = await state()
+            const settings = await js('window.triade.getSettings()')
+            console.log('[ob] clic concludi:', done, '→', JSON.stringify(after))
+            console.log('[ob] onboardingDone:', (settings as { onboardingDone?: boolean }).onboardingDone)
+          }
+
           if (process.env.TRIADE_SHOT_TEST === 'search') {
             const out = await js(
               `window.triade.searchWeb(${JSON.stringify(process.env.TRIADE_SHOT_QUERY ?? 'vulkan amd rx 7600 xt')}, 4)`

@@ -11,6 +11,8 @@ export const LOCALES: { id: Locale; label: string; flag: string }[] = [
 export type Dict = Record<string, string>
 
 const en: Dict = {
+  'onboarding.back': "back",
+  'onboarding.finish': "finish",
   'settings.personaBackend': "backend of this chat",
   'backend.perChatNote': "Each chat picks its model from this provider in the personalities tab.",
   'backend.title': "Where the model runs",
@@ -250,6 +252,8 @@ const en: Dict = {
 }
 
 const it: Dict = {
+  'onboarding.back': "indietro",
+  'onboarding.finish': "concludi",
   'settings.personaBackend': "backend di questa chat",
   'backend.perChatNote': "Ogni chat sceglie il proprio modello di questo provider nella scheda personalità.",
   'backend.title': "Dove gira il modello",
@@ -486,6 +490,8 @@ const it: Dict = {
 }
 
 const de: Dict = {
+  'onboarding.back': "zurück",
+  'onboarding.finish': "fertig",
   'settings.personaBackend': "Backend dieses Chats",
   'backend.perChatNote': "Jeder Chat wählt sein Modell dieses Anbieters im Tab Persönlichkeiten.",
   'backend.title': "Wo läuft das Modell",
@@ -721,6 +727,8 @@ const de: Dict = {
 }
 
 const fr: Dict = {
+  'onboarding.back': "retour",
+  'onboarding.finish': "terminer",
   'settings.personaBackend': "backend de ce chat",
   'backend.perChatNote': "Chaque chat choisit son modèle de ce fournisseur dans l'onglet personnalités.",
   'backend.title': "Où tourne le modèle",
@@ -956,6 +964,8 @@ const fr: Dict = {
 }
 
 const es: Dict = {
+  'onboarding.back': "atrás",
+  'onboarding.finish': "finalizar",
   'settings.personaBackend': "backend de este chat",
   'backend.perChatNote': "Cada chat elige su modelo de este proveedor en la pestaña personalidades.",
   'backend.title': "Dónde se ejecuta el modelo",

@@ -61,19 +61,30 @@ export default function Onboarding({
   const toggle = (id: string): void =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
 
+  // modelli già presenti su disco: l'onboarding deve poter concludere anche senza download
+  const installed = catalog.filter((m) => m.installed).map((m) => m.id)
+  const effective = selected.length ? selected : installed
+  const canFinish = effective.length > 0
+  const remoteChosen = localBackend !== 'llama'
+
+  const goBack = (): void => {
+    if (step === 'models') setStep('backend')
+    else if (step === 'backend') setStep('language')
+  }
+
   const start = async (): Promise<void> => {
-    if (!selected.length) return
+    if (!canFinish) return
     setWorking(true)
     setError(null)
     try {
-      for (const id of selected) {
+      for (const id of effective) {
         const entry = catalog.find((m) => m.id === id)
         if (entry?.installed) continue
         setPhase(id)
         await window.triade.modelsInstall(id)
         await onProgress()
       }
-      await onDone(selected, selected[0], personas)
+      await onDone(effective, effective[0], personas)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -131,14 +142,32 @@ export default function Onboarding({
               setLocalRemote(remoteCfg)
             }}
           />
+
+        <h3 className="searchtitle">{t('onboarding.personasTitle')}</h3>
+        <p className="lead small">{t('onboarding.personasLead')}</p>
+        <div className="personacount">
+          {[1, 2, 3].map((n) => (
+            <button
+              key={n}
+              className={`langbutton ${personas === n ? 'selected' : ''}`}
+              onClick={() => setPersonas(n)}
+            >
+              {t(n === 1 ? 'onboarding.personasOne' : n === 2 ? 'onboarding.personasTwo' : 'onboarding.personasThree')}
+            </button>
+          ))}
+        </div>
+
           <footer className="modalfooter">
+            <button className="ghost" onClick={() => setStep('language')}>
+              ← {t('onboarding.back')}
+            </button>
             <button
               className="primary"
               onClick={async () => {
                 await onBackend(localBackend, localRemote)
                 if (remoteBackend) {
-                  // nessun download: si passa direttamente al modello attivo
-                  await onDone([], localRemote[localBackend as Exclude<Backend, 'llama'>].model, personas)
+                  // nessun download: si mantiene il catalogo locale già presente
+                  await onDone(installed, installed[0] ?? '', personas)
                   return
                 }
                 setStep('models')
@@ -159,20 +188,6 @@ export default function Onboarding({
         <p className="lead">
           {t('onboarding.lead')} <code>dati/modelli/</code> {t('onboarding.lead2')}
         </p>
-
-        <h3 className="searchtitle">{t('onboarding.personasTitle')}</h3>
-        <p className="lead small">{t('onboarding.personasLead')}</p>
-        <div className="personacount">
-          {[1, 2, 3].map((n) => (
-            <button
-              key={n}
-              className={`langbutton ${personas === n ? 'selected' : ''}`}
-              onClick={() => setPersonas(n)}
-            >
-              {t(n === 1 ? 'onboarding.personasOne' : n === 2 ? 'onboarding.personasTwo' : 'onboarding.personasThree')}
-            </button>
-          ))}
-        </div>
 
         <ul className="catalog">
           {catalog.map((m) => (
@@ -214,20 +229,17 @@ export default function Onboarding({
         {error && <p className="error">{error}</p>}
 
         <footer className="modalfooter">
+          <button className="ghost" onClick={goBack}>
+            ← {t('onboarding.back')}
+          </button>
           <button
             className="ghost"
-            onClick={() =>
-              void onDone(
-                catalog.filter((m) => m.installed).map((m) => m.id),
-                catalog[0]?.id ?? '',
-                personas
-              )
-            }
+            onClick={() => void onDone(installed, installed[0] ?? '', personas)}
           >
             {t('onboarding.skip')}
           </button>
-          <button className="primary" onClick={() => void start()} disabled={working || !selected.length}>
-            {t('onboarding.start')}
+          <button className="primary" onClick={() => void start()} disabled={working || !canFinish}>
+            {canFinish && selected.length === 0 ? t('onboarding.finish') : t('onboarding.start')}
           </button>
         </footer>
       </div>
