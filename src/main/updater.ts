@@ -5,7 +5,7 @@ import path from 'node:path'
 import { app, BrowserWindow } from 'electron'
 import { translate } from '../shared/i18n'
 import { getSettings, saveSettings } from './settings'
-import { dataDir } from './paths'
+import { dataDir, runDir } from './paths'
 
 const REPO = 'blastbeng/triade-ai'
 const TIMEOUT_MS = 7000
@@ -170,9 +170,28 @@ export async function downloadUpdate(info: UpdateInfo, onPct?: (p: number) => vo
 const pendingFile = (): string => path.join(dataDir(), 'aggiornamenti', 'pending.json')
 
 /** Segna un aggiornamento in corso: se al riavvio la versione non è quella nuova, si torna indietro. */
-function markPending(version: string, backup: string): void {
+function markPending(version: string, backup: string, target = '', finalPath = ''): void {
   fs.mkdirSync(path.dirname(pendingFile()), { recursive: true })
-  fs.writeFileSync(pendingFile(), JSON.stringify({ version, backup, at: Date.now() }), 'utf8')
+  fs.writeFileSync(
+    pendingFile(),
+    JSON.stringify({ version, backup, target, finalPath, at: Date.now() }),
+    'utf8'
+  )
+}
+
+/** Percorso del marker scritto dall'app all'avvio: prova che la nuova versione è partita. */
+export function bootMarker(version: string): string {
+  return path.join(runDir(), `boot-${version}.ok`)
+}
+
+/** Chiamata all'avvio: certifica che questa versione è viva. */
+export function markBooted(): void {
+  try {
+    fs.mkdirSync(runDir(), { recursive: true })
+    fs.writeFileSync(bootMarker(app.getVersion()), String(Date.now()), 'utf8')
+  } catch {
+    /* ignore */
+  }
 }
 
 /**
@@ -189,6 +208,15 @@ export function recoverFailedUpdate(): string | null {
       return null
     }
     const target = process.env.APPIMAGE ?? process.execPath
+    // se il nuovo file ha un nome diverso, va rimosso prima di ripristinare
+    const finalPath = (data as { finalPath?: string }).finalPath
+    if (finalPath && finalPath !== target && fs.existsSync(finalPath)) {
+      try {
+        fs.rmSync(finalPath, { force: true })
+      } catch {
+        /* ignore */
+      }
+    }
     if (data.backup && fs.existsSync(data.backup)) {
       fs.copyFileSync(data.backup, target)
       if (process.platform !== 'win32') fs.chmodSync(target, 0o755)
@@ -208,30 +236,36 @@ export function applyUpdate(newExe: string, version = ''): void {
     const helper = path.join(path.dirname(newExe), 'aggiorna.cmd')
     // Su Windows rinominare un eseguibile IN USO è permesso, copiarlo no:
     // per questo si usa move (rename atomico) con retry, non copy.
-    const exeName = path.basename(target)
+    const finalPath = path.join(path.dirname(target), path.basename(newExe))
+    const marker = bootMarker(version)
     const script = [
       '@echo off',
       'setlocal',
-      'set LOG=%~dp0aggiorna.log',
-      'echo [%DATE% %TIME%] avvio sostituzione >> "%LOG%" 2>&1',
+      `set LOG=%~dp0aggiorna.log`,
+      `echo [%DATE% %TIME%] sostituzione verso ${path.basename(newExe)} >> "%LOG%" 2>&1`,
       'ping 127.0.0.1 -n 4 >nul',
-      'move /Y "${target}" "${target}.old" >> "%LOG%" 2>&1',
+      `move /Y "${target}" "${target}.old" >> "%LOG%" 2>&1`,
       'for /L %%i in (1,1,15) do (',
-      '  move /Y "${newExe}" "${target}" >> "%LOG%" 2>&1',
-      '  if exist "${target}" goto started',
+      `  move /Y "${newExe}" "${finalPath}" >> "%LOG%" 2>&1`,
+      `  if exist "${finalPath}" goto started`,
       '  ping 127.0.0.1 -n 2 >nul',
       ')',
       ':started',
-      'if not exist "${target}" move /Y "${target}.old" "${target}" >> "%LOG%" 2>&1',
-      'start "" "${target}"',
-      'ping 127.0.0.1 -n 9 >nul',
-      'tasklist /FI "IMAGENAME eq ${exeName}" | find /I "${exeName}" >nul',
-      'if errorlevel 1 (',
-      '  echo rollback: nuova versione non viva >> "%LOG%" 2>&1',
-      '  move /Y "${target}" "${target}.failed" >> "%LOG%" 2>&1',
-      '  move /Y "${target}.old" "${target}" >> "%LOG%" 2>&1',
-      '  start "" "${target}"',
-      ')',
+      `if not exist "${finalPath}" move /Y "${target}.old" "${target}" >> "%LOG%" 2>&1`,
+      `if not exist "${finalPath}" goto done`,
+      `start "" "${finalPath}"`,
+      `echo [%DATE% %TIME%] avviata ${path.basename(newExe)}, attendo il marker >> "%LOG%" 2>&1`,
+      'ping 127.0.0.1 -n 21 >nul',
+      `if exist "${marker}" goto ok`,
+      `echo [%DATE% %TIME%] marker assente: rollback >> "%LOG%" 2>&1`,
+      `move /Y "${finalPath}" "${finalPath}.failed" >> "%LOG%" 2>&1`,
+      `move /Y "${target}.old" "${target}" >> "%LOG%" 2>&1`,
+      `start "" "${target}"`,
+      'goto done',
+      ':ok',
+      `echo [%DATE% %TIME%] aggiornamento completato >> "%LOG%" 2>&1`,
+      `del /Q "${target}.old" >nul 2>&1`,
+      ':done',
       'del /Q "%~f0"'
     ].join('\r\n')
     fs.writeFileSync(helper, `${script}\r\n`)
@@ -247,30 +281,31 @@ export function applyUpdate(newExe: string, version = ''): void {
     )
   }
   const backup = `${current}.old`
-  markPending(version, backup)
+  const finalPath = path.join(path.dirname(current), path.basename(newExe))
+  markPending(version, backup, current, finalPath)
   try {
     // copiare sopra un eseguibile in esecuzione dà ETXTBSY: si sposta il vecchio
     // e si mette il nuovo al suo posto (rename atomico, stesso filesystem).
     fs.rmSync(backup, { force: true })
     if (fs.existsSync(current)) fs.renameSync(current, backup)
     try {
-      fs.renameSync(newExe, current)
+      fs.renameSync(newExe, finalPath)
     } catch {
-      fs.copyFileSync(newExe, current)
+      fs.copyFileSync(newExe, finalPath)
       fs.rmSync(newExe, { force: true })
     }
-    fs.chmodSync(current, 0o755)
+    fs.chmodSync(finalPath, 0o755)
   } catch (err) {
     // ripristino immediato se qualcosa è andato storto a metà
     try {
-      if (!fs.existsSync(current) && fs.existsSync(backup)) fs.renameSync(backup, current)
+      if (!fs.existsSync(finalPath) && fs.existsSync(backup)) fs.renameSync(backup, current)
     } catch {
       /* ignore */
     }
     throw new Error(`sostituzione dell'eseguibile fallita: ${(err as Error).message}`)
   }
   // conserva gli argomenti di avvio (es. --no-sandbox dove il sandbox SUID manca)
-  app.relaunch({ execPath: current, args: process.argv.slice(1) })
+  app.relaunch({ execPath: finalPath, args: process.argv.slice(1) })
   app.exit(0)
 }
 

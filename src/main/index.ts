@@ -496,9 +496,11 @@ app.whenReady().then(async () => {
   registerIpc()
   try {
     const { recoverFailedUpdate } = await import('./updater')
-    const { cleanupUpdateLeftovers } = await import('./updater')
+    const { cleanupUpdateLeftovers, markBooted } = await import('./updater')
     cleanupUpdateLeftovers()
     const rolledBack = recoverFailedUpdate()
+    // certifica che questa versione è viva: è la prova che il watchdog Windows attende
+    markBooted()
     if (rolledBack) {
       dialog.showErrorBox(
         t('update.rollbackTitle'),
