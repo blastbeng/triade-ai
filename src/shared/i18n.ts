@@ -1265,7 +1265,7 @@ const es: Dict = {
   'common.error': 'Error'
 }
 
-const catalogs: Record<Locale, Dict> = { en, it, de, fr, es }
+export const catalogs: Record<Locale, Dict> = { en, it, de, fr, es }
 
 export function translate(locale: Locale, key: string, params?: Record<string, string | number>): string {
   const dict = catalogs[locale] ?? en

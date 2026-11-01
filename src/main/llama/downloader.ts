@@ -212,53 +212,89 @@ async function finalize(part: string, dest: string, expected: number, url = ''):
   }
 }
 
+const BLOCK = 64 * 1024 * 1024
+
+/**
+ * Scarica un blocco con Range e verifica che la lunghezza sia ESATTAMENTE quella
+ * richiesta: un proxy o una CDN che tronca/riavvolge i byte viene scoperto qui,
+ * blocco per blocco, e non a fine download.
+ */
+async function fetchBlock(url: string, from: number, to: number): Promise<Buffer> {
+  const expected = to - from + 1
+  let lastErr: unknown = null
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const signals = [AbortSignal.timeout(180000)]
+      if (state.abort) signals.push(state.abort.signal)
+      const res = await fetch(url, {
+        headers: { Range: `bytes=${from}-${to}` },
+        redirect: 'follow',
+        signal: AbortSignal.any(signals)
+      })
+      if (res.status === 200) throw new Error('il server ignora le richieste ranged')
+      if (res.status !== 206) throw new Error(`HTTP ${res.status}`)
+      const buf = Buffer.from(await res.arrayBuffer())
+      if (buf.length !== expected) {
+        throw new Error(`blocco ${from}-${to}: ricevuti ${buf.length} byte su ${expected}`)
+      }
+      return buf
+    } catch (err) {
+      lastErr = err
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 1000 * attempt))
+    }
+  }
+  throw new Error(`blocco ${from}-${to} non scaricabile: ${(lastErr as Error).message}`)
+}
+
 async function downloadWithResumeInner(
   url: string,
   dest: string,
   onPct: (pct: number) => void
 ): Promise<void> {
   const part = `${dest}.part`
-  let start = fs.existsSync(part) ? fs.statSync(part).size : 0
-  const total = await remoteSize(url)
-  // solo un file COMPLETO al byte si può promuovere: prima bastava il 99,9%
-  // e un .part troncato di pochi MB diventava un modello "valido" ma illeggibile
-  if (total > 0 && start === total) {
-    await finalize(part, dest, total, url)
-    onPct(1)
-    return
+
+  // dimensione obbligatoria: senza, il download non è verificabile e viene rifiutato
+  let total = await remoteSize(url)
+  if (total <= 0) {
+    try {
+      const probe = await fetch(url, {
+        headers: { Range: 'bytes=0-0' },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(20000)
+      })
+      const cr = probe.headers.get('content-range')
+      total = cr ? Number(cr.split('/')[1]) : 0
+      await probe.body?.cancel().catch(() => undefined)
+    } catch {
+      total = 0
+    }
   }
-  if (total > 0 && start > total) {
+  if (total <= 0) throw new Error('il server non dichiara la dimensione: download non verificabile')
+
+  // ripresa allineata al blocco: un blocco parziale viene scartato, mai completato a caso
+  let have = fs.existsSync(part) ? Math.min(fs.statSync(part).size, total) : 0
+  have = Math.floor(have / BLOCK) * BLOCK
+  if (!fs.existsSync(part)) fs.writeFileSync(part, '')
+  fs.truncateSync(part, have)
+
+  const fd = fs.openSync(part, 'r+')
+  try {
+    for (let from = have; from < total; from += BLOCK) {
+      const to = Math.min(from + BLOCK - 1, total - 1)
+      const buf = await fetchBlock(url, from, to)
+      fs.writeSync(fd, buf, 0, buf.length, from)
+      onPct(Math.min(0.999, (to + 1) / total))
+    }
+  } finally {
+    fs.closeSync(fd)
+  }
+
+  const size = fs.statSync(part).size
+  if (size !== total) {
     fs.rmSync(part, { force: true })
-    start = 0
+    throw new Error(`download incompleto: ${size} byte su ${total} attesi`)
   }
-  const headers: Record<string, string> = {}
-  if (start > 0) headers.Range = `bytes=${start}-`
-  const res = await fetch(url, { headers, redirect: 'follow', signal: state.abort?.signal })
-  if (!res.ok && res.status !== 206) throw new Error(`download fallito (${res.status}) da ${url}`)
-  if (res.status !== 206) start = 0
-  // HuggingFace spesso reindirizza senza content-length: ricaviamo il totale
-  // da Content-Range oppure dal content-length della risposta effettiva,
-  // altrimenti la barra resterebbe ferma a 0%.
-  let totalKnown = total
-  if (totalKnown <= 0) {
-    const range = res.headers.get('content-range')
-    const fromRange = range ? Number(range.split('/')[1]) : 0
-    const length = Number(res.headers.get('content-length') ?? 0)
-    totalKnown = Number.isFinite(fromRange) && fromRange > 0 ? fromRange : start + (length || 0)
-  }
-  if (!res.body) throw new Error('risposta senza corpo')
-  const sink = fs.createWriteStream(part, { flags: start > 0 ? 'a' : 'w' })
-  let received = start
-  const source = Readable.fromWeb(res.body as any)
-  source.on('data', (chunk: Buffer) => {
-    received += chunk.length
-    if (totalKnown > 0) onPct(Math.min(0.999, received / totalKnown))
-  })
-  await pipeline(source, sink)
-  if (totalKnown > 0 && fs.statSync(part).size < totalKnown * 0.995) {
-    throw new Error('download incompleto: rilancia, riprenderà da dove si era fermato')
-  }
-  await finalize(part, dest, totalKnown, url)
+  await finalize(part, dest, total, url)
   onPct(1)
 }
 
