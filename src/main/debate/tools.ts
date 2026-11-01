@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { cacheDir } from '../paths'
-import { fetchPage, webSearch, webSearchDetailed } from '../search'
+import { assertPublicUrl, fetchPage, webSearch, webSearchDetailed } from '../search'
 import { extractAudio, extractFrames } from '../media/ffmpeg'
 import { transcribe } from '../media/transcribe'
 
@@ -74,6 +74,8 @@ export const TOOL_SPECS = [
 
 async function download(url: string, maxBytes = 25 * 1024 * 1024): Promise<string | null> {
   try {
+    // l'URL arriva dal modello: niente localhost/169.254/reti private
+    assertPublicUrl(url)
     const res = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
       redirect: 'follow',

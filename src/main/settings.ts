@@ -3,6 +3,73 @@ import path from 'node:path'
 import { DEFAULT_SETTINGS, type Settings } from '../shared/types'
 import { areDefaultPersonas, defaultPersonas } from '../shared/personas'
 import { settingsFile } from './paths'
+import { safeStorage } from 'electron'
+
+const SECRET_PREFIX = 'enc1:'
+
+/** I campi che non devono mai finire in chiaro su disco. */
+function secretPaths(s: Settings): string[][] {
+  return [
+    ['remote', 'openai', 'apiKey'],
+    ['remote', 'anthropic', 'apiKey'],
+    ['remote', 'ollama', 'apiKey'],
+    ['search', 'braveKey'],
+    ['search', 'tavilyKey'],
+    ['search', 'googleKey']
+  ]
+}
+
+function eachSecret(s: Settings): { get: () => string; set: (v: string) => void }[] {
+  return secretPaths(s).map(([a, b, c]) => ({
+    get: () => {
+      const obj = (s as unknown as Record<string, unknown>)[a] as Record<string, unknown>
+      const inner = (c ? obj?.[b] : obj) as Record<string, unknown> | undefined
+      return String((c ? inner?.[c] : obj?.[b]) ?? '')
+    },
+    set: (v: string) => {
+      const obj = (s as unknown as Record<string, unknown>)[a] as Record<string, unknown>
+      if (c) {
+        const inner = obj[b] as Record<string, unknown>
+        inner[c] = v
+      } else {
+        obj[b] = v
+      }
+    }
+  }))
+}
+
+/** Cifra le chiavi prima di scrivere (se il sistema offre un keystore). */
+function encryptSecrets(s: Settings): void {
+  let available = false
+  try {
+    available = safeStorage.isEncryptionAvailable()
+  } catch {
+    available = false
+  }
+  if (!available) return
+  for (const f of eachSecret(s)) {
+    const value = f.get()
+    if (!value || value.startsWith(SECRET_PREFIX)) continue
+    try {
+      f.set(SECRET_PREFIX + safeStorage.encryptString(value).toString('base64'))
+    } catch {
+      /* se non si può cifrare, si lascia com'è invece di perdere la chiave */
+    }
+  }
+}
+
+/** Decifra al caricamento; i valori in chiaro di vecchie installazioni restano validi. */
+function decryptSecrets(s: Settings): void {
+  for (const f of eachSecret(s)) {
+    const value = f.get()
+    if (!value.startsWith(SECRET_PREFIX)) continue
+    try {
+      f.set(safeStorage.decryptString(Buffer.from(value.slice(SECRET_PREFIX.length), 'base64')))
+    } catch {
+      f.set('')
+    }
+  }
+}
 
 let cached: Settings | null = null
 
@@ -83,6 +150,7 @@ export function getSettings(): Settings {
   }
   if (!loaded.contextSize || loaded.contextSize < 2048) loaded.contextSize = 65536
   if (!loaded.compressionThreshold) loaded.compressionThreshold = 0.75
+  decryptSecrets(loaded)
   cached = loaded
   return loaded
 }
@@ -91,6 +159,8 @@ export function saveSettings(patch: Partial<Settings>): Settings {
   const previous = getSettings()
   const next = merge(previous, patch)
   const clean = JSON.parse(JSON.stringify(next)) as Settings
+  const toWrite = JSON.parse(JSON.stringify(clean)) as Settings
+  encryptSecrets(toWrite)
 
   // un array di personalità vuoto o incompleto non deve mai sovrascrivere quelle esistenti
   if (!clean.personas || clean.personas.length !== 3) {
