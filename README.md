@@ -49,6 +49,9 @@ CUDA, per GPU NVIDIA. Nessun supporto ROCm/HIP.
 - **Uno o più llama-server.** Un processo per ogni coppia modello+GPU: 3 chat sullo stesso modello =
   1 processo; modelli o GPU diverse = un processo ciascuna. All'avvio i processi rimasti da
   un'esecuzione precedente vengono chiusi (pidfile in `dati/run/`), così la VRAM è libera.
+- **MoE e offload.** Per i modelli con esperti i pesi contati sul budget VRAM sono il 55% (il resto
+  resta in RAM) e i layer vengono scelti dal `fit` di llama.cpp: è così che un 30B-A3B gira su 16 GB
+  senza OOM.
 - **Budget di VRAM del pool.** Prima di avviare un server il pool calcola quanti modelli diversi
   gireranno sulla stessa GPU, somma pesi e buffer e **ripartisce la KV cache**: il contesto di
   ciascuno scende quanto serve a farli convivere. Se nemmeno il minimo (2048 token) entra, l'avvio
@@ -91,9 +94,11 @@ Regole di ammissione, applicate anche lato main process (la UI non è fidata):
 | Controllo | Comportamento |
 |---|---|
 | Vision | serve un `mmproj` nel repo: senza, il modello è **escluso** ("non supporta immagini/video") |
-| Quant | si scelgono i quant dal più grande al più piccolo e si prende **il migliore che entra** in VRAM (con 1 GB di riserva e stima di KV dal contesto); se nessuno entra il modello è escluso con i MiB richiesti/disponibili |
+| Quant | si scelgono i quant dal più grande al più piccolo e si prende **il migliore che entra**; se nessuno entra il modello è escluso con i MiB richiesti/disponibili |
 | VRAM | stima = pesi + mmproj + KV(contesto) + buffer (≈9% dei pesi); confronto con la GPU migliore |
-| RAM | mostrata nel verdetto per trasparenza (download e fallback) |
+| **KV esatta** | l'app scarica i primi 8 MB del GGUF con `Range` e legge l'header: layer di attenzione, head KV, dimensioni K/V, `full_attention_interval`. La stima del contesto è quindi quella reale, non una proporzione sui parametri |
+| **MoE** | architetture con esperti (`*moe`, `A3B`, `NxM`) possono girare **con gli esperti su CPU**: in GPU va ~55% dei pesi. Se il quant non entra interamente, il modello viene accettato in modalità *parziale* con il **contesto consigliato** calcolato (es. Qwen3-VL-30B-A3B Q4_K_M su 16 GB → 9.7 GB VRAM, 18.5 GB RAM, ctx 81920) |
+| RAM | per i MoE è un requisito reale: i pesi restano in RAM (max 80% della RAM di sistema) |
 
 Il quant selezionato viene registrato nel catalogo (`models.custom` nelle impostazioni) con repo,
 file e dimensione, quindi compare tra i modelli scaricabili e selezionabili per singola chat.
