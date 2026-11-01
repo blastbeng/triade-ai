@@ -85,6 +85,7 @@ const api = {
   submit: (topic: string, files: string[], personaId?: string): Promise<Session> =>
     ipcRenderer.invoke('debate:submit', { topic, files, personaId }),
   pauseDebate: (): Promise<Session | null> => ipcRenderer.invoke('debate:pause'),
+  stopDebate: (): Promise<Session | null> => ipcRenderer.invoke('debate:stop'),
   resumeDebate: (id: string): Promise<Session> => ipcRenderer.invoke('debate:resume', id),
   newChat: (): Promise<boolean> => ipcRenderer.invoke('debate:new'),
 

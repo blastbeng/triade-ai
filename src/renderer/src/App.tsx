@@ -230,6 +230,19 @@ export default function App(): JSX.Element {
     }
   }
 
+  const stopDebate = async (): Promise<void> => {
+    setBusy(true)
+    try {
+      const s = await window.triade.stopDebate()
+      if (s) setSession(s)
+      setStream(null)
+      setStreamReasoning(null)
+      setSessions(await window.triade.listSessions())
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const pause = async (): Promise<void> => {
     const s = await window.triade.pauseDebate()
     if (s) setSession(s)
@@ -325,12 +338,26 @@ export default function App(): JSX.Element {
           </div>
 
           <div className="actions">
-            {isRunning ? (
+            {isRunning && (
               <button className="warn" onClick={() => void pause()}>
                 pausa
               </button>
-            ) : (
-              <button className="primary" disabled={!session || busy || session.state === 'concluded'} onClick={() => void resume()}>
+            )}
+            {(isRunning || session?.state === 'paused') && (
+              <button
+                className="danger"
+                title="Chiudi il dibattito: nessun altro turno automatico"
+                onClick={() => void stopDebate()}
+              >
+                stop
+              </button>
+            )}
+            {!isRunning && (
+              <button
+                className="primary"
+                disabled={!session || busy || session.state === 'concluded'}
+                onClick={() => void resume()}
+              >
                 riprendi
               </button>
             )}

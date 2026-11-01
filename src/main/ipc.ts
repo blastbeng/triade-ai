@@ -234,6 +234,10 @@ export function registerIpc(): void {
     await engine.pause()
     return engine.current
   })
+  ipcMain.handle('debate:stop', async () => {
+    const session = await engine.stop()
+    return session
+  })
   ipcMain.handle('debate:resume', (_e, id: string) => engine.resume(id))
   ipcMain.handle('debate:new', async () => {
     await engine.reset()

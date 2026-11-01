@@ -141,6 +141,18 @@ function createWindow(): void {
               `[smoke] eliminazione voce di memoria: ${before.entries} -> ${removed.stats.entries}`
             )
           }
+          if (process.env.TRIADE_SMOKE === '6') {
+            await js(
+              `window.triade.startDebate('Smoke stop: dibattito da fermare subito.', [], '')`
+            )
+            await new Promise((r) => setTimeout(r, 6000))
+            const stopped = (await js('window.triade.stopDebate()')) as { state: string; turns: unknown[] }
+            console.log(`[smoke] dopo stop: stato=${stopped.state} turni=${stopped.turns.length}`)
+            await new Promise((r) => setTimeout(r, 1500))
+            const still = (await js('window.triade.currentSession()')) as { state: string; turns: unknown[] }
+            console.log(`[smoke] dopo 1.5s: stato=${still.state} turni=${still.turns.length} (nessun nuovo turno atteso)`)
+          }
+
           if (process.env.TRIADE_SMOKE === '5') {
             // prova completa: aggiunta da HuggingFace + download effettivo
             const repo = process.env.TRIADE_SMOKE_REPO ?? 'ggml-org/SmolVLM2-256M-Video-Instruct-GGUF'

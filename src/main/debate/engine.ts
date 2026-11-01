@@ -205,6 +205,16 @@ export class DebateEngine extends EventEmitter {
     if (this.session && this.session.state === 'running') this.setState('paused')
   }
 
+  /** Chiude il dibattito: nessun altro turno automatico, memoria distillata. */
+  async stop(): Promise<Session | null> {
+    if (!this.session) return null
+    await this.halt()
+    this.setState('stopped')
+    this.emitEvent({ type: 'log', message: 'dibattito fermato dall\u2019utente' })
+    this.distillInBackground(this.session)
+    return this.session
+  }
+
   /** Ferma la generazione e attende che il ciclo in corso esca davvero. */
   async halt(): Promise<void> {
     this.abort?.abort()

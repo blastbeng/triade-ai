@@ -124,7 +124,7 @@ export interface Turn {
   cut?: 'loop' | 'budget'
 }
 
-export type SessionState = 'running' | 'paused' | 'concluded' | 'error'
+export type SessionState = 'running' | 'paused' | 'stopped' | 'concluded' | 'error'
 
 export interface Consensus {
   answer: string

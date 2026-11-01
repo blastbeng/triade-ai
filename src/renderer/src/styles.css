@@ -92,7 +92,22 @@ body {
   border-color: #1c4a3a;
 }
 
-.badge.warn {
+.badge.danger {
+  background: #3a1616;
+  border: 1px solid #7a2b2b;
+  color: #fca5a5;
+  border-radius: 9px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.danger:hover {
+  background: #4a1b1b;
+  border-color: #a33;
+}
+
+.warn {
   color: var(--warn);
   border-color: #4a3f1c;
 }
@@ -130,7 +145,22 @@ button.primary {
   color: var(--accent);
 }
 
-button.warn {
+button.danger {
+  background: #3a1616;
+  border: 1px solid #7a2b2b;
+  color: #fca5a5;
+  border-radius: 9px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.danger:hover {
+  background: #4a1b1b;
+  border-color: #a33;
+}
+
+.warn {
   background: #3a2d10;
   border-color: #6b5420;
   color: var(--warn);
@@ -622,7 +652,22 @@ button.ghost {
   color: var(--ok);
 }
 
-.kv .warn {
+.kv .danger {
+  background: #3a1616;
+  border: 1px solid #7a2b2b;
+  color: #fca5a5;
+  border-radius: 9px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.danger:hover {
+  background: #4a1b1b;
+  border-color: #a33;
+}
+
+.warn {
   color: var(--warn);
 }
 

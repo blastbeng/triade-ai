@@ -89,6 +89,7 @@ interface Api {
   startDebate(topic: string, files: string[], personaId?: string): Promise<Session>
   submit(topic: string, files: string[], personaId?: string): Promise<Session>
   pauseDebate(): Promise<Session | null>
+  stopDebate(): Promise<Session | null>
   resumeDebate(id: string): Promise<Session>
   newChat(): Promise<boolean>
   pickAttachments(): Promise<Attachment[]>
