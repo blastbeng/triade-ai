@@ -174,6 +174,12 @@ async function finalize(part: string, dest: string, expected: number, url = ''):
       throw new Error(`download incompleto: ${actual} byte su ${expected} attesi. Riprova.`)
     }
     fs.writeFileSync(`${dest}.size`, String(expected), 'utf8')
+  } else if (!url) {
+    // né dimensione né hash: meglio un errore chiaro che un modello corrotto
+    fs.rmSync(dest, { force: true })
+    throw new Error(
+      'impossibile verificare il download (dimensione non dichiarata dal server): riprova'
+    )
   }
   const check = validateGgufFile(dest)
   if (!check.ok) {
@@ -183,6 +189,10 @@ async function finalize(part: string, dest: string, expected: number, url = ''):
 
   // verifica forte: SHA-256 ufficiale dichiarato da HuggingFace
   const expectedHash = url ? await remoteSha256(url) : ''
+  if (!expectedHash && expected <= 0) {
+    fs.rmSync(dest, { force: true })
+    throw new Error('download non verificabile (né dimensione né hash): riprova')
+  }
   if (expectedHash) {
     // streaming: un modello da 5,6 GB non deve mai finire intero in RAM
     const actual = await new Promise<string>((resolve, reject) => {
