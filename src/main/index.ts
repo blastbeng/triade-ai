@@ -68,6 +68,12 @@ function createWindow(): void {
             )
           }
           await new Promise((r) => setTimeout(r, Number(process.env.TRIADE_SHOT_DELAY ?? 30000)))
+          if (process.env.TRIADE_SHOT_SCROLL === 'top') {
+            await js(
+              "(() => { document.querySelectorAll('.messages').forEach((m) => { m.scrollTop = 0 }); return true })()"
+            )
+            await new Promise((r) => setTimeout(r, 400))
+          }
           const image = await mainWindow!.webContents.capturePage()
           const fs = await import('node:fs')
           const path = await import('node:path')
@@ -153,7 +159,8 @@ function createWindow(): void {
             )
             await new Promise((r) => setTimeout(r, 6000))
             const stopped = (await js('window.triade.stopDebate()')) as { state: string; turns: unknown[] }
-            console.log(`[smoke] dopo stop: stato=${stopped.state} turni=${stopped.turns.length}`)
+            const listAfter = (await js('window.triade.listSessions()')) as { id: string }[]
+            console.log(`[smoke] dopo stop: stato=${stopped.state} turni=${stopped.turns.length} sessioni elencate=${listAfter.length}`)
             await new Promise((r) => setTimeout(r, 1500))
             const still = (await js('window.triade.currentSession()')) as { state: string; turns: unknown[] }
             console.log(`[smoke] dopo 1.5s: stato=${still.state} turni=${still.turns.length} (nessun nuovo turno atteso)`)
