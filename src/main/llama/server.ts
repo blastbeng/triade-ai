@@ -213,7 +213,8 @@ class LlamaInstance extends EventEmitter {
         ]
         this.logLines = []
         this.push(
-          `avvio (tentativo ${attempt}, porta ${port}) -c ${s.contextSize} -ngl ${s.gpuLayers}` +
+          `avvio (tentativo ${attempt}, porta ${port}) -c ${plan.ctx} ` +
+            (plan.autoFit ? '-ngl auto (fit di llama.cpp) ' : `-ngl ${plan.ngl} `) +
             (this.device ? ` --device ${this.device.label} (${this.device.name})` : ' --device auto')
         )
         const child = spawn(exe, args, { windowsHide: true, cwd: path.dirname(exe) })
