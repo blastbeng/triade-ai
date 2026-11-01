@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
+import { app } from 'electron'
 import { execFile } from 'node:child_process'
 import { rotateLog } from '../housekeep'
 import { cacheDir, dataDir, findBinary, modelsDir, runDir } from '../paths'
@@ -245,6 +246,18 @@ class LlamaInstance extends EventEmitter {
       let lastError: Error | null = null
       for (let attempt = 1; attempt <= 5; attempt++) {
         const port = await freePort()
+        // la VRAM dedotta dal driver può essere troncata a 4 GiB: non deve
+        // schiacciare il contesto a 2048, altrimenti l'utente vede "2k" nell'header
+        if ((this.device as { estimated?: boolean } | null)?.estimated) {
+          const wanted = this.ctxOverride ?? getSettings().contextSize
+          if (plan.ctx < wanted) {
+            plan.ctx = wanted
+            this.push(
+              `[tuning] VRAM stimata: contesto mantenuto a ${plan.ctx} (l'offload lo decide llama.cpp)`
+            )
+          }
+        }
+
         const args = [
           '-m', modelPath,
           ...(() => {
@@ -276,7 +289,7 @@ class LlamaInstance extends EventEmitter {
         ]
         this.logLines = []
         this.push(
-          `avvio (tentativo ${attempt}, porta ${port}) -c ${plan.ctx} ` +
+          `avvio (v${app.getVersion()}, tentativo ${attempt}, porta ${port}) -c ${plan.ctx} ` +
             (plan.autoFit ? '-ngl auto (fit di llama.cpp) ' : `-ngl ${plan.ngl} `) +
             (this.device ? ` --device ${this.device.label} (${this.device.name})` : ' --device auto')
         )
@@ -329,7 +342,9 @@ class LlamaInstance extends EventEmitter {
         }
         const bindIssue = this.logLines.some((l) => BIND_FAILURE.test(l))
         lastError = new Error(
-          bindIssue ? `porta ${port} occupata da un altro processo` : 'llama-server non ha risposto: controlla il log'
+          bindIssue
+            ? `porta ${port} occupata da un altro processo`
+            : `llama-server non ha risposto (app v${app.getVersion()}, binari in ${exe}): controlla il log`
         )
         await this.stop()
         if (!bindIssue) break
