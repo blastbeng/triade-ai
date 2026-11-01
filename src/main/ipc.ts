@@ -122,10 +122,12 @@ export function registerIpc(): void {
   ipcMain.handle('session:list', () => listSessions())
   ipcMain.handle('session:load', (_e, id: string) => loadSession(id))
   ipcMain.handle('session:current', () => engine.current)
-  ipcMain.handle('session:delete', (_e, id: string) => {
+  ipcMain.handle('session:delete', async (_e, id: string) => {
     deleteSession(id)
     memory.removeSession(id)
-    return listSessions()
+    // se era la chat aperta, l'engine non deve più tenerla viva
+    if (engine.current?.id === id) await engine.reset()
+    return { sessions: listSessions(), memory: memory.stats() }
   })
 
   ipcMain.handle(
@@ -185,6 +187,11 @@ export function registerIpc(): void {
   ipcMain.handle('memory:stats', () => memory.stats())
   ipcMain.handle('memory:recent', (_e, limit: number) => memory.recent(limit ?? 40))
   ipcMain.handle('memory:search', (_e, query: string) => memory.search(query, 12))
+  ipcMain.handle('memory:delete', (_e, ids: string[]) => {
+    memory.removeEntries(Array.isArray(ids) ? ids : [String(ids)])
+    return { stats: memory.stats(), items: memory.recent(60) }
+  })
+
   ipcMain.handle('memory:clear', () => {
     memory.clear()
     return memory.stats()

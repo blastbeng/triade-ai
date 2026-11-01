@@ -232,16 +232,27 @@ export default function App(): JSX.Element {
         <div className="sessionlist">
           {sessions.length === 0 && <p className="empty">nessuna chat salvata</p>}
           {sessions.map((s) => (
-            <button
-              key={s.id}
-              className={`sessionrow ${session?.id === s.id ? 'selected' : ''}`}
-              onClick={() => void openSession(s.id)}
-            >
-              <span className="title">{s.topic.split('\n')[0].slice(0, 60)}</span>
-              <span className="sub">
-                {s.turns} turni · {s.state} · {new Date(s.updatedAt).toLocaleDateString('it-IT')}
-              </span>
-            </button>
+            <div key={s.id} className={`sessionrow ${session?.id === s.id ? 'selected' : ''}`}>
+              <button className="rowbtn" onClick={() => void openSession(s.id)}>
+                <span className="title">{s.topic.split('\n')[0].slice(0, 60)}</span>
+                <span className="sub">
+                  {s.turns} turni · {s.state} · {new Date(s.updatedAt).toLocaleDateString('it-IT')}
+                </span>
+              </button>
+              <button
+                className="del"
+                title="Elimina questa chat e tutta la sua memoria"
+                onClick={async (e) => {
+                  e.stopPropagation()
+                  if (!window.confirm('Eliminare questa chat? Verrà rimossa anche la memoria che ha prodotto.')) return
+                  const res = await window.triade.deleteSession(s.id)
+                  setSessions(res.sessions)
+                  if (session?.id === s.id) setSession(null)
+                }}
+              >
+                ×
+              </button>
+            </div>
           ))}
         </div>
         <button className="ghost memorybtn" onClick={() => setShowMemory(true)}>

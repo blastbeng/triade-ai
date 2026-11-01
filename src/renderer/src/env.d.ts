@@ -60,7 +60,10 @@ interface Api {
   listSessions(): Promise<{ id: string; topic: string; updatedAt: number; state: string; turns: number }[]>
   loadSession(id: string): Promise<Session | null>
   currentSession(): Promise<Session | null>
-  deleteSession(id: string): Promise<{ id: string; topic: string; updatedAt: number; state: string; turns: number }[]>
+  deleteSession(id: string): Promise<{
+    sessions: { id: string; topic: string; updatedAt: number; state: string; turns: number }[]
+    memory: MemoryStats
+  }>
   startDebate(topic: string, files: string[], personaId?: string): Promise<Session>
   submit(topic: string, files: string[], personaId?: string): Promise<Session>
   pauseDebate(): Promise<Session | null>
@@ -71,6 +74,7 @@ interface Api {
   memoryStats(): Promise<MemoryStats>
   memoryRecent(limit?: number): Promise<MemoryItem[]>
   memorySearch(query: string): Promise<MemoryItem[]>
+  memoryDelete(ids: string[]): Promise<{ stats: MemoryStats; items: MemoryItem[] }>
   memoryClear(): Promise<MemoryStats>
   appInfo(): Promise<{ version: string; platform: string; cwd: string; portable: boolean; catalog: { id: string; name: string; vision: boolean }[] }>
   pathForFile(file: File): string

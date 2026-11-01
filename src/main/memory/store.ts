@@ -172,6 +172,28 @@ class VectorMemory {
     this.save(true)
   }
 
+  /** Rimuove singole voci (dalla pagina memoria condivisa). */
+  removeEntries(ids: string[]): number {
+    this.load()
+    const drop = new Set(ids)
+    if (!drop.size) return 0
+    const keepEntries: MemoryEntry[] = []
+    const keepVectors: Float32Array[] = []
+    for (let i = 0; i < this.entries.length; i++) {
+      if (drop.has(this.entries[i].id)) continue
+      keepEntries.push(this.entries[i])
+      keepVectors.push(this.vectors[i])
+    }
+    const removed = this.entries.length - keepEntries.length
+    if (!removed) return 0
+    this.entries = keepEntries
+    this.vectors = keepVectors
+    this.hashes = new Set(keepEntries.map((e) => createHash('sha1').update(e.text).digest('hex')))
+    this.dirty = true
+    this.save(true)
+    return removed
+  }
+
   /** Rimuove le voci di una sessione eliminata. */
   removeSession(sessionId: string): void {
     this.load()

@@ -89,6 +89,24 @@ function createWindow(): void {
           console.log(`[smoke] catalogo: ${catalog.length} modelli`)
           const memory = (await js('window.triade.memoryStats()')) as { entries: number }
           console.log(`[smoke] memoria: ${memory.entries} elementi`)
+          const recent = (await js('window.triade.memoryRecent(3)')) as { id: string }[]
+          if (recent.length) {
+            const removed = (await js(
+              `window.triade.memoryDelete(${JSON.stringify([recent[0].id])})`
+            )) as { stats: { entries: number } }
+            console.log(
+              `[smoke] eliminazione voce di memoria: ${memory.entries} -> ${removed.stats.entries}`
+            )
+          }
+          const list = (await js('window.triade.listSessions()')) as { id: string }[]
+          if (list.length) {
+            const res = (await js(
+              `window.triade.deleteSession(${JSON.stringify(list[0].id)})`
+            )) as { sessions: unknown[]; memory: { entries: number } }
+            console.log(
+              `[smoke] eliminazione sessione: ${list.length} -> ${res.sessions.length} chat, memoria ${res.memory.entries}`
+            )
+          }
           console.log('[smoke] OK')
 
           if (process.env.TRIADE_SMOKE === '2') {

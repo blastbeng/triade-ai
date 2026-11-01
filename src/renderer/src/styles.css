@@ -1277,3 +1277,79 @@ button.ghost {
   padding: 1px 7px;
   white-space: nowrap;
 }
+
+/* ---------- eliminazione sessioni e voci di memoria ---------- */
+.sessionrow {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0;
+}
+
+.sessionrow .rowbtn {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 7px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.sessionrow:hover {
+  background: #101824;
+  border-color: var(--line);
+  border-radius: 8px;
+}
+
+.sessionrow.selected {
+  background: #102027;
+  border: 1px solid #1d5b60;
+  border-radius: 8px;
+}
+
+.sessionrow .del {
+  flex: 0 0 22px;
+  border: none;
+  background: transparent;
+  color: #5c6b80;
+  font-size: 15px;
+  line-height: 1;
+  border-radius: 6px;
+  opacity: 0;
+  transition: 0.15s;
+}
+
+.sessionrow:hover .del,
+.sessionrow.selected .del {
+  opacity: 1;
+}
+
+.sessionrow .del:hover {
+  background: #3a1d1d;
+  color: #fca5a5;
+}
+
+.memlist li {
+  align-items: flex-start;
+}
+
+.memdel {
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  color: #5c6b80;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 4px;
+  border-radius: 6px;
+}
+
+.memdel:hover {
+  background: #3a1d1d;
+  color: #fca5a5;
+}

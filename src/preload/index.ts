@@ -18,6 +18,14 @@ export interface CatalogEntry {
   status: ModelStatus | null
 }
 
+export interface MemoryItem {
+  id: string
+  text: string
+  kind: string
+  ts: number
+  score?: number
+}
+
 export interface MemoryStats {
   entries: number
   byKind: Record<string, number>
@@ -59,8 +67,10 @@ const api = {
     ipcRenderer.invoke('session:list'),
   loadSession: (id: string): Promise<Session | null> => ipcRenderer.invoke('session:load', id),
   currentSession: (): Promise<Session | null> => ipcRenderer.invoke('session:current'),
-  deleteSession: (id: string): Promise<{ id: string; topic: string; updatedAt: number; state: string; turns: number }[]> =>
-    ipcRenderer.invoke('session:delete', id),
+  deleteSession: (id: string): Promise<{
+    sessions: { id: string; topic: string; updatedAt: number; state: string; turns: number }[]
+    memory: MemoryStats
+  }> => ipcRenderer.invoke('session:delete', id),
 
   startDebate: (topic: string, files: string[], personaId?: string): Promise<Session> =>
     ipcRenderer.invoke('debate:start', { topic, files, personaId }),
@@ -78,6 +88,8 @@ const api = {
     ipcRenderer.invoke('memory:recent', limit),
   memorySearch: (query: string): Promise<{ id: string; text: string; kind: string; ts: number; score: number }[]> =>
     ipcRenderer.invoke('memory:search', query),
+  memoryDelete: (ids: string[]): Promise<{ stats: MemoryStats; items: MemoryItem[] }> =>
+    ipcRenderer.invoke('memory:delete', ids),
   memoryClear: (): Promise<MemoryStats> => ipcRenderer.invoke('memory:clear'),
 
   appInfo: (): Promise<{ version: string; platform: string; cwd: string; portable: boolean; catalog: { id: string; name: string; vision: boolean }[] }> =>

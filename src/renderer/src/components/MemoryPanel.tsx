@@ -15,6 +15,12 @@ export default function MemoryPanel({ onClose }: { onClose: () => void }): JSX.E
     void refresh()
   }, [])
 
+  const remove = async (id: string): Promise<void> => {
+    const res = await window.triade.memoryDelete([id])
+    setStats(res.stats)
+    setItems((prev) => prev.filter((i) => i.id !== id))
+  }
+
   const search = async (): Promise<void> => {
     if (!query.trim()) return refresh()
     setItems(await window.triade.memorySearch(query))
@@ -65,6 +71,9 @@ export default function MemoryPanel({ onClose }: { onClose: () => void }): JSX.E
                   {typeof m.score === 'number' && ` · score ${m.score.toFixed(3)}`}
                 </small>
               </div>
+              <button className="memdel" title="Elimina questa voce dalla memoria" onClick={() => void remove(m.id)}>
+                ×
+              </button>
             </li>
           ))}
           {items.length === 0 && <li className="empty">memoria vuota</li>}
