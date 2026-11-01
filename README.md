@@ -234,7 +234,36 @@ credentials are committed.
   recommended.
 - App icon still the Electron default.
 
-## 9. CI and automatic releases (GitHub Actions)
+## 9. CI and releases (branches)
+
+| Branch | What runs | Result |
+|---|---|---|
+| `main` | `ci` workflow: typecheck, build, package on Linux + Windows | artifacts only, **no release** |
+| `release` | `release` workflow: verifies `release == main`, builds, signs, packages | **GitHub Release** `v<version>` with the Windows `.zip`, the Linux `.tar.gz` and `SHA256SUMS.txt` |
+
+`promote` runs on every push to `main` and decides whether the change is a **big one**: it compares
+the version in `package.json` with the last `v*` tag — a **minor or major bump** (or the very first
+tag) counts as big. If it is, it fast-forwards the `release` branch to `main` (the branch must not
+contain extra commits) which triggers the release. A patch-only push stays on `main` and publishes
+nothing; to force a release anyway: *Actions → promote → Run workflow → force*.
+
+The release branch is therefore always an exact copy of `main`: `release.yml` refuses to publish if
+`git rev-parse HEAD` differs from `origin/main`.
+
+### Activating the workflows
+
+1. The files live in `.github/workflows/` (`ci.yml`, `promote.yml`, `release.yml`). Pushing them
+   requires a token with the **`workflow`** scope (classic PAT) or *Workflows: Read and write*
+   (fine-grained). Without it GitHub rejects the push with
+   `refusing to allow a Personal Access Token to create or update workflow`.
+2. Repo → **Settings → Actions → General → Workflow permissions** → *Read and write permissions*
+   (the release job creates tags and releases with `GITHUB_TOKEN`).
+3. If `release` is protected: allow the GitHub Actions bot to push to it, or leave it unprotected —
+   it is only written by `promote`.
+4. First run: `Actions → promote → Run workflow` with `force` = true, or bump the version with
+   `npm run release:minor` and push to `main`.
+
+## 10. CI details (old section placeholder) (GitHub Actions)
 
 The repository lives on GitHub, so the pipeline is **GitHub Actions** (`.github/workflows/pipeline.yml`);
 GitLab CI cannot run on GitHub-hosted repositories, it would only apply to a GitLab mirror.
