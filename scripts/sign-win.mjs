@@ -106,12 +106,26 @@ function signLinux() {
 function signWindows() {
   fs.mkdirSync(certDir, { recursive: true })
   const script = `
-$ErrorActionPreference = 'Stop'
-$cert = Get-ChildItem Cert:\\CurrentUser\\My | Where-Object { $_.Subject -eq 'CN=TriadeAI' } | Select-Object -First 1
+$ErrorActionPreference = 'Continue'
+$cert = $null
+try {
+  $cert = Get-ChildItem Cert:\\CurrentUser\\My |
+    Where-Object { $_.Subject -eq 'CN=TriadeAI' } | Select-Object -First 1
+} catch {
+  Write-Output ("[sign] archivio certificati non disponibile: " + $_.Exception.Message)
+}
 if (-not $cert) {
-  $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=TriadeAI' \
-    -KeyUsage DigitalSignature -FriendlyName 'TriadeAI self-signed' \
-    -CertStoreLocation 'Cert:\\CurrentUser\\My' -NotAfter (Get-Date).AddYears(2)
+  try {
+    $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=TriadeAI' \
+      -KeyUsage DigitalSignature -FriendlyName 'TriadeAI self-signed' \
+      -NotAfter (Get-Date).AddYears(2)
+  } catch {
+    Write-Output ("[sign] creazione certificato fallita: " + $_.Exception.Message)
+  }
+}
+if (-not $cert) {
+  Write-Output '[sign] nessun certificato: artefatti lasciati non firmati'
+  exit 0
 }
 $files = Get-ChildItem -Path '${dist.replace(/\\/g, '\\\\')}' -Include *.exe,*.msi,*.msix -File -Recurse
 foreach ($f in $files) {
@@ -120,9 +134,7 @@ foreach ($f in $files) {
   Write-Output ("[sign] " + $f.Name + " -> " + $res.Status)
 }
 `
-  execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], {
-    stdio: 'inherit'
-  })
+  execFileSync('powershell', ['-NoProfile', '-Command', script], { stdio: 'inherit' })
 }
 
 try {
@@ -130,6 +142,15 @@ try {
   else signLinux()
   console.log('[sign] completato (self-signed: SmartScreen avviserà comunque su altre macchine)')
 } catch (err) {
+  const realCert = Boolean(process.env.CSC_LINK || process.env.AZURE_SIGNING_ACCOUNT)
   console.error(`[sign] firma fallita: ${err.message}`)
-  process.exitCode = 1
+  if (realCert) {
+    // con un certificato reale la firma è un requisito, non un optional
+    process.exitCode = 1
+  } else {
+    console.error(
+      '[sign] nessun certificato reale configurato: proseguo con artefatti non firmati ' +
+        '(la firma self-signed non rimuove gli avvisi SmartScreen su altre macchine).'
+    )
+  }
 }
