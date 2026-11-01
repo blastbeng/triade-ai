@@ -25,6 +25,12 @@ interface Props {
   nextUp?: boolean
   ui?: UiSettings
   active: boolean
+  /** modello assegnato a questa chat (es. ornith-1.5-9b) */
+  modelLabel?: string
+  /** porta del server che la serve */
+  port?: number | null
+  /** contesto effettivo di quel server */
+  ctx?: number | null
 }
 
 export default function ChatColumn({
@@ -38,6 +44,9 @@ export default function ChatColumn({
   nextUp,
   ui,
   active
+  modelLabel,
+  port,
+  ctx
 }: Props): JSX.Element {
   const t = useT()
   const boxRef = useRef<HTMLDivElement>(null)
@@ -90,6 +99,13 @@ export default function ChatColumn({
       <header>
         <span className="dot">{persona.emoji}</span>
         <h2>{persona.name}</h2>
+        {modelLabel && (
+          <span className="modelchip" title={`${modelLabel}${port ? ` · porta ${port}` : ''}`}>
+            {modelLabel}
+            {port ? ` :${port}` : ''}
+            {ctx ? ` · ${Math.round(ctx / 1024)}k` : ''}
+          </span>
+        )}
         {busy && (
           <span className={`phase ${phase}`}>
             <span className="spinner" />

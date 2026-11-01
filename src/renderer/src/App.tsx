@@ -515,6 +515,9 @@ export default function App(): JSX.Element {
               turns={turnsFor(persona.id)}
               streaming={stream?.agentId === persona.id ? stream.text : null}
               ui={settings?.ui}
+              modelLabel={(settings?.models.byPersona as Record<string, string> | undefined)?.[persona.id] ?? settings?.models.active}
+              port={servers.find((x) => x.modelId === ((settings?.models.byPersona as Record<string, string> | undefined)?.[persona.id] ?? settings?.models.active))?.port ?? null}
+              ctx={servers.find((x) => x.modelId === ((settings?.models.byPersona as Record<string, string> | undefined)?.[persona.id] ?? settings?.models.active))?.contextSize ?? null}
               streamReasoning={streamReasoning?.agentId === persona.id ? streamReasoning.text : null}
               phase={phases[persona.id] ?? null}
               nextUp={
