@@ -496,6 +496,8 @@ app.whenReady().then(async () => {
   registerIpc()
   try {
     const { recoverFailedUpdate } = await import('./updater')
+    const { cleanupUpdateLeftovers } = await import('./updater')
+    cleanupUpdateLeftovers()
     const rolledBack = recoverFailedUpdate()
     if (rolledBack) {
       dialog.showErrorBox(

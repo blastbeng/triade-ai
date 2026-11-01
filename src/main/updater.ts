@@ -110,6 +110,15 @@ function fileHash(file: string): string {
 
 /** Scarica, verifica e applica l'aggiornamento. Ritorna il percorso del nuovo eseguibile. */
 export async function downloadUpdate(info: UpdateInfo, onPct?: (p: number) => void): Promise<string> {
+  const target = process.env.APPIMAGE ?? process.execPath
+  try {
+    fs.accessSync(path.dirname(target), fs.constants.W_OK)
+  } catch {
+    throw new Error(
+      `la cartella dell’eseguibile non è scrivibile (${path.dirname(target)}): ` +
+        'sposta l’app in una cartella tua, oppure scarica il pacchetto dalla pagina Releases'
+    )
+  }
   const dir = path.join(dataDir(), 'aggiornamenti')
   fs.mkdirSync(dir, { recursive: true })
   const archive = path.join(dir, info.assetName)
@@ -307,6 +316,35 @@ export function progressWindow(title: string): { update: (p: number) => void; cl
       if (!win.isDestroyed()) win.destroy()
     }
   }
+}
+
+/**
+ * Rimuove backup e residui di aggiornamenti falliti (`<exe>.failed`).
+ * Il `.old` dell'ultimo aggiornamento resta: serve al rollback manuale.
+ */
+export function cleanupUpdateLeftovers(maxAgeDays = 3): number {
+  let removed = 0
+  try {
+    const exe = process.env.APPIMAGE ?? process.execPath
+    const dir = path.dirname(exe)
+    const base = path.basename(exe)
+    const now = Date.now()
+    for (const name of fs.readdirSync(dir)) {
+      if (!name.startsWith(base) || !name.endsWith('.failed')) continue
+      const file = path.join(dir, name)
+      try {
+        if (now - fs.statSync(file).mtimeMs > maxAgeDays * 24 * 60 * 60 * 1000) {
+          fs.rmSync(file, { force: true })
+          removed++
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return removed
 }
 
 /** Testo localizzato per il dialogo di aggiornamento. */

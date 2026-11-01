@@ -50,5 +50,29 @@ if (fs.readFileSync(target, 'utf8') !== 'OLD') {
   console.error('[test] rollback fallito')
   process.exit(1)
 }
+
+// 3) watchdog: se la nuova versione non è viva, lo script deve ripristinare l'originale
+const target2 = path.join(tmp, 'Watchdog.exe')
+fs.writeFileSync(target2, 'NEW-BROKEN')
+fs.writeFileSync(`${target2}.old`, 'OLD-GOOD')
+const wd = path.join(tmp, 'watchdog.cmd')
+fs.writeFileSync(
+  wd,
+  [
+    '@echo off',
+    'tasklist /FI "IMAGENAME eq triade-nonexistent-xyz.exe" | find /I "triade-nonexistent-xyz.exe" >nul',
+    'if errorlevel 1 (',
+    `  move /Y "${target2}" "${target2}.failed" >nul`,
+    `  move /Y "${target2}.old" "${target2}" >nul`,
+    ')'
+  ].join('\r\n')
+)
+execFileSync('cmd.exe', ['/c', wd], { stdio: 'inherit' })
+if (fs.readFileSync(target2, 'utf8') !== 'OLD-GOOD') {
+  console.error('[test] il watchdog non ha ripristinato la versione precedente')
+  process.exit(1)
+}
+console.log('[test] watchdog: ripristino della versione precedente OK')
+
 fs.rmSync(tmp, { recursive: true, force: true })
 console.log('[test] swap rename + rollback su Windows: OK')
