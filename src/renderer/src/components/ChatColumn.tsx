@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Persona, Turn } from '../../../shared/types'
+import type { Persona, Turn, UiSettings } from '../../../shared/types'
 import Markdown from '../markdown'
 
 export type Phase = 'prefill' | 'thinking' | 'writing' | 'tool' | 'idle'
@@ -20,6 +20,7 @@ interface Props {
   phase: Phase | null
   calledBy: string | null
   nextUp?: boolean
+  ui?: UiSettings
   active: boolean
 }
 
@@ -31,6 +32,7 @@ export default function ChatColumn({
   phase,
   calledBy,
   nextUp,
+  ui,
   active
 }: Props): JSX.Element {
   const boxRef = useRef<HTMLDivElement>(null)
@@ -107,13 +109,16 @@ export default function ChatColumn({
         {turns.map((turn) => (
           <article key={turn.id} className={`bubble ${turn.interrupted ? 'interrupted' : ''}`}>
             <div className="meta">
-              turno · {new Date(turn.ts).toLocaleTimeString('it-IT')}
-              {turn.tokensIn > 0 && <span className="tok"> · {turn.tokensIn} token di prompt</span>}
+              turno
+              {(ui?.showTimestamps ?? true) && ` · ${new Date(turn.ts).toLocaleTimeString('it-IT')}`}
+              {(ui?.showTokens ?? true) && turn.tokensIn > 0 && (
+                <span className="tok"> · {turn.tokensIn} token di prompt</span>
+              )}
               {turn.cut === 'loop' && <span className="tok"> · fermato: ripetizione</span>}
               {turn.cut === 'budget' && <span className="tok"> · vicino al limite di contesto</span>}
             </div>
 
-            <Markdown text={turn.text} />
+            {ui?.markdown === false ? <pre className="plain">{turn.text}</pre> : <Markdown text={turn.text} />}
 
             {turn.mentions && turn.mentions.length > 0 && (
               <div className="mentions">
@@ -166,7 +171,7 @@ export default function ChatColumn({
             )}
             {streaming !== null ? (
               <div className="md streamingText">
-                <Markdown text={streaming} />
+                {ui?.markdown === false ? <pre className="plain">{streaming}</pre> : <Markdown text={streaming} />}
                 <span className="caret" />
               </div>
             ) : (

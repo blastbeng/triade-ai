@@ -1492,3 +1492,88 @@ button.ghost {
   color: var(--text);
   font-family: inherit;
 }
+
+/* ---------- impostazioni UI (variabili applicate da App) ---------- */
+:root {
+  --ui-radius: 10px;
+  --ui-line: 1.55;
+  --ui-accent: #5eead4;
+}
+
+.bubble,
+.toolcard,
+.mention,
+.modelcard,
+.verdict,
+.modelsearch {
+  border-radius: var(--ui-radius);
+}
+
+.md {
+  line-height: var(--ui-line);
+}
+
+.md a {
+  color: var(--ui-accent);
+  border-bottom-color: color-mix(in srgb, var(--ui-accent) 45%, transparent);
+}
+
+pre.plain {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: var(--ui-line);
+  color: inherit;
+}
+
+body[data-density='compact'] .messages {
+  gap: 6px;
+  padding: 8px;
+}
+
+body[data-density='compact'] .bubble {
+  padding: 7px 9px;
+}
+
+body[data-density='compact'] .column header {
+  padding: 6px 10px;
+}
+
+body[data-density='compact'] .md {
+  font-size: 15px;
+}
+
+body[data-density='compact'] .toolcard pre,
+body[data-density='compact'] .reasoning pre {
+  max-height: 140px;
+}
+
+.uipreview {
+  border: 1px dashed #2a3a4c;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #0b1118;
+}
+
+.uipreview strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ui-accent);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.uipreview p,
+.uipreview li {
+  font-size: 0.9rem;
+  line-height: var(--ui-line);
+  margin: 0 0 6px;
+}
+
+.uipreview ul {
+  margin: 0 0 6px;
+  padding-left: 18px;
+}

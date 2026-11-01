@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { Attachment, DebateEvent, ModelStatus, ServerStatus, Session, Settings } from '../../shared/types'
+import type {
+  Attachment,
+  DebateEvent,
+  ModelStatus,
+  ServerStatus,
+  Session,
+  Settings,
+  UiFont
+} from '../../shared/types'
 import ChatColumn, { type Phase } from './components/ChatColumn'
 import Composer from './components/Composer'
 import SettingsPanel from './components/SettingsPanel'
@@ -124,10 +132,24 @@ export default function App(): JSX.Element {
     })
   }, [loadAll, pushLog])
 
+  const UI_FONTS: Record<UiFont, string> = {
+    system: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    sans: "Inter, 'Helvetica Neue', Arial, sans-serif",
+    serif: "Georgia, 'Times New Roman', serif",
+    mono: "'JetBrains Mono', 'Cascadia Mono', Consolas, monospace"
+  }
+
   useEffect(() => {
-    const scale = settings?.textScale ?? 1
-    document.body.style.zoom = String(scale)
-  }, [settings?.textScale])
+    const ui = settings?.ui
+    if (!ui) return
+    document.body.style.zoom = String(ui.fontScale ?? settings?.textScale ?? 1)
+    document.body.style.fontFamily = UI_FONTS[ui.fontFamily] ?? UI_FONTS.system
+    document.body.dataset.density = ui.density
+    const root = document.documentElement
+    root.style.setProperty('--ui-radius', `${ui.radius}px`)
+    root.style.setProperty('--ui-line', String(ui.lineHeight))
+    root.style.setProperty('--ui-accent', ui.accent)
+  }, [settings?.ui])
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -330,6 +352,7 @@ export default function App(): JSX.Element {
               persona={persona}
               turns={(session?.turns ?? []).filter((t) => t.agentId === persona.id)}
               streaming={stream?.agentId === persona.id ? stream.text : null}
+              ui={settings?.ui}
               streamReasoning={streamReasoning?.agentId === persona.id ? streamReasoning.text : null}
               phase={phases[persona.id] ?? null}
               nextUp={

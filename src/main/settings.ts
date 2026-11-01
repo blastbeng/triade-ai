@@ -10,7 +10,12 @@ function merge(base: Settings, patch: Partial<Settings>): Settings {
     ...base,
     ...patch,
     autoTune: patch.autoTune ?? base.autoTune,
-    textScale: patch.textScale ?? base.textScale,
+    textScale: patch.textScale ?? patch.ui?.fontScale ?? base.textScale,
+    ui: {
+      ...base.ui,
+      ...(patch.ui ?? {}),
+      fontScale: patch.ui?.fontScale ?? patch.textScale ?? base.ui.fontScale
+    },
     search: { ...base.search, ...(patch.search ?? {}) },
     asr: { ...base.asr, ...(patch.asr ?? {}) },
     models: {

@@ -20,6 +20,26 @@ export interface SearchSettings {
   maxResults: number
 }
 
+export type UiFont = 'system' | 'sans' | 'serif' | 'mono'
+export type UiDensity = 'comfortable' | 'compact'
+
+export interface UiSettings {
+  /** scala del testo (0.85 - 1.6) */
+  fontScale: number
+  fontFamily: UiFont
+  density: UiDensity
+  /** interlinea delle bolle (1.3 - 1.9) */
+  lineHeight: number
+  /** raggio degli angoli (0 - 16) */
+  radius: number
+  /** colore di evidenza dell'interfaccia */
+  accent: string
+  showTimestamps: boolean
+  showTokens: boolean
+  /** se disattivato, le bolle mostrano il testo grezzo */
+  markdown: boolean
+}
+
 export interface CustomModelEntry {
   id: string
   name: string
@@ -44,8 +64,9 @@ export interface Settings {
   maxTokensPerTurn: number
   maxTurns: number
   temperature: number
-  /** scala del testo dell'interfaccia (1 = 14px) */
+  /** scala del testo dell'interfaccia (1 = base) */
   textScale: number
+  ui: UiSettings
   toolsEnabled: boolean
   search: SearchSettings
   personas: Persona[]
@@ -224,6 +245,17 @@ export const DEFAULT_SETTINGS: Settings = {
   maxTurns: 40,
   temperature: 0.85,
   textScale: 1,
+  ui: {
+    fontScale: 1,
+    fontFamily: 'system',
+    density: 'comfortable',
+    lineHeight: 1.55,
+    radius: 10,
+    accent: '#5eead4',
+    showTimestamps: true,
+    showTokens: true,
+    markdown: true
+  },
   toolsEnabled: true,
   search: {
     provider: 'searxng',

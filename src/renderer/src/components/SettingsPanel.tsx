@@ -18,7 +18,7 @@ const PROVIDERS: { id: SearchProvider; label: string }[] = [
   { id: 'googlecse', label: 'Google CSE' }
 ]
 
-type Tab = 'generale' | 'ricerca' | 'gpu' | 'personas' | 'modelli'
+type Tab = 'generale' | 'ui' | 'ricerca' | 'gpu' | 'personas' | 'modelli'
 
 interface GpuInfo {
   usable: { key: string; label: string; backend: string; name: string; vramMiB: number; freeMiB: number }[]
@@ -60,7 +60,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
       <div className="modalbox settings" onClick={(e) => e.stopPropagation()}>
         <h2>Impostazioni</h2>
         <nav className="tabs">
-          {(['generale', 'ricerca', 'gpu', 'personas', 'modelli'] as Tab[]).map((t) => (
+          {(['generale', 'ui', 'ricerca', 'gpu', 'personas', 'modelli'] as Tab[]).map((t) => (
             <button key={t} className={tab === t ? 'tab active' : 'tab'} onClick={() => setTab(t)}>
               {t === 'personas' ? 'personalità' : t === 'modelli' ? 'modelli e download' : t}
             </button>
@@ -102,20 +102,6 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                 value={draft.maxTokensPerTurn}
                 onChange={(e) => setDraft({ ...draft, maxTokensPerTurn: Number(e.target.value) })}
               />
-            </label>
-            <label>
-              Dimensione del testo
-              <div className="inline">
-                <input
-                  type="range"
-                  min={85}
-                  max={160}
-                  step={5}
-                  value={Math.round((draft.textScale ?? 1) * 100)}
-                  onChange={(e) => setDraft({ ...draft, textScale: Number(e.target.value) / 100 })}
-                />
-                <span>{Math.round((draft.textScale ?? 1) * 100)}%</span>
-              </div>
             </label>
             <label>
               Max turni (stop automatico)
@@ -199,6 +185,152 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
               Contesto, strati GPU, flash attention, KV cache e modelli forzano il riavvio dei
               llama-server attivi.
             </p>
+          </div>
+        )}
+
+        {tab === 'ui' && (
+          <div className="form">
+            <label>
+              Dimensione del testo
+              <div className="inline">
+                <input
+                  type="range"
+                  min={85}
+                  max={160}
+                  step={5}
+                  value={Math.round((draft.ui?.fontScale ?? 1) * 100)}
+                  onChange={(e) => {
+                    const scale = Number(e.target.value) / 100
+                    setDraft({ ...draft, textScale: scale, ui: { ...draft.ui, fontScale: scale } })
+                  }}
+                />
+                <span>{Math.round((draft.ui?.fontScale ?? 1) * 100)}%</span>
+              </div>
+            </label>
+
+            <label>
+              Carattere
+              <select
+                value={draft.ui?.fontFamily ?? 'system'}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    ui: { ...draft.ui, fontFamily: e.target.value as Settings['ui']['fontFamily'] }
+                  })
+                }
+              >
+                <option value="system">Sistema (consigliato)</option>
+                <option value="sans">Sans (Inter/Helvetica)</option>
+                <option value="serif">Serif (Georgia)</option>
+                <option value="mono">Monospace (JetBrains Mono)</option>
+              </select>
+            </label>
+
+            <label>
+              Densità
+              <select
+                value={draft.ui?.density ?? 'comfortable'}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    ui: { ...draft.ui, density: e.target.value as Settings['ui']['density'] }
+                  })
+                }
+              >
+                <option value="comfortable">Comoda</option>
+                <option value="compact">Compatta (più messaggi a schermo)</option>
+              </select>
+            </label>
+
+            <label>
+              Interlinea
+              <div className="inline">
+                <input
+                  type="range"
+                  min={130}
+                  max={190}
+                  step={5}
+                  value={Math.round((draft.ui?.lineHeight ?? 1.55) * 100)}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      ui: { ...draft.ui, lineHeight: Number(e.target.value) / 100 }
+                    })
+                  }
+                />
+                <span>{(draft.ui?.lineHeight ?? 1.55).toFixed(2)}</span>
+              </div>
+            </label>
+
+            <label>
+              Angoli
+              <div className="inline">
+                <input
+                  type="range"
+                  min={0}
+                  max={16}
+                  step={1}
+                  value={draft.ui?.radius ?? 10}
+                  onChange={(e) =>
+                    setDraft({ ...draft, ui: { ...draft.ui, radius: Number(e.target.value) } })
+                  }
+                />
+                <span>{draft.ui?.radius ?? 10}px</span>
+              </div>
+            </label>
+
+            <label className="inline">
+              Colore di evidenza
+              <input
+                type="color"
+                value={draft.ui?.accent ?? '#5eead4'}
+                onChange={(e) => setDraft({ ...draft, ui: { ...draft.ui, accent: e.target.value } })}
+              />
+            </label>
+
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={draft.ui?.showTimestamps ?? true}
+                onChange={(e) =>
+                  setDraft({ ...draft, ui: { ...draft.ui, showTimestamps: e.target.checked } })
+                }
+              />
+              Mostra l'orario dei turni
+            </label>
+
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={draft.ui?.showTokens ?? true}
+                onChange={(e) => setDraft({ ...draft, ui: { ...draft.ui, showTokens: e.target.checked } })}
+              />
+              Mostra il conteggio dei token di prompt
+            </label>
+
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={draft.ui?.markdown ?? true}
+                onChange={(e) => setDraft({ ...draft, ui: { ...draft.ui, markdown: e.target.checked } })}
+              />
+              Formattazione markdown nelle risposte (testo grezzo se disattivata)
+            </label>
+
+            <div className="uipreview">
+              <strong>Anteprima</strong>
+              <p>
+                Testo normale con <strong>grassetto</strong>, <em>corsivo</em> e <code>codice</code>.
+              </p>
+              <ul>
+                <li>primo punto dell'elenco</li>
+                <li>secondo punto dell'elenco</li>
+              </ul>
+              <p className="note">
+                Le modifiche a carattere, densità, interlinea, angoli e colore si vedono subito dopo
+                il salvataggio.
+              </p>
+            </div>
           </div>
         )}
 
