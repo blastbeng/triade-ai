@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Persona, Turn } from '../../../shared/types'
 import Markdown from '../markdown'
 
@@ -34,8 +34,32 @@ export default function ChatColumn({
   active
 }: Props): JSX.Element {
   const boxRef = useRef<HTMLDivElement>(null)
+  const reasoningRef = useRef<HTMLPreElement>(null)
   const stickRef = useRef(true)
+  const startRef = useRef<number>(0)
+  const [elapsed, setElapsed] = useState(0)
   const busy = phase !== null && phase !== 'idle'
+
+  // cronometro visibile accanto allo stato: mostra che sta succedendo qualcosa
+  useEffect(() => {
+    if (!busy) {
+      setElapsed(0)
+      return
+    }
+    if (!startRef.current) startRef.current = Date.now()
+    const id = window.setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 1000)), 1000)
+    return () => window.clearInterval(id)
+  }, [busy])
+
+  useEffect(() => {
+    if (!busy) startRef.current = 0
+  }, [busy])
+
+  // il blocco del ragionamento deve scorrere da solo mentre cresce
+  useEffect(() => {
+    const pre = reasoningRef.current
+    if (pre) pre.scrollTop = pre.scrollHeight
+  }, [streamReasoning])
 
   // se l'utente è in fondo, la vista segue i nuovi token; se risale, resta dov'è
   const onScroll = (): void => {
@@ -63,6 +87,7 @@ export default function ChatColumn({
           <span className={`phase ${phase}`}>
             <span className="spinner" />
             {PHASE_LABEL[phase as Phase]}
+            {elapsed > 0 && ` · ${elapsed}s`}
           </span>
         )}
         {!busy && calledBy && <span className="calledby">chiamato da {calledBy}</span>}
@@ -136,7 +161,7 @@ export default function ChatColumn({
                 <summary>
                   <span className="spinner" /> sta ragionando…
                 </summary>
-                <pre>{streamReasoning}</pre>
+                <pre ref={reasoningRef}>{streamReasoning}</pre>
               </details>
             )}
             {streaming !== null ? (
