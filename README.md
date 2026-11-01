@@ -5,7 +5,7 @@
 TriadeAI is a local-first desktop app (Electron + React + TypeScript) where two or three AI agents
 discuss your topic with each other until they reach a validated consensus, or you stop them. With a
 single personality it becomes a normal ChatGPT/OpenWebUI-style chat. Inference runs either on a
-**local `llama-server` over Vulkan/CUDA** (no ROCm/HIP) or through a **remote API** (OpenAI,
+**local `llama-server` over Vulkan** (no ROCm/HIP) or through a **remote API** (OpenAI,
 Anthropic, Ollama).
 
 ```
@@ -86,7 +86,7 @@ for the personalities that actually use `llama`).
 
 | Backend | How | Needs GPU | Downloads |
 |---|---|---|---|
-| `llama` (default) | bundled `llama-server` (Vulkan, CUDA if fetched) | yes, dedicated | model + mmproj + whisper |
+| `llama` (default) | bundled `llama-server` (Vulkan, Vulkan if fetched) | yes, dedicated | model + mmproj + whisper |
 | `openai` | any OpenAI-compatible `/v1/chat/completions` (also Azure-style proxies) | no | none |
 | `anthropic` | `/v1/messages` adapter (system prompt, images as base64 blocks, tools as `input_schema`, streaming deltas) | no | none |
 | `ollama` | OpenAI-compatible `/v1` endpoint of Ollama | no | none |
@@ -128,11 +128,11 @@ point the setting at your own instance for serious use. *Settings → search* ha
   single entries can be deleted from the memory panel.
 
 ### GPU handling
-- Vulkan and CUDA only (no ROCm/HIP). Detection is **fully dynamic**: the driver-reported type
+- Vulkan only (no ROCm/HIP). Detection is **fully dynamic**: the driver-reported type
   (INTEGRATED/DISCRETE), dedicated memory and shared-memory heuristics exclude iGPUs without any
   hardcoded GPU name.
 - Every chat can use a different GPU when more than one usable dedicated GPU exists (e.g. a 3060 on
-  CUDA and a 7800 XT on Vulkan); with a single GPU the selector is disabled.
+  Vulkan and a 7800 XT on Vulkan); with a single GPU the selector is disabled.
 - One `llama-server` per **model+GPU pair**: same model everywhere = one process, different models =
   one process each.
 
@@ -160,7 +160,7 @@ point the setting at your own instance for serious use. *Settings → search* ha
 |---|---|
 | OS | Windows 10/11 x64 (portable exe) · Linux x64 (AppImage) |
 | Backend | local `llama-server` **or** any OpenAI/Anthropic/Ollama API |
-| GPU (local only) | **dedicated** AMD (Vulkan) or NVIDIA (Vulkan/CUDA); integrated GPUs are excluded |
+| GPU (local only) | **dedicated** AMD (Vulkan) or NVIDIA (Vulkan); integrated GPUs are excluded |
 | VRAM | 8 GB minimum for the 9B model at 131k with `q4_0` KV; 12–16 GB comfortable |
 | Disk | ~12 GB for the local default (model 5.6 GB + mmproj 0.7 GB + whisper ~1 GB + binaries) |
 
@@ -172,7 +172,7 @@ npm run fetch:bin                 # llama.cpp Vulkan + ffmpeg + whisper.cpp into
 npm run dev                       # dev mode; models are downloaded from the app
 npm run build:linux               # dist/TriadeAI-<version>.AppImage
 npm run build:win                 # dist/TriadeAI-<version>-portable.exe (wine on Linux)
-npm run fetch:bin -- --cuda       # optional: adds the CUDA build (NVIDIA)
+npm run fetch:bin -- --cuda       # optional: adds the Vulkan build (NVIDIA)
 ```
 
 ## 4. Data layout — always next to the executable

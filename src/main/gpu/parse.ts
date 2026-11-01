@@ -1,4 +1,6 @@
 export type Backend = 'vulkan' | 'cuda' | 'other'
+// 'cuda' resta nel tipo solo perché llama.cpp lo può stampare: le GPU CUDA
+// vengono scartate, tutto passa da Vulkan (AMD e NVIDIA).
 
 export interface GpuDevice {
   key: string

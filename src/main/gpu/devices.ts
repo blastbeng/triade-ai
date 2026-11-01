@@ -13,7 +13,8 @@ export interface DetectedGpus {
 }
 
 export function llamaBinaryFor(backend: Backend): string | null {
-  if (backend === 'cuda') return findBinary('cuda/llama-server')
+  // CUDA non è supportato: qualunque GPU passa da Vulkan
+  if (backend === 'cuda') return null
   return findBinary('llama-server')
 }
 
@@ -109,7 +110,7 @@ export async function detectGpus(force = false): Promise<DetectedGpus> {
   const found: GpuDevice[] = []
   const backends: Backend[] = []
 
-  for (const backend of ['vulkan', 'cuda'] as Backend[]) {
+  for (const backend of ['vulkan'] as Backend[]) {
     const exe = llamaBinaryFor(backend)
     if (!exe) continue
     backends.push(backend)
@@ -123,7 +124,7 @@ export async function detectGpus(force = false): Promise<DetectedGpus> {
 
   const classified = classify(found)
   const value: DetectedGpus = {
-    usable: classified.filter((d) => !d.integrated),
+    usable: classified.filter((d) => !d.integrated && d.backend === 'vulkan'),
     excluded: classified.filter((d) => d.integrated),
     backends,
     error: classified.length ? undefined : 'nessuna GPU rilevata: mancano i binari o il driver Vulkan/CUDA'
@@ -133,5 +134,5 @@ export async function detectGpus(force = false): Promise<DetectedGpus> {
 }
 
 export function hasCudaBuild(): boolean {
-  return Boolean(findBinary('cuda/llama-server'))
+  return false
 }

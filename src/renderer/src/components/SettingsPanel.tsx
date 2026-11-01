@@ -671,7 +671,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
             </div>
             <p className="note">
               {t('settings.gpuNote')}
-              {gpu && !gpu.cudaBuild && ` ${t('settings.cudaMissing')}`}
+
             </p>
           </div>
         )}

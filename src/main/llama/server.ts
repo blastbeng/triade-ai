@@ -117,7 +117,7 @@ class LlamaInstance extends EventEmitter {
     }
     this.logLines.push(clean)
     if (this.logLines.length > 300) this.logLines.splice(0, this.logLines.length - 300)
-    if (/(vulkan|cuda)/i.test(clean) && /device/i.test(clean)) this.deviceLabel = 'GPU'
+    if (/vulkan/i.test(clean) && /device/i.test(clean)) this.deviceLabel = 'GPU'
     this.emit('log', `[${this.modelId}] ${clean}`)
   }
 
@@ -265,7 +265,7 @@ class LlamaInstance extends EventEmitter {
         child.on('error', (err) => this.push(`[errore server] ${err.message}`))
 
         if (await this.waitHealthy(port, 15 * 60 * 1000)) {
-          this.deviceLabel = this.logLines.some((l) => /vulkan|cuda/i.test(l)) ? 'GPU' : 'CPU'
+          this.deviceLabel = this.logLines.some((l) => /vulkan/i.test(l)) ? 'GPU' : 'CPU'
           this.push(`[pronto su 127.0.0.1:${port} — ${this.deviceLabel}]`)
           return {
             modelId: this.modelId,
