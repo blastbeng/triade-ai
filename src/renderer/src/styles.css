@@ -1720,3 +1720,48 @@ body[data-density='compact'] .reasoning pre {
 .bubble.user pre.plain {
   color: #dbeaf8;
 }
+
+/* --- scelta lingua / numero personalità nell'onboarding --- */
+.langgrid,
+.personacount {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 4px;
+}
+
+.langbutton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: var(--text);
+  font-size: 15px;
+  cursor: pointer;
+  transition: border-color .12s ease, background .12s ease, color .12s ease;
+}
+
+.langbutton:hover {
+  border-color: var(--muted);
+}
+
+.langbutton .flag {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.langbutton.selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 20%, var(--panel2));
+  color: #eafffb;
+  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.langbutton .check {
+  color: var(--accent);
+  font-weight: 700;
+}

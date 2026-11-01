@@ -96,6 +96,7 @@ export default function Onboarding({
               >
                 <span className="flag">{l.flag}</span>
                 <span>{l.label}</span>
+                {l.id === locale && <span className="check">✓</span>}
               </button>
             ))}
           </div>
