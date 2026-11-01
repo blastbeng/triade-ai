@@ -152,6 +152,52 @@ export async function listRepoFiles(repo: string): Promise<HfFile[]> {
   return files
 }
 
+
+/** Elenco file di un repo (tree API), per cercare l'mmproj anche altrove. */
+async function repoFiles(repo: string): Promise<{ path: string; size: number }[]> {
+  try {
+    const res = await fetch(`https://huggingface.co/api/models/${repo}/tree/main?recursive=true`, {
+      headers: { 'User-Agent': 'triade-ai' },
+      signal: AbortSignal.timeout(20000)
+    })
+    if (!res.ok) return []
+    const arr = (await res.json()) as { path: string; size?: number; type?: string }[]
+    return arr.filter((f) => f.type !== 'directory').map((f) => ({ path: f.path, size: f.size ?? 0 }))
+  } catch {
+    return []
+  }
+}
+
+/**
+ * I quant imatrix (es. `-i1-GGUF`) non contengono il mmproj: la vision vive nel
+ * repo base. Si provano le varianti del nome finché si trova un mmproj.
+ */
+function baseRepos(repo: string): string[] {
+  const out = new Set<string>()
+  const add = (r: string): void => {
+    if (r && r !== repo) out.add(r)
+  }
+  add(repo.replace(/-i1-GGUF$/i, '-GGUF'))
+  add(repo.replace(/-i1-GGUF$/i, ''))
+  add(repo.replace(/-GGUF$/i, ''))
+  add(`${repo.replace(/-i1-GGUF$/i, '').replace(/-GGUF$/i, '')}-GGUF`)
+  return [...out]
+}
+
+async function mmprojFromBaseRepos(repo: string): Promise<{ path: string; size: number } | null> {
+  for (const candidate of baseRepos(repo)) {
+    const files = await repoFiles(candidate)
+    const found = files.filter((f) => /mmproj/i.test(f.path) && /\.gguf$/i.test(f.path))
+    if (found.length) {
+      // preferisce Q8_0, poi f16, poi il primo disponibile
+      const best =
+        found.find((f) => /q8_0/i.test(f.path)) ?? found.find((f) => /f16/i.test(f.path)) ?? found[0]
+      return best
+    }
+  }
+  return null
+}
+
 function pickMmproj(files: HfFile[]): HfFile | null {
   const candidates = files.filter((f) => /mmproj/i.test(f.path) && /\.gguf$/i.test(f.path))
   if (!candidates.length) return null
@@ -182,7 +228,7 @@ export async function inspectRepo(
 ): Promise<HfVerdict> {
   const files = await listRepoFiles(repo)
   const name = (modelRow?.modelId ?? repo).split('/').pop() ?? repo
-  const mmproj = pickMmproj(files)
+  const mmproj = pickMmproj(files) ?? (await mmprojFromBaseRepos(repo))
   const ggufs = files.filter(
     (f) => /\.gguf$/i.test(f.path) && !/mmproj/i.test(f.path) && !/-\d{5}-of-\d{5}/i.test(f.path)
   )

@@ -25,6 +25,8 @@ export interface CatalogModel {
   }
 }
 
+// imatrix: i pesi stanno nel repo -i1-GGUF, il mmproj (vision) resta nel repo base
+const HF_I1 = 'https://huggingface.co/mradermacher/Ornith-1.5-9B-uncensored-i1-GGUF/resolve/main'
 const HF = 'https://huggingface.co/mradermacher/Ornith-1.5-9B-uncensored-GGUF/resolve/main'
 
 export const CATALOG: CatalogModel[] = [
@@ -42,8 +44,8 @@ export const CATALOG: CatalogModel[] = [
     license: 'vedi model card junafinity/Ornith-1.5-9B-uncensored',
     files: {
       model: {
-        name: 'Ornith-1.5-9B-uncensored.Q4_K_M.gguf',
-        url: `${HF}/Ornith-1.5-9B-uncensored.Q4_K_M.gguf`
+        name: 'Ornith-1.5-9B-uncensored.i1-Q4_K_M.gguf',
+        url: `${HF_I1}/Ornith-1.5-9B-uncensored.i1-Q4_K_M.gguf`
       },
       mmproj: {
         name: 'Ornith-1.5-9B-uncensored.mmproj-Q8_0.gguf',
