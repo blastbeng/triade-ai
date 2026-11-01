@@ -333,6 +333,49 @@ function createWindow(): void {
  * Senza una GPU dedicata il progetto non è supportato: avviso esplicito e uscita
  * immediata, invece di far girare un modello da 9B sulla CPU.
  */
+/** Controllo aggiornamenti all'avvio: dialogo bloccante, timeout breve, mai fatale. */
+async function maybeUpdate(): Promise<void> {
+  try {
+    const { checkForUpdate, downloadUpdate, applyUpdate, updateTexts, skipVersion } =
+      await import('./updater')
+    const info = await checkForUpdate()
+    if (!info) return
+    const t = updateTexts()
+    const choice = dialog.showMessageBoxSync(mainWindow!, {
+      type: 'question',
+      buttons: [t.now, t.later, t.skip],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+      title: t.title,
+      message: t.message(info.version),
+      detail: info.notes || undefined
+    })
+    if (choice === 2) {
+      skipVersion(info.version)
+      return
+    }
+    if (choice !== 0) return
+
+    mainWindow?.setTitle(`TriadeAI — download aggiornamento…`)
+    const nuovo = await downloadUpdate(info, (p) => {
+      mainWindow?.setProgressBar(Math.min(1, p))
+      mainWindow?.setTitle(`TriadeAI — aggiornamento ${Math.round(p * 100)}%`)
+    })
+    mainWindow?.setProgressBar(-1)
+    applyUpdate(nuovo)
+  } catch (err) {
+    mainWindow?.setProgressBar(-1)
+    dialog.showMessageBoxSync(mainWindow!, {
+      type: 'error',
+      title: 'Aggiornamento non riuscito',
+      message: (err as Error).message,
+      detail: 'Puoi scaricare l\'ultima versione dalla pagina Releases del progetto.',
+      buttons: ['OK']
+    })
+  }
+}
+
 async function assertGpu(): Promise<boolean> {
   if (process.env.TRIADE_SKIP_GPU_CHECK === '1') return true
   // con un'API remota la GPU non serve: il controllo vale solo per llama-server locale
@@ -391,6 +434,10 @@ app.whenReady().then(async () => {
   })()
   registerIpc()
   createWindow()
+  // dopo che la finestra è pronta, controllo aggiornamenti (bloccante ma con timeout)
+  mainWindow?.once('ready-to-show', () => {
+    void maybeUpdate()
+  })
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })

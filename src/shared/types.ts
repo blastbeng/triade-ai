@@ -91,6 +91,8 @@ export interface Settings {
   remote: RemoteSettings
   /** motore degli embedding per memoria e contesto */
   embeddings: EmbeddingSettings
+  /** controllo aggiornamenti all'avvio */
+  updates: { enabled: boolean; skippedVersion?: string }
   /** Dimensione contesto (token) condivisa dalle 3 chat. */
   contextSize: number
   /** Frazione del contesto oltre la quale scatta il prompt compression (0.75 = 75%). */
@@ -307,6 +309,7 @@ export const DEFAULT_SETTINGS: Settings = {
     engine: 'llama',
     model: 'Qwen3-Embedding-0.6B-Q8_0.gguf'
   },
+  updates: { enabled: true },
   remote: {
     openai: { baseUrl: 'https://api.openai.com/v1', apiKey: '', model: '' },
     anthropic: { baseUrl: 'https://api.anthropic.com/v1', apiKey: '', model: '' },

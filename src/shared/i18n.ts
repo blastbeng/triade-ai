@@ -11,6 +11,11 @@ export const LOCALES: { id: Locale; label: string; flag: string }[] = [
 export type Dict = Record<string, string>
 
 const en: Dict = {
+  'update.title': "Update available",
+  'update.message': "TriadeAI {version} is available (you have an older version). Update now? The app will restart.",
+  'update.now': "Update now",
+  'update.later': "Later",
+  'update.skip': "Skip this version",
   'settings.corruptBadge': "corrupted file",
   'settings.repair': "repair (re-download)",
   'settings.corruptNotRepairable': "no source available: choose another model",
@@ -260,6 +265,11 @@ const en: Dict = {
 }
 
 const it: Dict = {
+  'update.title': "Aggiornamento disponibile",
+  'update.message': "È disponibile TriadeAI {version} (la tua versione è più vecchia). Aggiornare ora? L'app si riavvierà.",
+  'update.now': "Aggiorna ora",
+  'update.later': "Più tardi",
+  'update.skip': "Salta questa versione",
   'settings.corruptBadge': "file corrotto",
   'settings.repair': "ripara (riscarica)",
   'settings.corruptNotRepairable': "nessuna sorgente disponibile: scegli un altro modello",
@@ -506,6 +516,11 @@ const it: Dict = {
 }
 
 const de: Dict = {
+  'update.title': "Update verfügbar",
+  'update.message': "TriadeAI {version} ist verfügbar. Jetzt aktualisieren? Die App startet neu.",
+  'update.now': "Jetzt aktualisieren",
+  'update.later': "Später",
+  'update.skip': "Diese Version überspringen",
   'settings.corruptBadge': "beschädigte Datei",
   'settings.repair': "reparieren (neu laden)",
   'settings.corruptNotRepairable': "keine Quelle verfügbar: anderes Modell wählen",
@@ -751,6 +766,11 @@ const de: Dict = {
 }
 
 const fr: Dict = {
+  'update.title': "Mise à jour disponible",
+  'update.message': "TriadeAI {version} est disponible. Mettre à jour maintenant ? L'application redémarrera.",
+  'update.now': "Mettre à jour",
+  'update.later': "Plus tard",
+  'update.skip': "Ignorer cette version",
   'settings.corruptBadge': "fichier corrompu",
   'settings.repair': "réparer (retélécharger)",
   'settings.corruptNotRepairable': "aucune source disponible : choisissez un autre modèle",
@@ -996,6 +1016,11 @@ const fr: Dict = {
 }
 
 const es: Dict = {
+  'update.title': "Actualización disponible",
+  'update.message': "TriadeAI {version} está disponible. ¿Actualizar ahora? La app se reiniciará.",
+  'update.now': "Actualizar ahora",
+  'update.later': "Más tarde",
+  'update.skip': "Omitir esta versión",
   'settings.corruptBadge': "archivo corrupto",
   'settings.repair': "reparar (redescargar)",
   'settings.corruptNotRepairable': "sin origen disponible: elige otro modelo",
