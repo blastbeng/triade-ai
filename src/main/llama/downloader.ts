@@ -129,7 +129,39 @@ function mmprojSizeOf(m: CatalogModel): number {
   return Math.round((m.bytes ?? 0) * 0.12) || 1
 }
 
+const fileLocks = new Map<string, Promise<void>>()
+
 async function downloadWithResume(
+  url: string,
+  dest: string,
+  onPct: (pct: number) => void
+): Promise<void> {
+  const running = fileLocks.get(dest)
+  if (running) return running
+  const task = downloadWithResumeInner(url, dest, onPct).finally(() => fileLocks.delete(dest))
+  fileLocks.set(dest, task)
+  return task
+}
+
+/** Verifica finale unica: dimensione esatta, sidecar .size, header GGUF. */
+function finalize(part: string, dest: string, expected: number): void {
+  fs.renameSync(part, dest)
+  if (expected > 0) {
+    const actual = fs.statSync(dest).size
+    if (actual !== expected) {
+      fs.rmSync(dest, { force: true })
+      throw new Error(`download incompleto: ${actual} byte su ${expected} attesi. Riprova.`)
+    }
+    fs.writeFileSync(`${dest}.size`, String(expected), 'utf8')
+  }
+  const check = validateGgufFile(dest)
+  if (!check.ok) {
+    fs.rmSync(dest, { force: true })
+    throw new Error(`file scaricato corrotto (${check.reason}): riprova il download`)
+  }
+}
+
+async function downloadWithResumeInner(
   url: string,
   dest: string,
   onPct: (pct: number) => void
@@ -137,10 +169,16 @@ async function downloadWithResume(
   const part = `${dest}.part`
   let start = fs.existsSync(part) ? fs.statSync(part).size : 0
   const total = await remoteSize(url)
-  if (total > 0 && start >= total * 0.999) {
-    fs.renameSync(part, dest)
+  // solo un file COMPLETO al byte si può promuovere: prima bastava il 99,9%
+  // e un .part troncato di pochi MB diventava un modello "valido" ma illeggibile
+  if (total > 0 && start === total) {
+    finalize(part, dest, total)
     onPct(1)
     return
+  }
+  if (total > 0 && start > total) {
+    fs.rmSync(part, { force: true })
+    start = 0
   }
   const headers: Record<string, string> = {}
   if (start > 0) headers.Range = `bytes=${start}-`
@@ -169,23 +207,7 @@ async function downloadWithResume(
   if (totalKnown > 0 && fs.statSync(part).size < totalKnown * 0.995) {
     throw new Error('download incompleto: rilancia, riprenderà da dove si era fermato')
   }
-  fs.renameSync(part, dest)
-  if (totalKnown > 0) {
-    const actual = fs.statSync(dest).size
-    if (actual !== totalKnown) {
-      fs.rmSync(dest, { force: true })
-      throw new Error(
-        `download incompleto: ${actual} byte su ${totalKnown} attesi. Riprova.`
-      )
-    }
-    // impronta della dimensione: permette di riconoscere i troncamenti anche offline
-    fs.writeFileSync(`${dest}.size`, String(totalKnown), 'utf8')
-  }
-  const check = validateGgufFile(dest)
-  if (!check.ok) {
-    fs.rmSync(dest, { force: true })
-    throw new Error(`file scaricato corrotto (${check.reason}): riprova il download`)
-  }
+  finalize(part, dest, totalKnown)
   onPct(1)
 }
 
