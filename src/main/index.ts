@@ -433,6 +433,19 @@ app.whenReady().then(async () => {
     }
   })()
   registerIpc()
+  try {
+    const { recoverFailedUpdate } = await import('./updater')
+    const rolledBack = recoverFailedUpdate()
+    if (rolledBack) {
+      dialog.showErrorBox(
+        'Aggiornamento annullato',
+        `La versione ${rolledBack} non è riuscita ad avviarsi: è stata ripristinata la versione precedente.`
+      )
+    }
+  } catch {
+    /* il controllo non deve impedire l'avvio */
+  }
+
   createWindow()
   // dopo che la finestra è pronta, controllo aggiornamenti (bloccante ma con timeout)
   mainWindow?.once('ready-to-show', () => {

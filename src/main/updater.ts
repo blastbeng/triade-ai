@@ -154,13 +154,49 @@ export async function downloadUpdate(info: UpdateInfo, onPct?: (p: number) => vo
  * Windows: uno script .cmd attende la chiusura del processo, copia il nuovo exe
  *          al posto del vecchio e lo riavvia.
  */
-export function applyUpdate(newExe: string): void {
+const pendingFile = (): string => path.join(dataDir(), 'aggiornamenti', 'pending.json')
+
+/** Segna un aggiornamento in corso: se al riavvio la versione non è quella nuova, si torna indietro. */
+function markPending(version: string, backup: string): void {
+  fs.mkdirSync(path.dirname(pendingFile()), { recursive: true })
+  fs.writeFileSync(pendingFile(), JSON.stringify({ version, backup, at: Date.now() }), 'utf8')
+}
+
+/**
+ * Chiamata all'avvio: se esiste un aggiornamento segnato e stiamo girando con la
+ * versione vecchia, significa che il nuovo eseguibile non è partito → ripristino.
+ */
+export function recoverFailedUpdate(): string | null {
+  const file = pendingFile()
+  if (!fs.existsSync(file)) return null
+  try {
+    const data = JSON.parse(fs.readFileSync(file, 'utf8')) as { version: string; backup: string }
+    if (app.getVersion() === data.version) {
+      fs.rmSync(file, { force: true })
+      return null
+    }
+    const target = process.env.APPIMAGE ?? process.execPath
+    if (data.backup && fs.existsSync(data.backup)) {
+      fs.copyFileSync(data.backup, target)
+      if (process.platform !== 'win32') fs.chmodSync(target, 0o755)
+    }
+    fs.rmSync(file, { force: true })
+    return data.version
+  } catch {
+    fs.rmSync(file, { force: true })
+    return null
+  }
+}
+
+export function applyUpdate(newExe: string, version = ''): void {
   if (process.platform === 'win32') {
     const target = process.execPath
+    markPending(version, `${target}.old`)
     const helper = path.join(path.dirname(newExe), 'aggiorna.cmd')
     const script = [
       '@echo off',
       'ping 127.0.0.1 -n 4 >nul',
+      `copy /Y "${target}" "${target}.old" >nul`,
       `copy /Y "${newExe}" "${target}" >nul`,
       `start "" "${target}"`,
       'del /Q "%~f0"'
@@ -172,6 +208,7 @@ export function applyUpdate(newExe: string): void {
   }
   const current = process.env.APPIMAGE ?? process.execPath
   const backup = `${current}.old`
+  markPending(version, backup)
   try {
     if (fs.existsSync(current)) fs.copyFileSync(current, backup)
     fs.copyFileSync(newExe, current)
