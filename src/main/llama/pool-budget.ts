@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import type { GpuDevice } from '../gpu/devices'
-import { readGgufHints } from './gguf'
+import { isMoeArch, readGgufHints } from './gguf'
 
 const MIB = 1024 * 1024
 const RESERVE_MIB = 1024
@@ -56,7 +56,11 @@ export function planPool(
   if (!targets.length) return { contextByKey, notes }
 
   const available = Math.max(0, Math.min(device.vramMiB - RESERVE_MIB, device.freeMiB || device.vramMiB))
-  const weights = targets.reduce((sum, t) => sum + sizeMiB(t.modelPath) + sizeMiB(t.mmprojPath), 0)
+  const weights = targets.reduce((sum, t) => {
+    const w = sizeMiB(t.modelPath) + sizeMiB(t.mmprojPath)
+    // MoE: in GPU va solo la parte attiva/shared, gli esperti restano in RAM
+    return sum + (isMoeArch(readGgufHints(t.modelPath).architecture) ? w * 0.55 : w)
+  }, 0)
   const overheads = targets.reduce(
     (sum, t) => sum + Math.max(400, sizeMiB(t.modelPath) * 0.09),
     0

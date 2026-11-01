@@ -112,6 +112,18 @@ export default function ModelSearch({ onInstalled, onError }: Props): JSX.Elemen
             GPU: {verdict.deviceName ?? 'nessuna'} · VRAM disponibile {verdict.availableMiB} MiB · RAM{' '}
             {(verdict.ramMiB / 1024).toFixed(0)} GB · vision: {verdict.vision ? 'sì' : 'no'}
           </p>
+          <div className="chips">
+            <span className="chip">{verdict.arch}</span>
+            {verdict.moe && <span className="chip moe">MoE · esperti</span>}
+            {verdict.mode === 'partial' && <span className="chip warn">esperti su CPU</span>}
+            {verdict.mode === 'full' && <span className="chip ok">tutto in GPU</span>}
+            {verdict.ok && verdict.contextSuggestion > 0 && (
+              <span className="chip">contesto consigliato {verdict.contextSuggestion}</span>
+            )}
+            {verdict.ok && verdict.mode === 'partial' && (
+              <span className="chip">RAM ~{(verdict.ramNeededMiB / 1024).toFixed(1)} GB</span>
+            )}
+          </div>
 
           {verdict.ok && (
             <>
@@ -119,8 +131,8 @@ export default function ModelSearch({ onInstalled, onError }: Props): JSX.Elemen
                 Quant
                 <select value={quant} onChange={(e) => setQuant(e.target.value)}>
                   {verdict.variants.map((v) => (
-                    <option key={v.quant} value={v.quant} disabled={!v.fits}>
-                      {v.quant} · {gb(v.bytes)} · ≈{v.totalMiB} MiB{v.fits ? '' : ' (non entra)'}
+                    <option key={v.quant} value={v.quant} disabled={!v.fits && !v.fitsPartial}>
+                      {v.quant} · {gb(v.bytes)} · {v.fits ? `tutto in GPU (ctx ${v.ctxFull})` : v.fitsPartial ? `esperti in CPU (ctx ${v.ctxPartial})` : 'non entra'}
                     </option>
                   ))}
                 </select>

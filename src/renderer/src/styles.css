@@ -1646,3 +1646,37 @@ body[data-density='compact'] .reasoning pre {
   margin: 0 0 6px;
   padding-left: 18px;
 }
+
+/* ---------- chip del verdetto modello ---------- */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  font-size: 11.5px;
+  color: #b9c9da;
+  background: #121c26;
+  border: 1px solid #24313f;
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+
+.chip.moe {
+  color: #c4b5fd;
+  border-color: #3b3163;
+  background: #171330;
+}
+
+.chip.ok {
+  color: #6ee7b7;
+  border-color: #1d5b60;
+  background: #0d1f1e;
+}
+
+.chip.warn {
+  color: #fcd34d;
+  border-color: #5c4a1c;
+  background: #221c0d;
+}

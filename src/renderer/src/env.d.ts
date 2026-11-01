@@ -56,7 +56,21 @@ interface Api {
     deviceName: string | null
     ok: boolean
     reason: string
-    variants: { quant: string; file: string; bytes: number; totalMiB: number; fits: boolean }[]
+    moe: boolean
+    mode: 'full' | 'partial' | 'none'
+    arch: string
+    ramNeededMiB: number
+    contextSuggestion: number
+    variants: {
+      quant: string
+      file: string
+      bytes: number
+      totalMiB: number
+      fits: boolean
+      fitsPartial: boolean
+      ctxFull: number
+      ctxPartial: number
+    }[]
   }>
   modelsAddCustom(
     repo: string,

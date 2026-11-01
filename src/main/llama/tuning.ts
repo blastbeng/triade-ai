@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import type { GpuDevice } from '../gpu/devices'
-import { readGgufHints } from './gguf'
+import { isMoeArch, readGgufHints } from './gguf'
 
 const MiB = 1024 * 1024
 
@@ -55,6 +55,12 @@ export function planLaunch(input: PlanInput): LaunchPlan {
   const kvLayers = Math.max(1, Math.min(layers, hints.attentionLayers))
 
   const weightsMiB = fileMiB(input.modelPath) + fileMiB(input.mmprojPath)
+  // MoE: gli esperti possono restare in RAM, in GPU va ~55% dei pesi
+  const moe = isMoeArch(hints.architecture)
+  const vramWeightsMiB = moe ? weightsMiB * 0.55 : weightsMiB
+  if (moe) {
+    notes.push(`modello MoE (${hints.architecture}): esperti in CPU, in GPU ~${Math.round(vramWeightsMiB)} MiB`)
+  }
   const available = input.device ? Math.max(0, input.device.vramMiB - RESERVE_MIB) : 0
   const overheadMiB = Math.max(450, Math.round(weightsMiB * 0.09))
 
@@ -111,7 +117,12 @@ export function planLaunch(input: PlanInput): LaunchPlan {
     }
   }
 
-  const fits = (c: number, kv: keyof typeof ELEM_BYTES, weights = weightsMiB, offload = mmprojOffload): boolean =>
+  const fits = (
+    c: number,
+    kv: keyof typeof ELEM_BYTES,
+    weights = vramWeightsMiB,
+    offload = mmprojOffload
+  ): boolean =>
     weights + kvMiB(c, kv) + overheadMiB <= available + (offload ? 0 : fileMiB(input.mmprojPath))
 
   // 1) contesto richiesto con il tipo KV preferito
@@ -125,13 +136,13 @@ export function planLaunch(input: PlanInput): LaunchPlan {
       kvType = better
     } else {
       // 2) mmproj sulla CPU
-      if (input.mmprojPath && !fits(ctx, kvType, weightsMiB - fileMiB(input.mmprojPath))) {
+      if (input.mmprojPath && !fits(ctx, kvType, vramWeightsMiB - fileMiB(input.mmprojPath))) {
         notes.push('VRAM stretta: mmproj (vision) spostato sulla CPU')
       }
-      if (input.mmprojPath && fits(ctx, kvType, weightsMiB - fileMiB(input.mmprojPath))) {
+      if (input.mmprojPath && fits(ctx, kvType, vramWeightsMiB - fileMiB(input.mmprojPath))) {
         mmprojOffload = false
         const lowered = (['q8_0', 'q4_0'] as Array<keyof typeof ELEM_BYTES>).find((k) =>
-          fits(ctx, k, weightsMiB - fileMiB(input.mmprojPath))
+          fits(ctx, k, vramWeightsMiB - fileMiB(input.mmprojPath))
         )
         kvType = lowered ?? kvType
       }
@@ -139,7 +150,7 @@ export function planLaunch(input: PlanInput): LaunchPlan {
   }
 
   // 3) ancora fuori: riduco il contesto mantenendo la qualità del KV scelto
-  const budget = available - (mmprojOffload ? weightsMiB : weightsMiB - fileMiB(input.mmprojPath)) - overheadMiB
+  const budget = available - (mmprojOffload ? vramWeightsMiB : vramWeightsMiB - fileMiB(input.mmprojPath)) - overheadMiB
   const perTokenMiB = kvMiB(1, kvType)
   if (budget > 0 && perTokenMiB > 0) {
     const maxCtx = Math.floor(budget / perTokenMiB)
@@ -153,7 +164,10 @@ export function planLaunch(input: PlanInput): LaunchPlan {
   }
 
   // 4) ultima risorsa: offload parziale dei layer
-  const totalNeeded = (mmprojOffload ? weightsMiB : weightsMiB - fileMiB(input.mmprojPath)) + kvMiB(ctx, kvType) + overheadMiB
+  const totalNeeded =
+    (mmprojOffload ? vramWeightsMiB : vramWeightsMiB - fileMiB(input.mmprojPath)) +
+    kvMiB(ctx, kvType) +
+    overheadMiB
   if (totalNeeded > available && weightsMiB > 0) {
     const ratio = Math.max(0, (available - kvMiB(ctx, kvType) - overheadMiB) / (weightsMiB || 1))
     ngl = Math.max(0, Math.min(input.gpuLayers, Math.floor(layers * ratio)))
@@ -164,10 +178,14 @@ export function planLaunch(input: PlanInput): LaunchPlan {
   const batch = Math.min(2048, Math.max(512, ubatch * 4))
 
   const estimate = {
-    weightsMiB: Math.round(mmprojOffload ? weightsMiB : weightsMiB - fileMiB(input.mmprojPath)),
+    weightsMiB: Math.round(mmprojOffload ? vramWeightsMiB : vramWeightsMiB - fileMiB(input.mmprojPath)),
     kvMiB: Math.round(kvMiB(ctx, kvType)),
     overheadMiB,
-    totalMiB: Math.round((mmprojOffload ? weightsMiB : weightsMiB - fileMiB(input.mmprojPath)) + kvMiB(ctx, kvType) + overheadMiB),
+    totalMiB: Math.round(
+      (mmprojOffload ? vramWeightsMiB : vramWeightsMiB - fileMiB(input.mmprojPath)) +
+        kvMiB(ctx, kvType) +
+        overheadMiB
+    ),
     availableMiB: Math.round(available)
   }
 

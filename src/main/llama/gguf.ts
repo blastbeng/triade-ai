@@ -13,6 +13,11 @@ export interface GgufHints {
   hybrid: boolean
 }
 
+/** Architetture con esperti (MoE): solo una parte dei pesi è attiva per token. */
+export function isMoeArch(arch: string): boolean {
+  return /moe|mixtral|deepseek2|gpt-?oss|granitemoe|phimoe|dbrx/i.test(arch)
+}
+
 const DEFAULTS: GgufHints = {
   architecture: 'unknown',
   blockCount: 32,
@@ -39,6 +44,24 @@ export function readGgufHints(file: string, maxBytes = 16 * 1024 * 1024): GgufHi
     const buf = Buffer.alloc(len)
     fd = fs.openSync(file, 'r')
     fs.readSync(fd, buf, 0, len, 0)
+    return parseGgufBuffer(buf)
+  } catch {
+    return DEFAULTS
+  } finally {
+    if (fd !== null) {
+      try {
+        fs.closeSync(fd)
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+}
+
+/** Interpreta un header GGUF già in memoria (file locale o primi MB scaricati via Range). */
+export function parseGgufBuffer(buf: Buffer): GgufHints {
+  try {
+    const len = buf.length
     if (buf.toString('utf8', 0, 4) !== 'GGUF') return DEFAULTS
 
     let off = 16
@@ -141,13 +164,5 @@ export function readGgufHints(file: string, maxBytes = 16 * 1024 * 1024): GgufHi
     }
   } catch {
     return DEFAULTS
-  } finally {
-    if (fd !== null) {
-      try {
-        fs.closeSync(fd)
-      } catch {
-        /* ignore */
-      }
-    }
   }
 }
