@@ -49,7 +49,7 @@ function createWindow(): void {
         const js = (code: string): Promise<unknown> => mainWindow!.webContents.executeJavaScript(code)
         try {
           await js(
-            "window.triade.startDebate('Screenshot: come progettiamo un agente locale che usa la GPU AMD per la ricerca?', [])"
+            `window.triade.startDebate('Screenshot: come progettiamo un agente locale che usa la GPU AMD per la ricerca?', [], ${JSON.stringify(process.env.TRIADE_SHOT_PERSONA ?? '')})`
           )
           await new Promise((r) => setTimeout(r, Number(process.env.TRIADE_SHOT_DELAY ?? 30000)))
           const image = await mainWindow!.webContents.capturePage()
