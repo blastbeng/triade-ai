@@ -399,6 +399,21 @@ export async function anthropicChat(req: ChatRequest, baseUrlOverride?: string):
  * Adattatore Ollama (API nativa: POST /api/chat, NDJSON)
  * ------------------------------------------------------------------ */
 
+/** Ollama vuole il testo e le immagini come base64 separati, non i content parts OpenAI. */
+function toOllamaMessages(messages: ChatRequest['messages']): unknown[] {
+  return messages.map((m) => {
+    if (typeof m.content === 'string') return { role: m.role, content: m.content }
+    const parts = m.content as unknown as { type?: string; text?: string; image_url?: { url?: string } }[]
+    const text = parts.filter((x) => x.type === 'text').map((x) => x.text ?? '').join('\n')
+    const images = parts
+      .filter((x) => x.type === 'image_url')
+      .map((x) => String(x.image_url?.url ?? ''))
+      .map((u) => (u.startsWith('data:') ? u.slice(u.indexOf(',') + 1) : ''))
+      .filter((u) => u.length > 0)
+    return images.length ? { role: m.role, content: text, images } : { role: m.role, content: text }
+  })
+}
+
 export async function ollamaChat(baseUrl: string, req: ChatRequest): Promise<ChatResult> {
   const base = baseUrl.replace(/\/$/, '')
   const url = /\/api$/.test(base) ? `${base}/chat` : `${base}/api/chat`
@@ -410,7 +425,9 @@ export async function ollamaChat(baseUrl: string, req: ChatRequest): Promise<Cha
     },
     body: JSON.stringify({
       model: req.model,
-      messages: req.messages.map((m) => ({ role: m.role, content: m.content })),
+      messages: toOllamaMessages(req.messages),
+      // tool e immagini: Ollama li supporta, prima venivano scartati
+      ...(req.tools && req.tools.length ? { tools: req.tools } : {}),
       stream: true,
       options: {
         temperature: req.temperature ?? 0.8,
