@@ -11,6 +11,7 @@ export const LOCALES: { id: Locale; label: string; flag: string }[] = [
 export type Dict = Record<string, string>
 
 const en: Dict = {
+  'settings.testSearch': 'Test the search engine',
   'app.tagline': 'three personalities · {model} · one debate',
   'app.newChat': '+ new chat',
   'app.noSessions': 'no saved chats',
@@ -218,6 +219,7 @@ const en: Dict = {
 }
 
 const it: Dict = {
+  'settings.testSearch': 'Prova il motore di ricerca',
   'app.tagline': 'tre personalità · {model} · un dibattito',
   'app.newChat': '+ nuova chat',
   'app.noSessions': 'nessuna chat salvata',
@@ -422,6 +424,7 @@ const it: Dict = {
 }
 
 const de: Dict = {
+  'settings.testSearch': 'Suchmaschine testen',
   'app.tagline': 'drei Persönlichkeiten · {model} · eine Debatte',
   'app.newChat': '+ neuer Chat',
   'app.noSessions': 'keine gespeicherten Chats',
@@ -625,6 +628,7 @@ const de: Dict = {
 }
 
 const fr: Dict = {
+  'settings.testSearch': 'Tester le moteur de recherche',
   'app.tagline': 'trois personnalités · {model} · un débat',
   'app.newChat': '+ nouveau chat',
   'app.noSessions': 'aucun chat enregistré',
@@ -828,6 +832,7 @@ const fr: Dict = {
 }
 
 const es: Dict = {
+  'settings.testSearch': 'Probar el motor de búsqueda',
   'app.tagline': 'tres personalidades · {model} · un debate',
   'app.newChat': '+ nuevo chat',
   'app.noSessions': 'ningún chat guardado',

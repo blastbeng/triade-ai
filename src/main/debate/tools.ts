@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { cacheDir } from '../paths'
-import { fetchPage, webSearch } from '../search'
+import { fetchPage, webSearch, webSearchDetailed } from '../search'
 import { extractAudio, extractFrames } from '../media/ffmpeg'
 import { transcribe } from '../media/transcribe'
 
@@ -109,10 +109,13 @@ export async function runTool(
       if (!query) return { text: 'errore: query mancante' }
       const max = Math.min(10, Number(args.max_results ?? 5) || 5)
       log?.(`ricerca web: ${query}`)
-      const hits = await webSearch(query, max)
+      const { hits, engine } = await webSearchDetailed(query, max)
       if (!hits.length) return { text: `nessun risultato per "${query}"` }
+      log?.(`ricerca web (${engine}): ${hits.length} risultati`)
       return {
-        text: hits.map((h, i) => `${i + 1}. ${h.title}\n   ${h.url}\n   ${h.snippet}`).join('\n')
+        text:
+          `risultati da ${engine} per "${query}":\n` +
+          hits.map((h, i) => `${i + 1}. ${h.title}\n   ${h.url}\n   ${h.snippet}`).join('\n')
       }
     }
     case 'fetch_page': {

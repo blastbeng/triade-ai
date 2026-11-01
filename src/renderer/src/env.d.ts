@@ -98,6 +98,10 @@ interface Api {
   stopServer(): Promise<ServerStatus[]>
   listSessions(): Promise<{ id: string; topic: string; updatedAt: number; state: string; turns: number }[]>
   loadSession(id: string): Promise<Session | null>
+  searchWeb(
+    query: string,
+    max?: number
+  ): Promise<{ hits: { title: string; url: string; snippet: string }[]; engine: string }>
   currentSession(): Promise<Session | null>
   deleteSession(id: string): Promise<{
     sessions: {

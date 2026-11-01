@@ -49,6 +49,20 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
   const [downloading, setDownloading] = useState<string | null>(null)
   const [gpu, setGpu] = useState<GpuInfo | null>(null)
   const [gpuDraft, setGpuDraft] = useState<Record<string, string>>({})
+  const [probeQuery, setProbeQuery] = useState('vulkan amd')
+  const [probe, setProbe] = useState<{ engine: string; hits: { title: string; url: string }[] } | null>(null)
+  const [probeBusy, setProbeBusy] = useState(false)
+
+  const runProbe = async (): Promise<void> => {
+    setProbeBusy(true)
+    try {
+      setProbe(await window.triade.searchWeb(probeQuery, 3))
+    } catch (err) {
+      setProbe({ engine: `errore: ${(err as Error).message}`, hits: [] })
+    } finally {
+      setProbeBusy(false)
+    }
+  }
 
   const loadGpu = async (force = false): Promise<void> => {
     const info = await window.triade.gpuList(force)
@@ -406,6 +420,32 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
                 onChange={(e) => setDraft({ ...draft, search: { ...draft.search, maxResults: Number(e.target.value) } })}
               />
             </label>
+            <label>
+              {t('settings.testSearch')}
+              <div className="inline">
+                <input
+                  value={probeQuery}
+                  onChange={(e) => setProbeQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void runProbe()
+                  }}
+                />
+                <button className="ghost" onClick={() => void runProbe()} disabled={probeBusy}>
+                  {probeBusy ? '…' : t('search.find')}
+                </button>
+              </div>
+            </label>
+            {probe && (
+              <p className="note">
+                {probe.engine}
+                {probe.hits.length > 0 && (
+                  <>
+                    {' · '}
+                    {probe.hits.map((h) => h.title.slice(0, 48)).join(' | ')}
+                  </>
+                )}
+              </p>
+            )}
             <label>
               {t('settings.braveKey')}
               <input
