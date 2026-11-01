@@ -176,3 +176,59 @@ export async function runTool(
       return { text: `tool sconosciuto: ${name}` }
   }
 }
+
+type InlineCall = { id: string; type: 'function'; function: { name: string; arguments: string } }
+
+/**
+ * Alcuni template (e certi modelli) scrivono le tool call nel TESTO invece che
+ * nel campo strutturato:
+ *   <tool_call><function=fetch_page><parameter=url>https://…</parameter></function></tool_call>
+ *   <tool_call>{"name":"fetch_page","arguments":{"url":"…"}}</tool_call>
+ * Senza questo recupero il markup finisce nella bolla dell'agente al posto della risposta.
+ */
+export function extractInlineToolCalls(text: string): { calls: InlineCall[]; cleaned: string } {
+  const calls: InlineCall[] = []
+  let cleaned = text
+
+  cleaned = cleaned.replace(/<tool_call>\s*(\{[\s\S]*?\})\s*<\/tool_call>/g, (_m, js: string) => {
+    try {
+      const o = JSON.parse(js) as Record<string, unknown>
+      const fn = (o.function ?? o) as { name?: string; arguments?: unknown }
+      const name = String(fn.name ?? '')
+      if (!name) return ''
+      const args = fn.arguments ?? o.arguments ?? o.parameters ?? {}
+      calls.push({
+        id: `inline-${calls.length}`,
+        type: 'function',
+        function: { name, arguments: typeof args === 'string' ? args : JSON.stringify(args) }
+      })
+    } catch {
+      /* markup non parsabile: si scarta */
+    }
+    return ''
+  })
+
+  cleaned = cleaned.replace(
+    /<tool_call>\s*<function=([\w.-]+)>([\s\S]*?)<\/function>\s*<\/tool_call>/g,
+    (_m, name: string, body: string) => {
+      const args: Record<string, string> = {}
+      const pRe = /<parameter=([\w.-]+)>\s*([\s\S]*?)\s*<\/parameter>/g
+      let m: RegExpExecArray | null
+      while ((m = pRe.exec(body))) args[m[1]] = m[2].trim()
+      calls.push({ id: `inline-${calls.length}`, type: 'function', function: { name, arguments: JSON.stringify(args) } })
+      return ''
+    }
+  )
+
+  // residui di markup (blocchi troncati o malformati): non devono mai arrivare all'utente
+  cleaned = cleaned
+    .replace(/<\/?tool_call>/g, '')
+    .replace(/<function=[\w.-]+>/g, '')
+    .replace(/<\/function>/g, '')
+    .replace(/<parameter=[\w.-]+>/g, '')
+    .replace(/<\/parameter>/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+
+  return { calls, cleaned }
+}

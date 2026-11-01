@@ -5,6 +5,7 @@ import { llamaPool } from '../llama/server'
 import { getSettings } from '../settings'
 import { activePersonas } from '../../shared/personas'
 import { humanizeError } from '../errors'
+import { extractInlineToolCalls } from './tools'
 import { mediaUrl } from '../paths'
 import { defaultModelId } from '../models/registry'
 import type { Attachment, Backend, DebateEvent, Mention, Persona, Session, Turn } from '../../shared/types'
@@ -513,11 +514,25 @@ export class DebateEngine extends EventEmitter {
 
           // se la generazione si è chiusa a metà, gli argomenti possono essere JSON rotto:
           // in quel caso non li rimandiamo al server (lo farebbe fallire), chiediamo la risposta
-          const callsWithArgs = result.toolCalls.map((c) => ({ call: c, args: parseArgs(c.function.arguments) }))
+          let toolCalls = result.toolCalls
+          let content = result.content
+          if (!toolCalls.length && content.includes('<tool_call')) {
+            const inline = extractInlineToolCalls(content)
+            if (inline.calls.length) {
+              toolCalls = inline.calls
+              content = inline.cleaned
+              this.emitEvent({
+                type: 'log',
+                message: `tool call scritte come testo: recuperate ${inline.calls.length}`
+              })
+            }
+          }
+
+          const callsWithArgs = toolCalls.map((c) => ({ call: c, args: parseArgs(c.function.arguments) }))
           const validCalls = callsWithArgs.filter(
             (c): c is { call: (typeof result.toolCalls)[number]; args: Record<string, unknown> } => c.args !== null
           )
-          if (result.toolCalls.length && validCalls.length < result.toolCalls.length) {
+          if (toolCalls.length && validCalls.length < toolCalls.length) {
             this.emitEvent({
               type: 'log',
               message: 'tool call troncato dal limite di token: ignorato, chiedo la risposta'
@@ -599,7 +614,7 @@ export class DebateEngine extends EventEmitter {
             break
           }
 
-          text += result.content
+          text += content
           break
         }
 
