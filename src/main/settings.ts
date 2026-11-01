@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { DEFAULT_PERSONAS, DEFAULT_SETTINGS, type Settings } from '../shared/types'
+import { DEFAULT_SETTINGS, type Settings } from '../shared/types'
+import { areDefaultPersonas, defaultPersonas } from '../shared/personas'
 import { settingsFile } from './paths'
 
 let cached: Settings | null = null
@@ -46,7 +47,12 @@ export function getSettings(): Settings {
     loaded = DEFAULT_SETTINGS
   }
   // sane defaults requested by the user
-  if (!loaded.personas || loaded.personas.length !== 3) loaded.personas = DEFAULT_PERSONAS
+  if (!loaded.personas || loaded.personas.length !== 3) {
+    loaded.personas = defaultPersonas(loaded.ui?.language ?? 'en')
+  } else if (areDefaultPersonas(loaded.personas) && loaded.ui?.language !== 'it') {
+    // installazioni nuove o aggiornate: i system prompt predefiniti seguono la lingua
+    loaded.personas = defaultPersonas(loaded.ui?.language ?? 'en')
+  }
   if (!loaded.contextSize || loaded.contextSize < 2048) loaded.contextSize = 65536
   if (!loaded.compressionThreshold) loaded.compressionThreshold = 0.75
   cached = loaded
@@ -54,7 +60,16 @@ export function getSettings(): Settings {
 }
 
 export function saveSettings(patch: Partial<Settings>): Settings {
-  const next = merge(getSettings(), patch)
+  const previous = getSettings()
+  const next = merge(previous, patch)
+  // se l'utente cambia lingua e le personalità sono ancora quelle predefinite,
+  // i tre system prompt seguono la nuova lingua
+  const languageChanged =
+    patch.ui?.language !== undefined && patch.ui.language !== previous.ui.language
+  if (languageChanged && areDefaultPersonas(next.personas)) {
+    // gli id restano gli stessi: modelli e GPU assegnati per chat non si perdono
+    next.personas = defaultPersonas(next.ui.language)
+  }
   const clean = JSON.parse(JSON.stringify(next)) as Settings
   const file = settingsFile()
   fs.mkdirSync(path.dirname(file), { recursive: true })
