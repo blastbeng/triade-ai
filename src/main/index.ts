@@ -64,17 +64,24 @@ function createWindow(): void {
                    step: document.querySelector('.modalbox.onboarding h2')?.textContent ?? null
                  }
                })()`)
+            // attende che il modale sia montato
+            for (let i = 0; i < 40; i++) {
+              const st = (await state()) as { modal: boolean }
+              if (st.modal) break
+              await new Promise((r) => setTimeout(r, 250))
+            }
             console.log('[ob] lingua:', JSON.stringify(await state()))
             console.log('[ob] continua:', await click('continua'))
             await new Promise((r) => setTimeout(r, 900))
             console.log('[ob] passo backend:', JSON.stringify(await state()))
             const back1 = await click('indietro')
-            await new Promise((r) => setTimeout(r, 700))
-            console.log('[ob] indietro dal backend:', back1, JSON.stringify(await state()))
-            await click('continua')
             await new Promise((r) => setTimeout(r, 900))
-            await click('continua')
-            await new Promise((r) => setTimeout(r, 1200))
+            console.log('[ob] indietro dal backend:', back1, JSON.stringify(await state()))
+            console.log('[ob] riavanti:', await click('continua'))
+            await new Promise((r) => setTimeout(r, 900))
+            console.log('[ob] di nuovo backend:', JSON.stringify(await state()))
+            console.log('[ob] vai ai modelli:', await click('continua'))
+            await new Promise((r) => setTimeout(r, 1500))
             console.log('[ob] passo modelli:', JSON.stringify(await state()))
             const done = await click('concludi')
             await new Promise((r) => setTimeout(r, 1500))
