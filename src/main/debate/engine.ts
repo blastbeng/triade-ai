@@ -125,7 +125,10 @@ export class DebateEngine extends EventEmitter {
   }
 
   async submit(text: string, attachments: Attachment[] = [], startWith?: string): Promise<Session> {
-    if (this.session && this.session.turns.length > 0 && this.session.state !== 'running') {
+    // un messaggio inviato in una conversazione esistente la continua SEMPRE:
+    // se il dibattito è in corso lo si mette in pausa, non si crea una chat nuova
+    if (this.session && this.session.turns.length > 0) {
+      if (this.session.state === 'running') await this.pause()
       const session = this.session
       const personas = getSettings().personas
       const responder =
