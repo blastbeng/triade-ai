@@ -48,6 +48,11 @@ CUDA, per GPU NVIDIA. Nessun supporto ROCm/HIP.
 - **Uno o più llama-server.** Un processo per ogni coppia modello+GPU: 3 chat sullo stesso modello =
   1 processo; modelli o GPU diverse = un processo ciascuna. All'avvio i processi rimasti da
   un'esecuzione precedente vengono chiusi (pidfile in `dati/run/`), così la VRAM è libera.
+- **Budget di VRAM del pool.** Prima di avviare un server il pool calcola quanti modelli diversi
+  gireranno sulla stessa GPU, somma pesi e buffer e **ripartisce la KV cache**: il contesto di
+  ciascuno scende quanto serve a farli convivere. Se nemmeno il minimo (2048 token) entra, l'avvio
+  viene rifiutato con un messaggio esplicito invece di andare in OOM a metà dibattito
+  (es. tre modelli da 9B su 16 GB → rifiutato: 17891 MiB di pesi su 14500 disponibili).
 - **Scelta GPU per chat.** Le GPU vengono elencate dal backend (Vulkan/CUDA), le integrate sono
   riconosciute e escluse **senza nomi hardcoded** (tipo dichiarato dal driver Vulkan, memoria
   dedicata riportata dal sistema, euristica sulla memoria condivisa). Con una sola GPU la scelta è
@@ -71,6 +76,26 @@ CUDA, per GPU NVIDIA. Nessun supporto ROCm/HIP.
 | Driver | Adrenalin aggiornati (runtime Vulkan di sistema) |
 | Disco | ~7 GB modello + mmproj, ~1 GB whisper + binari |
 | OS | Windows 10/11 x64, Linux x64 |
+
+## Ricerca modelli su HuggingFace
+
+Primo avvio e sezione "modelli e download" offrono due strade:
+
+1. **Ornith 1.5 9B** (consigliato), già verificato e pronto;
+2. **ricerca su HuggingFace** (`/api/models?filter=gguf`): per ogni repo l'app scarica l'albero dei
+   file e calcola un verdetto **prima** di proporre il download.
+
+Regole di ammissione, applicate anche lato main process (la UI non è fidata):
+
+| Controllo | Comportamento |
+|---|---|
+| Vision | serve un `mmproj` nel repo: senza, il modello è **escluso** ("non supporta immagini/video") |
+| Quant | si scelgono i quant dal più grande al più piccolo e si prende **il migliore che entra** in VRAM (con 1 GB di riserva e stima di KV dal contesto); se nessuno entra il modello è escluso con i MiB richiesti/disponibili |
+| VRAM | stima = pesi + mmproj + KV(contesto) + buffer (≈9% dei pesi); confronto con la GPU migliore |
+| RAM | mostrata nel verdetto per trasparenza (download e fallback) |
+
+Il quant selezionato viene registrato nel catalogo (`models.custom` nelle impostazioni) con repo,
+file e dimensione, quindi compare tra i modelli scaricabili e selezionabili per singola chat.
 
 ## Modello
 
