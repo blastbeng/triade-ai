@@ -10,6 +10,7 @@ import { mediaUrl } from '../paths'
 import { defaultModelId } from '../models/registry'
 import type { Attachment, Backend, DebateEvent, Mention, Persona, Session, Turn } from '../../shared/types'
 import { buildMessages, summarize, tokenCountOf } from './context'
+import { attachmentContext } from './document'
 import { loadSession, newSession, provisionalTitle, saveSession } from './store'
 import { distillSession, rememberTurn, rememberUserNote } from '../memory/integrate'
 import { TOOL_SPECS, runTool } from './tools'
@@ -271,12 +272,8 @@ export class DebateEngine extends EventEmitter {
       ...(a.kind === 'image' ? [a.path] : []),
       ...(a.frames ?? [])
     ])
-    const context = attachments
-      .map((a) => {
-        const head = `ALLEGATO: ${a.name} (${a.kind})`
-        return a.text ? `${head}\n${a.text.slice(0, 6000)}` : head
-      })
-      .join('\n\n')
+    // chunk pertinenti invece dei primi 6000 caratteri: i documenti lunghi restano utili
+    const context = attachmentContext(attachments, topic)
     if (context) session.topic = `${topic}\n\nMateriale fornito dall'utente:\n${context}`
     this.session = session
     const personasForStart = activePersonas(getSettings())
