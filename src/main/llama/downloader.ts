@@ -24,15 +24,55 @@ const SIZE_TTL = 10 * 60 * 1000
 async function remoteSize(url: string): Promise<number> {
   const cached = sizeCache.get(url)
   if (cached && Date.now() - cached.at < SIZE_TTL) return cached.size
-  try {
-    const res = await fetch(url, { method: 'HEAD', redirect: 'follow' })
-    const len = res.headers.get('content-length') ?? res.headers.get('x-linked-size')
-    const size = len ? Number(len) : 0
-    if (size > 0) sizeCache.set(url, { at: Date.now(), size })
-    return size
-  } catch {
-    return 0
+  let size = 0
+
+  // 1) HuggingFace: dimensione esatta dall'API dei file (blobs=true)
+  const hf = /^https:\/\/huggingface\.co\/([^/]+\/[^/]+)\/resolve\/[^/]+\/(.+)$/.exec(url)
+  if (hf) {
+    try {
+      const api = `https://huggingface.co/api/models/${hf[1]}?blobs=true`
+      const res = await fetch(api, { signal: AbortSignal.timeout(15000) })
+      if (res.ok) {
+        const data = (await res.json()) as { siblings?: { rfilename: string; size?: number }[] }
+        const file = decodeURIComponent(hf[2])
+        const found = (data.siblings ?? []).find((s) => s.rfilename === file)
+        if (found?.size) size = found.size
+      }
+    } catch {
+      /* si prova comunque HEAD */
+    }
   }
+
+  // 2) HEAD (content-length / x-linked-size)
+  if (!size) {
+    try {
+      const res = await fetch(url, { method: 'HEAD', redirect: 'follow' })
+      const len = res.headers.get('content-length') ?? res.headers.get('x-linked-size')
+      size = len ? Number(len) : 0
+    } catch {
+      /* si prova il GET ranged */
+    }
+  }
+
+  // 3) GET di 1 byte: Content-Range contiene la dimensione totale
+  if (!size) {
+    try {
+      const res = await fetch(url, {
+        headers: { Range: 'bytes=0-0' },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(15000)
+      })
+      const range = res.headers.get('content-range')
+      const total = range ? Number(range.split('/')[1]) : 0
+      size = Number.isFinite(total) ? total : 0
+      await res.body?.cancel().catch(() => undefined)
+    } catch {
+      size = 0
+    }
+  }
+
+  if (size > 0) sizeCache.set(url, { at: Date.now(), size })
+  return size
 }
 
 function sizeOf(p: string): number {
@@ -41,8 +81,10 @@ function sizeOf(p: string): number {
 
 function complete(have: number, expected: number): boolean {
   if (have <= 0) return false
-  if (expected <= 0) return have > 1_000_000_000
-  return have >= expected * 0.995
+  // dimensione nota → deve combaciare al byte: 28 MB mancanti su 5,6 GB (0,5%)
+  // bastano a rendere il GGUF illeggibile, quindi niente tolleranza
+  if (expected > 0) return have === expected
+  return have > 1_000_000_000
 }
 
 export async function statusFor(id: string): Promise<ModelStatus> {
@@ -128,6 +170,17 @@ async function downloadWithResume(
     throw new Error('download incompleto: rilancia, riprenderà da dove si era fermato')
   }
   fs.renameSync(part, dest)
+  if (totalKnown > 0) {
+    const actual = fs.statSync(dest).size
+    if (actual !== totalKnown) {
+      fs.rmSync(dest, { force: true })
+      throw new Error(
+        `download incompleto: ${actual} byte su ${totalKnown} attesi. Riprova.`
+      )
+    }
+    // impronta della dimensione: permette di riconoscere i troncamenti anche offline
+    fs.writeFileSync(`${dest}.size`, String(totalKnown), 'utf8')
+  }
   const check = validateGgufFile(dest)
   if (!check.ok) {
     fs.rmSync(dest, { force: true })
@@ -248,12 +301,26 @@ export async function integrityReport(): Promise<IntegrityReport[]> {
     const check = validateGgufFile(modelFile)
     const mmprojPath = m.files.mmproj ? path.join(modelsDir(), m.files.mmproj.name) : ''
     const visionOk = mmprojPath ? validateGgufFile(mmprojPath).ok : true
+    // dimensione attesa registrata al download: intercetta i file troncati
+    // che l'header GGUF (integro) non tradisce
+    const sizeFile = `${modelFile}.size`
+    let sizeOk = true
+    if (fs.existsSync(sizeFile)) {
+      const expected = Number(fs.readFileSync(sizeFile, 'utf8').trim())
+      sizeOk = !expected || fs.statSync(modelFile).size === expected
+    }
     out.push({
       id: m.id,
       name: m.name,
       modelFile: m.files.model.name,
-      ok: check.ok && visionOk,
-      reason: check.ok ? (visionOk ? undefined : 'mmproj corrotto') : check.reason,
+      ok: check.ok && visionOk && sizeOk,
+      reason: !sizeOk
+        ? 'file troncato (dimensione diversa da quella scaricata)'
+        : check.ok
+          ? visionOk
+            ? undefined
+            : 'mmproj corrotto'
+          : check.reason,
       repairable: Boolean(m.files.model.url),
       bytes: fs.statSync(modelFile).size
     })
