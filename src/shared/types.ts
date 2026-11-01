@@ -24,6 +24,15 @@ export interface RemoteSettings {
   ollama: RemoteBackendConfig
 }
 
+export type EmbeddingEngine = 'llama' | 'openai' | 'ollama'
+
+export interface EmbeddingSettings {
+  /** dove calcolare gli embedding */
+  engine: EmbeddingEngine
+  /** file GGUF locale oppure nome modello remoto */
+  model: string
+}
+
 export type SearchProvider = 'searxng' | 'brave' | 'tavily' | 'googlecse'
 
 export interface SearchSettings {
@@ -80,6 +89,8 @@ export interface Settings {
   backendByPersona: Record<string, Backend>
   /** configurazione delle API remote */
   remote: RemoteSettings
+  /** motore degli embedding per memoria e contesto */
+  embeddings: EmbeddingSettings
   /** Dimensione contesto (token) condivisa dalle 3 chat. */
   contextSize: number
   /** Frazione del contesto oltre la quale scatta il prompt compression (0.75 = 75%). */
@@ -292,6 +303,10 @@ export const DEFAULT_SETTINGS: Settings = {
   personaCount: 3,
   backend: 'llama',
   backendByPersona: {},
+  embeddings: {
+    engine: 'llama',
+    model: 'Qwen3-Embedding-0.6B-Q8_0.gguf'
+  },
   remote: {
     openai: { baseUrl: 'https://api.openai.com/v1', apiKey: '', model: '' },
     anthropic: { baseUrl: 'https://api.anthropic.com/v1', apiKey: '', model: '' },

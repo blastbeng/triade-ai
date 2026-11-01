@@ -73,6 +73,8 @@ const api = {
 
   listSessions: (): Promise<{ id: string; topic: string; updatedAt: number; state: string; turns: number }[]> =>
     ipcRenderer.invoke('session:list'),
+  embeddingsProbe: (): Promise<{ ok: boolean; detail: string; dim: number }> =>
+    ipcRenderer.invoke('embeddings:probe'),
   version: (): Promise<string> => ipcRenderer.invoke('app:version'),
   remoteModels: (
     backend: string,

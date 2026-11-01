@@ -3,6 +3,7 @@ import path from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import { memoryDir } from '../paths'
 import { DIM, cosine, embed } from './embeddings'
+import { embedTexts } from './embed-client'
 
 export type MemoryKind = 'turno' | 'sintesi' | 'fatto' | 'documento'
 
@@ -31,13 +32,68 @@ interface Meta {
  *  - meta.json  : testi + metadati
  *  - vettori.f32: matrice dei vettori, un Float32Array dopo l'altro
  */
+/** due testi sono confrontabili solo se hanno la stessa dimensione */
+let activeDim = DIM
+
 class VectorMemory {
   private entries: MemoryEntry[] = []
   private vectors: Float32Array[] = []
   private hashes = new Set<string>()
   private loaded = false
+  private embedderTag = 'hash-768'
+  private reindexTimer: NodeJS.Timeout | null = null
+
+  private scheduleReindex(): void {
+    if (this.reindexTimer) return
+    this.reindexTimer = setTimeout(() => {
+      this.reindexTimer = null
+      void this.reindex()
+    }, 4000)
+  }
   private dirty = false
   private saveTimer: NodeJS.Timeout | null = null
+
+  /**
+   * Sceglie il motore di embedding (modello Qwen3 di default, remoto se configurato).
+   * Se il motore cambia, i vettori esistenti vengono ricalcolati.
+   */
+  async prepare(): Promise<void> {
+    const { getSettings } = await import('../settings')
+    const s = getSettings()
+    const tag = `${s.embeddings.engine}:${s.embeddings.model || 'default'}`
+    const probe = await embedTexts(['probe'])
+    const dim = probe?.[0]?.length ?? DIM
+    this.embedderTag = probe ? tag : 'hash-768'
+    const changed = Math.abs(dim - activeDim) > 0 || this.embedderTag !== this.persistedEmbedder()
+    activeDim = dim
+    if (changed) await this.reindex()
+  }
+
+  private persistedEmbedder(): string {
+    try {
+      const meta = JSON.parse(fs.readFileSync(this.metaFile(), 'utf8')) as { embedder?: string }
+      return meta.embedder ?? 'hash-768'
+    } catch {
+      return 'hash-768'
+    }
+  }
+
+  /** Ricalcola tutti i vettori con il motore corrente (una passata, a batch). */
+  async reindex(): Promise<void> {
+    this.load()
+    if (!this.entries.length) {
+      this.dirty = true
+      return
+    }
+    const vectors = await embedTexts(this.entries.map((e) => e.text))
+    this.vectors = this.entries.map((entry, i) => {
+      const vec = vectors?.[i]
+      return vec && vec.length ? vec : embed(entry.text)
+    })
+    activeDim = this.vectors[0]?.length ?? DIM
+    this.dirty = true
+    this.save(true)
+  }
 
   private metaFile(): string {
     return path.join(memoryDir(), 'meta.json')
@@ -117,7 +173,9 @@ class VectorMemory {
         topic: item.topic,
         ts: item.ts ?? Date.now()
       })
-      this.vectors.push(embed(text))
+      const provisional = this.embedderTag === 'hash-768' ? embed(text) : new Float32Array(activeDim)
+      this.vectors.push(provisional)
+      if (this.embedderTag !== 'hash-768') this.scheduleReindex()
       added++
     }
     if (added) this.scheduleSave()

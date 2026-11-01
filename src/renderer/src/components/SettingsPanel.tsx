@@ -50,6 +50,7 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
   const [downloading, setDownloading] = useState<string | null>(null)
   const [gpu, setGpu] = useState<GpuInfo | null>(null)
   const [gpuDraft, setGpuDraft] = useState<Record<string, string>>({})
+  const [embedProbe, setEmbedProbe] = useState<string | null>(null)
   const [probeQuery, setProbeQuery] = useState('vulkan amd')
   const [probe, setProbe] = useState<{ engine: string; hits: { title: string; url: string }[] } | null>(null)
   const [probeBusy, setProbeBusy] = useState(false)
@@ -151,6 +152,60 @@ export default function SettingsPanel({ settings, catalog, onClose, onSave, onRe
               remote={draft.remote}
               onChange={(backend, remote) => setDraft({ ...draft, backend, remote })}
             />
+            <h3 className="searchtitle">{t('embeddings.title')}</h3>
+            <label>
+              {t('embeddings.engine')}
+              <select
+                value={draft.embeddings?.engine ?? 'llama'}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    embeddings: {
+                      engine: e.target.value as 'llama' | 'openai' | 'ollama',
+                      model: draft.embeddings?.model ?? ''
+                    }
+                  })
+                }
+              >
+                <option value="llama">llama-server (locale)</option>
+                <option value="openai">OpenAI API</option>
+                <option value="ollama">Ollama</option>
+              </select>
+            </label>
+            <label>
+              {t('embeddings.model')}
+              <input
+                value={draft.embeddings?.model ?? 'Qwen3-Embedding-0.6B-Q8_0.gguf'}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    embeddings: {
+                      engine: draft.embeddings?.engine ?? 'llama',
+                      model: e.target.value
+                    }
+                  })
+                }
+              />
+            </label>
+            <div className="inline">
+              <button
+                className="ghost"
+                onClick={async () => {
+                  setEmbedProbe('…')
+                  try {
+                    const res = await window.triade.embeddingsProbe()
+                    setEmbedProbe(res.ok ? `ok · ${res.detail}` : `errore: ${res.detail}`)
+                  } catch (err) {
+                    setEmbedProbe(`errore: ${(err as Error).message}`)
+                  }
+                }}
+              >
+                {t('embeddings.test')}
+              </button>
+              <span className="note">{embedProbe ?? ''}</span>
+            </div>
+            <p className="note">{t('embeddings.note')}</p>
+
             {(draft.backend ?? 'llama') !== 'llama' && (
               <p className="note">{t('backend.perChatNote')}</p>
             )}

@@ -313,6 +313,11 @@ export function registerIpc(): void {
     }
   )
 
+  ipcMain.handle('embeddings:probe', async () => {
+    const { probeEmbeddings } = await import('./memory/embed-client')
+    return probeEmbeddings()
+  })
+
   ipcMain.handle('app:version', () => app.getVersion())
 
   ipcMain.handle('search:web', async (_e, payload: { query: string; max?: number }) => {

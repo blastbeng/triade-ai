@@ -144,6 +144,20 @@ export function mediaUrl(file: string): string {
   return `file://${rel}`
 }
 
+/** Porta TCP libera scelta dal sistema (mai porte occupate). */
+export async function freePort(): Promise<number> {
+  const net = await import('node:net')
+  return new Promise((resolve, reject) => {
+    const server = net.createServer()
+    server.on('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address()
+      const port = typeof address === 'object' && address ? address.port : 0
+      server.close(() => resolve(port))
+    })
+  })
+}
+
 export function findBinary(base: string): string | null {
   const names = process.platform === 'win32' ? [`${base}.exe`, base] : [base]
   for (const name of names) {

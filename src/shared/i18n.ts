@@ -11,6 +11,11 @@ export const LOCALES: { id: Locale; label: string; flag: string }[] = [
 export type Dict = Record<string, string>
 
 const en: Dict = {
+  'embeddings.title': "Embeddings (memory and documents)",
+  'embeddings.engine': "Embedding engine",
+  'embeddings.model': "Embedding model",
+  'embeddings.test': "test",
+  'embeddings.note': "Default: Qwen3-Embedding-0.6B-Q8_0.gguf on the local llama-server; the index is rebuilt when the engine changes, and falls back to the built-in lexical vectors if unavailable.",
   'onboarding.back': "back",
   'onboarding.finish': "finish",
   'settings.personaBackend': "backend of this chat",
@@ -252,6 +257,11 @@ const en: Dict = {
 }
 
 const it: Dict = {
+  'embeddings.title': "Embedding (memoria e documenti)",
+  'embeddings.engine': "Motore di embedding",
+  'embeddings.model': "Modello di embedding",
+  'embeddings.test': "verifica",
+  'embeddings.note': "Default: Qwen3-Embedding-0.6B-Q8_0.gguf sul llama-server locale; l'indice viene ricostruito al cambio di motore e, se non disponibile, si torna ai vettori lessicali interni.",
   'onboarding.back': "indietro",
   'onboarding.finish': "concludi",
   'settings.personaBackend': "backend di questa chat",
@@ -490,6 +500,11 @@ const it: Dict = {
 }
 
 const de: Dict = {
+  'embeddings.title': "Embeddings (Gedächtnis und Dokumente)",
+  'embeddings.engine': "Embedding-Engine",
+  'embeddings.model': "Embedding-Modell",
+  'embeddings.test': "testen",
+  'embeddings.note': "Standard: Qwen3-Embedding-0.6B-Q8_0.gguf auf dem lokalen llama-server; der Index wird bei Wechsel neu aufgebaut.",
   'onboarding.back': "zurück",
   'onboarding.finish': "fertig",
   'settings.personaBackend': "Backend dieses Chats",
@@ -727,6 +742,11 @@ const de: Dict = {
 }
 
 const fr: Dict = {
+  'embeddings.title': "Embeddings (mémoire et documents)",
+  'embeddings.engine': "Moteur d'embedding",
+  'embeddings.model': "Modèle d'embedding",
+  'embeddings.test': "tester",
+  'embeddings.note': "Défaut : Qwen3-Embedding-0.6B-Q8_0.gguf sur le llama-server local ; l'index est reconstruit au changement.",
   'onboarding.back': "retour",
   'onboarding.finish': "terminer",
   'settings.personaBackend': "backend de ce chat",
@@ -964,6 +984,11 @@ const fr: Dict = {
 }
 
 const es: Dict = {
+  'embeddings.title': "Embeddings (memoria y documentos)",
+  'embeddings.engine': "Motor de embeddings",
+  'embeddings.model': "Modelo de embeddings",
+  'embeddings.test': "probar",
+  'embeddings.note': "Por defecto: Qwen3-Embedding-0.6B-Q8_0.gguf en el llama-server local; el índice se reconstruye al cambiar.",
   'onboarding.back': "atrás",
   'onboarding.finish': "finalizar",
   'settings.personaBackend': "backend de este chat",

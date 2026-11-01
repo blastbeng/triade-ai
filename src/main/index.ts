@@ -368,6 +368,14 @@ app.whenReady().then(async () => {
     return
   }
   await llamaPool.cleanupOrphans()
+  void (async () => {
+    try {
+      const { memory } = await import('./memory/store')
+      await memory.prepare()
+    } catch (err) {
+      console.error('[memoria] preparazione embedding fallita:', (err as Error).message)
+    }
+  })()
   registerIpc()
   createWindow()
   app.on('activate', () => {
