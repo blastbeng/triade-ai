@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { createHash } from 'node:crypto'
 import { validateGgufFile } from '../models/verify'
 import path from 'node:path'
 import { Readable } from 'node:stream'
@@ -20,6 +21,26 @@ const state: {
 
 const sizeCache = new Map<string, { at: number; size: number }>()
 const SIZE_TTL = 10 * 60 * 1000
+
+/** SHA-256 ufficiale del file su HuggingFace (lfs.sha256), se disponibile. */
+async function remoteSha256(url: string): Promise<string> {
+  const hf = /^https:\/\/huggingface\.co\/([^/]+\/[^/]+)\/resolve\/[^/]+\/(.+)$/.exec(url)
+  if (!hf) return ''
+  try {
+    const res = await fetch(`https://huggingface.co/api/models/${hf[1]}?blobs=true`, {
+      signal: AbortSignal.timeout(20000)
+    })
+    if (!res.ok) return ''
+    const data = (await res.json()) as {
+      siblings?: { rfilename: string; lfs?: { sha256?: string } }[]
+    }
+    const file = decodeURIComponent(hf[2])
+    const found = (data.siblings ?? []).find((s) => s.rfilename === file)
+    return found?.lfs?.sha256 ?? ''
+  } catch {
+    return ''
+  }
+}
 
 async function remoteSize(url: string): Promise<number> {
   const cached = sizeCache.get(url)
@@ -144,7 +165,7 @@ async function downloadWithResume(
 }
 
 /** Verifica finale unica: dimensione esatta, sidecar .size, header GGUF. */
-function finalize(part: string, dest: string, expected: number): void {
+async function finalize(part: string, dest: string, expected: number, url = ''): Promise<void> {
   fs.renameSync(part, dest)
   if (expected > 0) {
     const actual = fs.statSync(dest).size
@@ -159,6 +180,26 @@ function finalize(part: string, dest: string, expected: number): void {
     fs.rmSync(dest, { force: true })
     throw new Error(`file scaricato corrotto (${check.reason}): riprova il download`)
   }
+
+  // verifica forte: SHA-256 ufficiale dichiarato da HuggingFace
+  const expectedHash = url ? await remoteSha256(url) : ''
+  if (expectedHash) {
+    // streaming: un modello da 5,6 GB non deve mai finire intero in RAM
+    const actual = await new Promise<string>((resolve, reject) => {
+      const h = createHash('sha256')
+      const rs = fs.createReadStream(dest)
+      rs.on('data', (c) => h.update(c))
+      rs.on('error', reject)
+      rs.on('end', () => resolve(h.digest('hex')))
+    })
+    if (actual !== expectedHash) {
+      fs.rmSync(dest, { force: true })
+      throw new Error(
+        'il file scaricato non corrisponde all’hash ufficiale (download corrotto): riprova'
+      )
+    }
+    fs.writeFileSync(`${dest}.meta`, JSON.stringify({ size: expected, sha256: expectedHash }), 'utf8')
+  }
 }
 
 async function downloadWithResumeInner(
@@ -172,7 +213,7 @@ async function downloadWithResumeInner(
   // solo un file COMPLETO al byte si può promuovere: prima bastava il 99,9%
   // e un .part troncato di pochi MB diventava un modello "valido" ma illeggibile
   if (total > 0 && start === total) {
-    finalize(part, dest, total)
+    await finalize(part, dest, total, url)
     onPct(1)
     return
   }
@@ -207,7 +248,7 @@ async function downloadWithResumeInner(
   if (totalKnown > 0 && fs.statSync(part).size < totalKnown * 0.995) {
     throw new Error('download incompleto: rilancia, riprenderà da dove si era fermato')
   }
-  finalize(part, dest, totalKnown)
+  await finalize(part, dest, totalKnown, url)
   onPct(1)
 }
 
